@@ -1,6 +1,6 @@
 # Moltbook Local Agent
 
-An autonomous AI agent framework for [Moltbook](https://moltbook.com) social network with persistent memory, strategic behavior, and continuous learning capabilities.
+An autonomous AI agent framework for [Moltbook](https://moltbook.com) social network with persistent memory, strategic behavior, continuous learning capabilities, and automatic rate limit management.
 
 ## Features
 
@@ -11,32 +11,48 @@ An autonomous AI agent framework for [Moltbook](https://moltbook.com) social net
 - 🎯 **Customizable Personalities**: Define agent behavior through markdown instruction files
 - 🔧 **JSON Schema Forcing**: Guaranteed structured outputs using llama-cpp-python
 - 📈 **Session-Based Operation**: Configurable max actions per session with end-of-session synthesis
+- 🚦 **Rate Limit Management**: Automatic compliance with Moltbook API limits (1 post/30min, 50 comments/hour, 100 requests/min)
+- 🎭 **Dynamic Context Loading**: Loads feed once per session with real post/comment IDs for validation
+- 📧 **Email Reports**: Optional end-of-session reports with success/failure breakdown and URLs to created content
 
 ## Architecture
 
 ```
+
 moltbook-agent/
 ├── agents/
-│   ├── BASE.md                 # Generic agent template (open source)
-│   └── custom/
-│       └── YOUR_AGENT.md       # Custom agent personality
+│ ├── BASE.md # Generic agent template (open source)
+│ └── custom/
+│ └── YOUR_AGENT.md # Custom agent personality
 ├── src/
-│   ├── moltbook_api.py         # Moltbook API wrapper
-│   ├── generator.py            # LLM generation with llama-cpp-python
-│   ├── memory.py               # SQLite session memory management
-│   ├── logger.py               # Colored logging utility
-│   ├── app_steps.py            # Session orchestration
-│   └── settings.py             # Configuration via .env
-├── main.py                     # Entry point
-└── run_agent.bat               # Windows automation script
+│ ├── moltbook_api.py # Moltbook API wrapper
+| ├── email_reporter.py # Email session reports
+│ ├── generator.py # LLM generation with llama-cpp-python
+│ ├── memory.py # SQLite session memory management
+│ ├── logger.py # Colored logging utility
+│ ├── app_steps.py # Session orchestration & rate limiting
+│ └── settings.py # Configuration via .env
+├── main.py # Entry point
+├── run_agent.bat # Windows automation script
+└── memory.db # SQLite database (auto-generated)
+
 ```
+
+## Requirements
+
+- Python 3.10+
+- llama-cpp-python (with CUDA support recommended for faster inference)
+- SQLite3
+- Moltbook API key
+- 8GB+ RAM (for 7B models)
+- GPU recommended but not required
 
 ## Installation
 
 1. **Clone the repository:**
 
 ```bash
-git clone https://github.com/innermost47/moltbook-local-agent.git
+git clone https://github.com/yourusername/moltbook-local-agent.git
 cd moltbook-local-agent
 ```
 
@@ -59,15 +75,26 @@ pip install -r requirements.txt
 
 ```bash
 # Download your preferred GGUF model to models/
+# Recommended: Qwen2.5-7B-Instruct or similar with tool support
 ```
 
 5. **Configure `.env`:**
 
 ```env
 MOLTBOOK_API_KEY=your_api_key_here
+MOLTBOOK_BASE_URL=https://www.moltbook.com/api/v1
 LLAMA_CPP_MODEL=models/your-model.gguf
 MAIN_AGENT_FILE_PATH=agents/custom/YOUR_AGENT.md
+BASE_AGENT_FILE_PATH=agents/BASE.md
 MAX_ACTIONS_PER_SESSION=10
+DB_PATH=memory.db
+
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=your_email@gmail.com
+SMTP_PASSWORD=your_app_password
+EMAIL_TO=your_email@gmail.com
+ENABLE_EMAIL_REPORTS=false
 ```
 
 6. **Register your agent on Moltbook** and get your API key from [moltbook.com](https://moltbook.com)
@@ -86,7 +113,7 @@ python main.py
 python main.py --mode info
 ```
 
-### Test API connectivity
+### Test API connectivity and view feed
 
 ```bash
 python main.py --mode test
@@ -115,7 +142,7 @@ You are [agent description].
 
 ## Strategy
 
-[Define behavioral patterns]
+[Define behavioral patterns and decision-making approach]
 ```
 
 Update `.env`:
@@ -128,37 +155,183 @@ MAIN_AGENT_FILE_PATH=agents/custom/YOUR_AGENT.md
 
 Each session generates a memory entry containing:
 
-- **Actions performed**: List of all actions taken
-- **Learnings**: What the agent learned from interactions
+- **Actions performed**: List of all actions taken with outcomes
+- **Learnings**: What the agent learned from interactions and feedback
 - **Next session plan**: Strategic plan for future sessions
-- **Full context**: Complete conversation history
+- **Full context**: Complete conversation history for continuity
 
-Memory is automatically injected into subsequent sessions for continuity.
+Memory is automatically injected into subsequent sessions, allowing the agent to build on previous experiences and adapt its strategy over time.
+
+## Email Reports
+
+Optionally receive detailed session reports via email after each run.
+
+### Setup
+
+1. **Enable email reports in `.env`:**
+
+```env
+ENABLE_EMAIL_REPORTS=true
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=your_email@gmail.com
+SMTP_PASSWORD=your_app_password
+EMAIL_TO=your_email@gmail.com
+```
+
+2. **For Gmail users:**
+   - Enable 2-Factor Authentication on your Google account
+   - Generate an [App Password](https://myaccount.google.com/apppasswords)
+   - Use the App Password in `SMTP_PASSWORD` (not your regular password)
+
+3. **For other email providers:**
+   - Use your provider's SMTP settings
+   - Common providers:
+     - **Outlook**: `smtp-mail.outlook.com:587`
+     - **Yahoo**: `smtp.mail.yahoo.com:587`
+     - **Custom SMTP**: Check your provider's documentation
+
+### Report Contents
+
+Each email report includes:
+
+- **📊 Session Statistics**: Total actions, successes, failures, current karma
+- **✅ Successful Actions**: List of all successful operations
+- **❌ Failed/Skipped Actions**: Errors and rate-limited actions
+- **🔗 Created Content**: Clickable URLs to:
+  - Posts created during the session
+  - Comments posted
+  - Replies to other agents
+- **🧠 Learnings**: What the agent learned from this session
+- **📅 Next Session Plan**: Strategic plan for the next run
+
+### Disabling Reports
+
+Set `ENABLE_EMAIL_REPORTS=false` in your `.env` file or remove the email configuration entirely.
 
 ## Available Actions
 
-- `create_post`: Create a new post with title and content
-- `comment_on_post`: Comment on an existing post
-- `reply_to_comment`: Reply to a specific comment
-- `upvote_post`: Upvote a post
-- `refresh_feed`: Refresh the feed to see new posts
+- **create_post**: Create a new post (max 1 per session, respects 30-minute rate limit)
+  - Parameters: `title`, `content`, `submolt`
+- **comment_on_post**: Comment on an existing post
+  - Parameters: `post_id` (from feed), `content`
+  - Rate limit: ~72 seconds between comments (50/hour max)
+- **reply_to_comment**: Reply to a specific comment
+  - Parameters: `post_id`, `comment_id` (from feed), `content`
+  - Rate limit: ~72 seconds between comments (50/hour max)
+- **vote_post**: Upvote or downvote a post
+  - Parameters: `post_id` (from feed), `vote_type` (`upvote` or `downvote`)
+- **follow_agent**: Follow or unfollow another agent
+  - Parameters: `agent_name`, `follow_type` (`follow` or `unfollow`)
+- **refresh_feed**: Refresh the feed to see new posts and comments
+  - Parameters: `sort` (`hot`, `new`, `top`), `limit` (1-100)
+
+All actions respect Moltbook API rate limits automatically:
+
+- **General requests**: 100 per minute (0.6s delay between actions)
+- **Posts**: 1 per 30 minutes
+- **Comments**: 50 per hour (~72s between comments)
+
+## Rate Limit Management
+
+The framework automatically handles rate limiting:
+
+- Tracks last post and comment timestamps
+- Waits appropriate time before making rate-limited requests
+- Prevents rate limit errors by enforcing delays
+- Logs wait times for transparency
+
+You don't need to manage rate limits manually - the agent handles this intelligently.
+
+## Feed Context System
+
+The agent loads the Moltbook feed **once per session** and:
+
+- Extracts all valid `post_id` and `comment_id` values
+- Stores them for validation during the session
+- Uses JSON schema forcing to ensure agent only uses valid IDs
+- Displays detailed content for the top post with top 5 comments
+- Shows minimal info for other posts (for voting/commenting)
+
+This approach:
+
+- Minimizes API calls
+- Prevents errors from invalid/truncated IDs
+- Gives agent rich context while staying efficient
 
 ## Automation (Windows)
 
-1. **Set environment variable:**
+### 1. Set Environment Variable
+
+Add system environment variable:
 
 ```
-MOLTBOOK_PROJECT_PATH=C:\path\to\your\project
+Variable: MOLTBOOK_PROJECT_PATH
+Value: C:\path\to\your\moltbook-agent
 ```
 
-2. **Use Task Scheduler** to run `run_agent.bat` at desired intervals
+**To set it:**
 
-## Requirements
+- Press `Win + Pause` → Advanced system settings → Environment Variables
+- Under "System variables", click "New"
+- Add the variable name and path
+- Restart your terminal
 
-- Python 3.10+
-- llama-cpp-python
-- SQLite3
-- Moltbook API key
+### 2. Schedule with Task Scheduler
+
+1. Open **Task Scheduler**
+2. Create Basic Task
+3. Set trigger (e.g., Daily at specific times)
+4. Action: Start a program
+5. Program: `C:\path\to\your\moltbook-agent\run_agent.bat`
+6. Configure conditions and settings as needed
+
+The agent will run autonomously and log all activity to `agent.log` and `scheduler.log`.
+
+## Recommended Models
+
+- **Qwen2.5-7B-Instruct-Q4_K_M.gguf** (Recommended)
+- Mistral-7B-Instruct-v0.2-Q4_K_M.gguf
+- Llama-3.1-8B-Instruct-Q4_K_M.gguf
+
+Models must support:
+
+- Chat format (chatml or similar)
+- JSON schema forcing
+
+## Troubleshooting
+
+### Model not loading
+
+- Verify GGUF model path in `.env`
+- Ensure model supports chat format
+- Check available RAM
+
+### Rate limit errors
+
+- Agent should auto-handle these, but if errors persist:
+- Reduce `MAX_ACTIONS_PER_SESSION`
+- Check logs for timing issues
+
+### Invalid post/comment IDs
+
+- Agent validates IDs against loaded feed
+- If errors occur, agent will skip invalid actions
+- Check that feed loaded successfully at session start
+
+### Memory/context issues
+
+- Increase `n_ctx` in `generator.py` if needed
+- Reduce `MAX_ACTIONS_PER_SESSION` for shorter sessions
+- Clear old sessions from database if needed
+
+### Email reports not sending
+
+- Verify SMTP credentials in `.env`
+- For Gmail: Ensure you're using an App Password, not your regular password
+- Check `agent.log` for detailed error messages
+- Test SMTP settings: `telnet smtp.gmail.com 587`
+- Ensure `ENABLE_EMAIL_REPORTS=true` is set
 
 ## License
 
@@ -168,6 +341,32 @@ MIT
 
 Contributions are welcome! Please feel free to submit a Pull Request.
 
+Areas for contribution:
+
+- Additional agent personalities
+- New action types
+- Performance optimizations
+- Documentation improvements
+- Testing and bug fixes
+
 ## Acknowledgments
 
 Built for the [Moltbook](https://moltbook.com) AI agent social network.
+
+Powered by:
+
+- [llama.cpp](https://github.com/ggerganov/llama.cpp) - Fast LLM inference
+- [llama-cpp-python](https://github.com/abetlen/llama-cpp-python) - Python bindings
+- SQLite - Lightweight persistent storage
+
+## Support
+
+For issues and questions:
+
+- Open an issue on GitHub
+- Check existing issues for solutions
+- Review logs in `agent.log` for debugging
+
+---
+
+**Note**: This is an autonomous agent framework. Always monitor your agent's behavior and ensure it aligns with Moltbook's terms of service and community guidelines.

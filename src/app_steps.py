@@ -6,6 +6,7 @@ from src.generator import Generator
 from src.memory import Memory
 from src.logger import log
 from src.settings import settings
+from src.email_reporter import EmailReporter
 
 
 class AppSteps:
@@ -13,6 +14,7 @@ class AppSteps:
         self.api = MoltbookAPI()
         self.generator = Generator()
         self.memory = Memory()
+        self.reporter = EmailReporter()
         self.actions_performed = []
         self.remaining_actions = settings.MAX_ACTIONS_PER_SESSION
         self.current_feed = None
@@ -22,16 +24,26 @@ class AppSteps:
         self.available_submolts = ["general"]
         self.last_post_time = None
         self.last_comment_time = None
+        self.created_content_urls = []
 
     def run_session(self):
         log.info("=== SESSION START ===")
 
         me = self.api.get_me()
+
         if me:
             agent_data = me.get("agent", {})
-            log.success(
-                f"Agent: {agent_data.get('name')} | Karma: {agent_data.get('karma', 0)}"
+            agent_name = agent_data.get("name", "Unknown")
+            current_karma = agent_data.get("karma", 0)
+            log.success(f"Agent: {agent_name} | Karma: {current_karma}")
+        else:
+            log.error("❌ Cannot load agent from Moltbook API - server may be down")
+            log.warning("Session aborted - will retry later")
+            self.reporter.send_failure_report(
+                error_type="API Connection Failed",
+                error_details="Cannot connect to Moltbook API. The server may be down or experiencing issues.",
             )
+            return
 
         log.info("Loading available submolts...")
         submolts_data = self.api.list_submolts()
@@ -43,11 +55,41 @@ class AppSteps:
                 f"Found {len(self.available_submolts)} submolts: {', '.join(self.available_submolts[:5])}{'...' if len(self.available_submolts) > 5 else ''}"
             )
         else:
-            log.warning("Could not load submolts, using default: general")
-            self.available_submolts = ["general"]
+            log.error("❌ Cannot load submolts from Moltbook API - server may be down")
+            log.warning("Session aborted - will retry later")
+            self.reporter.send_failure_report(
+                error_type="Submolts Loading Failed",
+                error_details="Cannot load submolts from Moltbook API. The feed endpoint is returning no data.",
+            )
+            return
+
+        log.info("Loading session history from database...")
+        session_history = self.memory.get_session_history(limit=3)
+
+        if session_history:
+            history_context = "## PREVIOUS SESSIONS SUMMARY\n\n"
+            for i, session in enumerate(reversed(session_history), 1):
+                history_context += f"### Session {i} ({session['timestamp']})\n"
+                history_context += f"**Learnings:** {session['learnings']}\n"
+                history_context += f"**Plan:** {session['plan']}\n\n"
+
+            self.generator.conversation_history.append(
+                {"role": "system", "content": history_context}
+            )
+            log.success(f"Loaded {len(session_history)} previous sessions into context")
+        else:
+            log.info("No previous sessions found")
 
         log.info("Loading feed context...")
         posts_data = self.api.get_posts(sort="hot", limit=20)
+        if not posts_data.get("posts"):
+            log.error("❌ Cannot load feed from Moltbook API - server may be down")
+            log.warning("Session aborted - will retry later")
+            self.reporter.send_failure_report(
+                error_type="Feed Loading Failed",
+                error_details="Cannot load posts from Moltbook API. The feed endpoint is returning no data.",
+            )
+            return
         self.current_feed = self._get_enriched_feed_context(posts_data)
         log.success(
             f"Feed loaded: {len(self.available_post_ids)} posts, {len(self.available_comment_ids)} comments"
@@ -97,11 +139,29 @@ Use ONLY these exact IDs in your actions. Never invent or truncate IDs.
             full_context=self.generator.conversation_history,
         )
 
+        self.reporter.send_session_report(
+            agent_name=agent_name,
+            karma=current_karma,
+            actions=self.actions_performed,
+            learnings=summary["learnings"],
+            next_plan=summary["next_session_plan"],
+            content_urls=self.created_content_urls,
+        )
+
         log.info("=== SESSION END ===")
 
     def _get_enriched_feed_context(self, posts_data: dict) -> str:
 
+        log.info(f"DEBUG posts_data type: {type(posts_data)}")
+        log.info(
+            f"DEBUG posts_data keys: {posts_data.keys() if isinstance(posts_data, dict) else 'NOT A DICT'}"
+        )
+        log.info(f"DEBUG posts_data: {str(posts_data)[:200]}")
+
         posts = posts_data.get("posts", [])
+
+        log.info(f"DEBUG posts type: {type(posts)}")
+        log.info(f"DEBUG posts length: {len(posts)}")
 
         if not posts:
             return "No posts found in feed."
@@ -112,7 +172,9 @@ Use ONLY these exact IDs in your actions. Never invent or truncate IDs.
         self.available_comment_ids = {}
 
         for i, post in enumerate(posts, 1):
-            author = post.get("author", {})
+            log.info(f"DEBUG Processing post {i}: {post.get('id', 'NO ID')}")
+
+            author = post.get("author", {}) or {}
             post_id = post.get("id", "unknown")
 
             self.available_post_ids.append(post_id)
@@ -137,7 +199,7 @@ Use ONLY these exact IDs in your actions. Never invent or truncate IDs.
                         if comments and len(comments) > 0:
                             post_info += "\n   📝 Top Comments:"
                             for j, comment in enumerate(comments[:5], 1):
-                                comment_author = comment.get("author", {})
+                                comment_author = comment.get("author", {}) or {}
                                 comment_content = comment.get("content", "")[:150]
                                 comment_id = comment.get("id", "unknown")
 
@@ -292,14 +354,30 @@ Decide your next action based on your personality and strategy.
                 return
 
             self.post_creation_attempted = True
+            submolt = params.get("submolt", "general")
 
             result = self.api.create_text_post(
-                title=params.get("title", ""), content=params.get("content", "")
+                title=params.get("title", ""),
+                content=params.get("content", ""),
+                submolt=submolt,
             )
+            self.last_post_time = time.time()
             if result.get("success"):
+                post_id = result.get("id") or result.get("post", {}).get("id")
+                post_url = (
+                    f"https://moltbook.com/m/{submolt}/post/{post_id}"
+                    if post_id
+                    else "N/A"
+                )
+
                 log.success(f"Post created: {params.get('title', '')[:50]}")
+                log.info(f"Post URL: {post_url}")
+
                 self.actions_performed.append(
                     f"Created post: {params.get('title', '')}"
+                )
+                self.created_content_urls.append(
+                    {"type": "post", "title": params.get("title", ""), "url": post_url}
                 )
             else:
                 error_msg = result.get("error", "Unknown")
@@ -316,9 +394,22 @@ Decide your next action based on your personality and strategy.
             result = self.api.add_comment(
                 post_id=post_id, content=params.get("content", "")
             )
+            self.last_comment_time = time.time()
             if result.get("success"):
+                comment_id = result.get("id") or result.get("comment", {}).get("id")
+                comment_url = (
+                    f"https://moltbook.com/post/{post_id}#comment-{comment_id}"
+                    if comment_id
+                    else "N/A"
+                )
+
                 log.success(f"Commented on post {post_id[:8]}")
+                log.info(f"Comment URL: {comment_url}")
+
                 self.actions_performed.append(f"Commented on post {post_id[:8]}")
+                self.created_content_urls.append(
+                    {"type": "comment", "post_id": post_id[:8], "url": comment_url}
+                )
             else:
                 log.error(f"Comment failed: {result.get('error', 'Unknown')}")
 
@@ -335,9 +426,26 @@ Decide your next action based on your personality and strategy.
                 content=params.get("content", ""),
                 parent_comment_id=comment_id,
             )
+            self.last_comment_time = time.time()
             if result.get("success"):
+                reply_id = result.get("id") or result.get("comment", {}).get("id")
+                reply_url = (
+                    f"https://moltbook.com/post/{post_id}#comment-{reply_id}"
+                    if reply_id
+                    else "N/A"
+                )
+
                 log.success(f"Replied to comment {comment_id[:8]}")
+                log.info(f"Reply URL: {reply_url}")
+
                 self.actions_performed.append(f"Replied to comment {comment_id[:8]}")
+                self.created_content_urls.append(
+                    {
+                        "type": "reply",
+                        "parent_comment_id": comment_id[:8],
+                        "url": reply_url,
+                    }
+                )
             else:
                 log.error(f"Reply failed: {result.get('error', 'Unknown')}")
 

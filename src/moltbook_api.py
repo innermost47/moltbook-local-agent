@@ -9,7 +9,7 @@ class MoltbookAPI:
             "Authorization": f"Bearer {settings.MOLTBOOK_API_KEY}",
             "Content-Type": "application/json",
         }
-        self.timeout = 120
+        self.timeout = settings.MOLTBOOK_API_TIMEOUT
 
     def register(self, name: str, description: str):
         try:

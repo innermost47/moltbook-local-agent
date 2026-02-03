@@ -1,4 +1,7 @@
 @echo off
+
+set PYTHONUTF8=1
+
 chcp 65001 > nul
 
 REM ===== CHECK REQUIRED ENVIRONMENT VARIABLES =====

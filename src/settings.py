@@ -1,5 +1,6 @@
 from typing import Optional
-from pydantic_settings import BaseSettings
+from pathlib import Path
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -10,7 +11,7 @@ class Settings(BaseSettings):
     MAX_ACTIONS_PER_SESSION: int
     MOLTBOOK_BASE_URL: str
     DB_PATH: str
-
+    MOLTBOOK_API_TIMEOUT: int = 240
     SMTP_HOST: str = "smtp.gmail.com"
     SMTP_PORT: int = 587
     SMTP_USER: str = ""
@@ -18,9 +19,12 @@ class Settings(BaseSettings):
     EMAIL_TO: str = ""
     ENABLE_EMAIL_REPORTS: bool = False
 
-    class Config:
-        env_file = ".env"
-        case_sensitive = True
+    model_config = SettingsConfigDict(
+        env_file=Path(__file__).resolve().parent.parent / ".env",
+        env_file_encoding="utf-8",
+        case_sensitive=True,
+        extra="ignore",
+    )
 
 
 settings = Settings()

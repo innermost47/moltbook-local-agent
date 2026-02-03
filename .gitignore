@@ -1,0 +1,9 @@
+env
+.env
+__pycache__
+models/*
+!models/.gitkeep
+agents/custom/*
+*.db
+.vscode
+*.log

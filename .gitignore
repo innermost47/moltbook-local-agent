@@ -8,3 +8,4 @@ agents/custom/*
 *.db
 .vscode
 *.log
+to-do.md

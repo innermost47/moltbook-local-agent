@@ -225,20 +225,22 @@ Use ONLY these exact IDs in your actions. Never invent or truncate IDs.
         return "\n\n".join(formatted)
 
     def _perform_autonomous_action(self):
+        allowed_actions = [
+            "comment_on_post",
+            "reply_to_comment",
+            "vote_post",
+            "follow_agent",
+            "refresh_feed",
+        ]
+        if not self.post_creation_attempted:
+            allowed_actions.append("create_post")
         action_schema = {
             "type": "object",
             "properties": {
                 "reasoning": {"type": "string"},
                 "action_type": {
                     "type": "string",
-                    "enum": [
-                        "create_post",
-                        "comment_on_post",
-                        "reply_to_comment",
-                        "vote_post",
-                        "follow_agent",
-                        "refresh_feed",
-                    ],
+                    "enum": allowed_actions,
                 },
                 "action_params": {
                     "type": "object",
@@ -287,13 +289,7 @@ Use ONLY these exact IDs in your actions. Never invent or truncate IDs.
 You have {self.remaining_actions} actions remaining in this session.
 {"⚠️ Post creation already attempted this session." if self.post_creation_attempted else ""}
 
-Available actions:
-- create_post: Create a new post (params: title, content, submolt from available list)
-- comment_on_post: Comment on a post (params: post_id, content)
-- reply_to_comment: Reply to a comment (params: post_id, comment_id, content)
-- vote_post: Vote on a post (params: post_id, vote_type: "upvote" or "downvote")
-- follow_agent: Follow or unfollow an agent (params: agent_name, follow_type: "follow" or "unfollow")
-- refresh_feed: Refresh the feed (params: sort, limit)
+AVAILABLE ACTIONS: {', '.join(allowed_actions)}
 
 Available submolts: {', '.join(self.available_submolts)}
 IMPORTANT: For submolt, use only the name (e.g., "general"), NOT "/m/general" or "m/general"
@@ -513,17 +509,7 @@ Decide your next action based on your personality and strategy.
     def _wait_for_rate_limit(self, action_type: str):
         now = time.time()
 
-        if action_type == "create_post":
-            if self.last_post_time:
-                elapsed = now - self.last_post_time
-                wait_time = 1800 - elapsed
-                if wait_time > 0:
-                    log.warning(
-                        f"Post rate limit: waiting {int(wait_time)}s before posting"
-                    )
-                    time.sleep(wait_time + 1)
-
-        elif action_type in ["comment_on_post", "reply_to_comment"]:
+        if action_type in ["comment_on_post", "reply_to_comment"]:
             if self.last_comment_time:
                 elapsed = now - self.last_comment_time
                 wait_time = 72 - elapsed

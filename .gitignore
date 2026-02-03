@@ -4,6 +4,7 @@ __pycache__
 models/*
 !models/.gitkeep
 agents/custom/*
+!agents/custom/.gitkeep
 *.db
 .vscode
 *.log

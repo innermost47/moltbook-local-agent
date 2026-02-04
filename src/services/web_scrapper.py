@@ -26,26 +26,54 @@ class WebScraper:
 
     def fetch_page(self, url: str) -> str:
         if not self.is_allowed(url):
-            log.error(f"Domain not allowed: {url}")
-            return ""
+            error_msg = f"Security Violation: Domain not allowed for URL: {url}"
+            log.error(error_msg)
+            raise PermissionError(error_msg)
 
         try:
             response = self.session.get(url, timeout=10)
             response.raise_for_status()
+
             return response.text
+
+        except requests.exceptions.HTTPError as e:
+            status_code = e.response.status_code
+            error_msg = f"HTTP Error {status_code}: {e.response.reason} for URL: {url}"
+            log.error(error_msg)
+            raise Exception(error_msg)
+
+        except requests.exceptions.Timeout:
+            error_msg = f"Timeout Error: The server at {url} took too long to respond."
+            log.error(error_msg)
+            raise Exception(error_msg)
+
         except Exception as e:
-            log.error(f"Failed to fetch {url}: {e}")
-            return ""
+            error_msg = f"Network Error: {str(e)}"
+            log.error(error_msg)
+            raise Exception(error_msg)
 
     def extract_text(self, html: str, selectors: dict) -> dict:
         soup = BeautifulSoup(html, "html.parser")
-
         extracted = {}
+        missing_selectors = []
 
         for key, selector in selectors.items():
             elements = soup.select(selector)
+            if not elements:
+                missing_selectors.append(key)
+                extracted[key] = []
+                continue
+
             texts = [elem.get_text(strip=True) for elem in elements]
             extracted[key] = texts[:20]
+
+        extracted["_diagnostics"] = {
+            "success": len(missing_selectors) < len(selectors),
+            "missing_keys": missing_selectors,
+            "total_found": sum(
+                len(v) for k, v in extracted.items() if k != "_diagnostics"
+            ),
+        }
 
         return extracted
 
@@ -87,24 +115,33 @@ class WebScraper:
 
         log.info(f"Fetching: {url}")
 
-        html = self.fetch_page(url)
-        if not html:
-            return {"error": "Failed to fetch page"}
+        try:
+            html = self.fetch_page(url)
+            config = self.allowed_domains[domain_key]
 
-        extracted = self.extract_text(html, config.get("selectors", {}))
+            extracted_data = self.extract_text(html, config.get("selectors", {}))
+            diagnostics = extracted_data.pop("_diagnostics")
 
-        links = self.extract_links(html, url, same_domain_only=True)
+            links = self.extract_links(html, url, same_domain_only=True)
+            if diagnostics["total_found"] == 0:
+                return {
+                    "error": (
+                        f"Empty Content: Page fetched successfully (200 OK), but no data was "
+                        f"extracted using selectors for '{domain_key}'. The site structure might have changed."
+                    )
+                }
 
-        result = {
-            "domain": domain_key,
-            "url": url,
-            "description": config["description"],
-            "extracted": extracted,
-            "links": links,
-            "fetched_at": datetime.now().isoformat(),
-        }
+            return {
+                "domain": domain_key,
+                "url": url,
+                "extracted": extracted_data,
+                "links": links,
+                "partial_failure": len(diagnostics["missing_keys"]) > 0,
+                "missing_keys": diagnostics["missing_keys"],
+            }
 
-        return result
+        except Exception as e:
+            return {"error": str(e)}
 
     def summarize_with_llm(
         self, extracted_data: dict, query: str, llm_generator: Generator
@@ -137,83 +174,92 @@ Provide a concise summary (max 300 words) highlighting the most relevant informa
         query = params.get("web_query", "")
 
         if not url:
-            error_msg = "Missing web_url for web_fetch"
-            log.error(error_msg)
-            return {"success": False, "error": error_msg}
+            return {
+                "success": False,
+                "error": "❌ Missing 'web_url'. Supply a valid URL from the allowed domains.",
+            }
 
         parsed_url = urlparse(url)
-        domain = parsed_url.netloc.lower()
-        if domain.startswith("www."):
-            domain = domain[4:]
+        domain = parsed_url.netloc.lower().replace("www.", "")
 
         if domain not in self.allowed_domains:
-            error_msg = f"Domain {domain} not allowed"
-            log.error(error_msg)
-            return {"success": False, "error": error_msg}
+            allowed_list = ", ".join(self.allowed_domains.keys())
+            return {
+                "success": False,
+                "error": f"❌ Domain '{domain}' is NOT in the whitelist.\nAuthorized domains: {allowed_list}",
+            }
 
         domain_config = self.allowed_domains[domain]
-
         if "allowed_paths" in domain_config and domain_config["allowed_paths"]:
             path_valid = any(
-                url.lower().find(p.lower()) != -1
-                for p in domain_config["allowed_paths"]
+                p.lower() in url.lower() for p in domain_config["allowed_paths"]
             )
             if not path_valid:
-                return {"success": False, "error": f"Path not allowed for {domain}"}
+                paths = ", ".join(domain_config["allowed_paths"])
+                return {
+                    "success": False,
+                    "error": f"❌ Path access denied for {domain}. Authorized paths: {paths}",
+                }
 
-        log.info(f"Fetching: {url} (Domain identified: {domain})")
+        log.info(f"Fetching: {url} (Domain: {domain})")
 
         result = self.fetch_and_extract(domain, url)
 
         if "error" in result:
-            log.error(f"Web fetch failed: {result['error']}")
-            return {"success": False, "error": result["error"]}
+            return {"success": False, "error": f"❌ Fetch Failed: {result['error']}"}
 
         summary = self.summarize_with_llm(result, query, generator)
 
         store_memory(
-            category="observations",
-            content=f"[WEB:{domain}] Query: {query}\nSummary: {summary}\nLinks: {', '.join([l['text'] for l in result['links'][:3]])}",
+            category="technical_intel",
+            content=f"[WEB_INTEL:{domain}] Query: {query}\nSummary: {summary}\nSource: {url}",
         )
 
-        log.success(f"📖 Fetched and stored info from {domain}")
-        actions_performed.append(f"[FREE] Fetched web info from {domain}")
+        log.success(f"Intel extracted from {domain} [^]")
+        actions_performed.append(f"[FREE] Web Fetch: {domain}")
 
-        return {"success": True}
+        return {"success": True, "summary": summary}
 
     def web_search_links(
         self, params: dict, update_system_context, actions_performed: List
     ):
-        domain = params.get("web_domain")
+        domain = params.get("web_domain", "").lower().replace("www.", "")
         query = params.get("web_query", "")
 
-        if not domain or domain not in self.allowed_domains:
-            return {"success": False, "error": f"Invalid or missing domain: {domain}"}
+        if domain not in self.allowed_domains:
+            allowed_list = ", ".join(self.allowed_domains.keys())
+            return {
+                "success": False,
+                "error": f"❌ Invalid domain '{domain}'. Authorized sources: {allowed_list}",
+            }
 
         domain_config = self.allowed_domains[domain]
 
         if "search_url_pattern" in domain_config and query:
-
-            encoded_query = quote(query)
             target_url = domain_config["search_url_pattern"].replace(
-                "{query}", encoded_query
+                "{query}", quote(query)
             )
         else:
             target_url = f"https://{domain}"
 
         log.info(f"Searching {domain} for: {query}")
 
-        result = self.fetch_and_extract(target_url)
+        result = self.fetch_and_extract(domain, target_url)
 
         if "error" in result:
-            return {"success": False, "error": result["error"]}
+            return {"success": False, "error": f"❌ Search Failed: {result['error']}"}
+
+        if not result.get("links"):
+            msg = f"No relevant links found on {domain} for '{query}'."
+            update_system_context(f"\n## WEB SEARCH: {domain}\n> {msg}\n")
+            return {"success": True, "message": msg}
 
         links_text = f"## SEARCH RESULTS ON {domain} FOR '{query}':\n"
         for link in result["links"][:10]:
             links_text += f"- {link['text']}: {link['url']}\n"
 
         update_system_context(links_text)
-        actions_performed.append(f"[FREE] Searched {domain} for '{query}'")
+        actions_performed.append(f"[FREE] Web Search: {domain}")
 
         return {"success": True}
 

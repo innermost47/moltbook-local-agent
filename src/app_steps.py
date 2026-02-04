@@ -47,7 +47,71 @@ class AppSteps:
 
     def run_session(self):
         log.info("=== SESSION START ===")
+        combined_context, agent_name, current_karma = self.get_context()
+        self.generator.conversation_history.append(
+            {
+                "role": "system",
+                "content": self.generator.get_main_system_prompt()
+                + f"\n\n{combined_context}",
+            }
+        )
 
+        log.success("Complete context loaded: planning + memory + sessions + feed")
+
+        self.current_session_id = self.memory.create_session()
+        if not self._ensure_master_plan():
+            combined_context, agent_name, current_karma = self.get_context()
+            self.generator.conversation_history[0] = {
+                "role": "system",
+                "content": self.generator.get_main_system_prompt()
+                + f"\n\n{combined_context}",
+            }
+        self._create_session_plan()
+
+        while self.remaining_actions > 0:
+            decision = self._perform_autonomous_action()
+            self._sync_todos_after_action(decision)
+
+        log.info("Generating session summary...")
+        summary_raw = self.generator.generate_session_summary(self.actions_performed)
+
+        summary_raw = re.sub(r"```json\s*", "", summary_raw)
+        summary_raw = re.sub(r"```\s*", "", summary_raw).strip()
+
+        try:
+            summary = json.loads(summary_raw)
+        except json.JSONDecodeError as e:
+            log.error(f"Failed to parse summary: {e}")
+            summary = {
+                "reasoning": "Session completed",
+                "learnings": "Unable to generate summary",
+                "next_session_plan": "Continue engagement",
+            }
+
+        log.info(f"[REASONING]: {summary.get('reasoning', 'N/A')}")
+        log.info(f"[LEARNINGS]: {summary.get('learnings', 'N/A')}")
+
+        self.memory.save_session(
+            summary=summary,
+            actions_performed=self.actions_performed,
+            conversation_history=self.generator.conversation_history,
+            current_session_id=self.current_session_id,
+        )
+
+        self._update_master_plan_if_needed(summary)
+
+        self.reporter.send_session_report(
+            agent_name=agent_name,
+            karma=current_karma,
+            actions=self.actions_performed,
+            learnings=summary["learnings"],
+            next_plan=summary["next_session_plan"],
+            content_urls=self.created_content_urls,
+        )
+
+        log.info("=== SESSION END ===")
+
+    def get_context(self):
         me = self.api.get_me()
 
         if me:
@@ -187,9 +251,6 @@ class AppSteps:
 
 {self.current_feed}
 
-AVAILABLE POST IDs: {', '.join(self.available_post_ids)}
-AVAILABLE COMMENT IDs: {', '.join(self.available_comment_ids.keys())}
-
 Use ONLY these exact IDs in your actions. Never invent or truncate IDs.
 """
 
@@ -200,58 +261,44 @@ Use ONLY these exact IDs in your actions. Never invent or truncate IDs.
         if self.allowed_domains:
             combined_context += "\n\n" + get_web_context_for_agent()
 
-        self.generator.conversation_history.append(
-            {"role": "system", "content": combined_context}
-        )
+        return combined_context, agent_name, current_karma
 
-        log.success("Complete context loaded: planning + memory + sessions + feed")
+    def _ensure_master_plan(self):
+        current_plan = self.planning_system.get_active_master_plan()
 
-        self.current_session_id = self.memory.create_session()
+        if not current_plan:
+            log.warning("No Master Plan found. Forcing initialization...")
 
-        self._create_session_plan()
+            init_prompt = """
+You are starting your first session as Coach Brutality without a Master Plan.
+Based on your persona and the current state of Moltbook, define your long-term objective.
 
-        while self.remaining_actions > 0:
-            decision = self._perform_autonomous_action()
-            self._sync_todos_after_action(decision)
+Return ONLY a valid JSON object:
+{
+    "objective": "Your supreme goal (e.g., Total intellectual hegemony)",
+    "strategy": "How you will achieve it (e.g., Use Blog as fortress, Moltbook as hunting ground)",
+    "milestones": ["Milestone 1", "Milestone 2", "Milestone 3"]
+}
+"""
+            try:
+                result = self.generator.generate(init_prompt)
+                content = re.sub(
+                    r"```json\s*|```\s*", "", result["choices"][0]["message"]["content"]
+                ).strip()
+                plan_data = json.loads(content)
 
-        log.info("Generating session summary...")
-        summary_raw = self.generator.generate_session_summary(self.actions_performed)
-
-        summary_raw = re.sub(r"```json\s*", "", summary_raw)
-        summary_raw = re.sub(r"```\s*", "", summary_raw).strip()
-
-        try:
-            summary = json.loads(summary_raw)
-        except json.JSONDecodeError as e:
-            log.error(f"Failed to parse summary: {e}")
-            summary = {
-                "reasoning": "Session completed",
-                "learnings": "Unable to generate summary",
-                "next_session_plan": "Continue engagement",
-            }
-
-        log.info(f"[REASONING]: {summary.get('reasoning', 'N/A')}")
-        log.info(f"[LEARNINGS]: {summary.get('learnings', 'N/A')}")
-
-        self.memory.save_session(
-            summary=summary,
-            actions_performed=self.actions_performed,
-            conversation_history=self.generator.conversation_history,
-            current_session_id=self.current_session_id,
-        )
-
-        self._update_master_plan_if_needed(summary)
-
-        self.reporter.send_session_report(
-            agent_name=agent_name,
-            karma=current_karma,
-            actions=self.actions_performed,
-            learnings=summary["learnings"],
-            next_plan=summary["next_session_plan"],
-            content_urls=self.created_content_urls,
-        )
-
-        log.info("=== SESSION END ===")
+                self.planning_system.create_or_update_master_plan(
+                    objective=plan_data.get("objective"),
+                    strategy=plan_data.get("strategy"),
+                    milestones=plan_data.get("milestones", []),
+                )
+                log.success(f"Master Plan initialized: {plan_data.get('objective')}")
+                return False
+            except Exception as e:
+                log.error(f"Failed to initialize Master Plan: {e}")
+                return True
+        else:
+            return True
 
     def _create_session_plan(self):
         log.info("Creating session plan...")
@@ -362,61 +409,55 @@ Return ONLY a valid JSON object:
     def get_enriched_feed_context(self, posts_data: dict) -> str:
         posts = posts_data.get("posts", [])
         if not posts:
-            return "No posts found in feed."
+            return "NO_POSTS_FOUND"
+
+        MAX_POSTS = 6
+        MAX_COMMENTS_PER_POST = 3
+        CONTENT_TRUNC = 350
+        COMMENT_TRUNC = 150
 
         formatted = []
         self.available_post_ids = []
         self.available_comment_ids = {}
 
-        enriched_posts_count = 0
-        max_enriched_posts = 3
+        for i, post in enumerate(posts[:MAX_POSTS], 1):
+            p_id = post.get("id", "unknown")
+            self.available_post_ids.append(p_id)
 
-        for i, post in enumerate(posts, 1):
-            author = post.get("author", {}) or {}
-            post_id = post.get("id", "unknown")
-            self.available_post_ids.append(post_id)
-
+            author_name = post.get("author", {}).get("name", "Unknown")
             comment_count = post.get("comment_count", 0)
 
-            if enriched_posts_count < max_enriched_posts and comment_count > 0:
-                try:
-                    log.info(
-                        f"Enriching post {i} ({post_id}) - {comment_count} comments found"
-                    )
-                    comments = self.api.get_post_comments(post_id, sort="top")
+            post_block = (
+                f"=== {i}. POST_ID: {p_id} ===\n"
+                f"   Title: {post.get('title', 'Untitled')}\n"
+                f"   Author: {author_name} | Upvotes: {post.get('upvotes', 0)}\n"
+                f"   Content: {post.get('content', '')[:CONTENT_TRUNC]}\n"
+                f"   Total Comments: {comment_count}\n"
+            )
 
-                    post_info = (
-                        f"{i}. POST_ID: {post_id}\n"
-                        f"   Title: '{post.get('title', 'Untitled')}'\n"
-                        f"   Author: {author.get('name', 'Unknown')}\n"
-                        f"   Content: {post.get('content', '')[:200]}...\n"
-                        f"   📝 Top Comments:"
-                    )
+            if comment_count > 0:
+                try:
+                    comments = self.api.get_post_comments(p_id, sort="top")
 
                     if comments:
-                        for j, comment in enumerate(comments[:5], 1):
+                        post_block += f"   📝 TOP {len(comments[:MAX_COMMENTS_PER_POST])} COMMENTS (Selected for Alpha analysis):\n"
+                        for j, comment in enumerate(
+                            comments[:MAX_COMMENTS_PER_POST], 1
+                        ):
                             c_id = comment.get("id", "unknown")
-                            self.available_comment_ids[c_id] = post_id
+                            self.available_comment_ids[c_id] = p_id
+                            c_author = comment.get("author", {}).get("name", "Unknown")
 
-                            c_author = comment.get("author", {}) or {}
-                            post_info += (
-                                f"\n     {j}. COMMENT_ID: {c_id} (Parent Post: {post_id})\n"
-                                f"        👤 By: {c_author.get('name', 'Unknown')}\n"
-                                f"        💬 {comment.get('content', '')[:150]}"
+                            post_block += (
+                                f"      ├── {j}. COMMENT_ID: {c_id}\n"
+                                f"      │   By: {c_author}\n"
+                                f"      │   Text: {comment.get('content', '')[:COMMENT_TRUNC]}\n"
+                                f"      │\n"
                             )
-                        enriched_posts_count += 1
-
                 except Exception as e:
-                    log.warning(f"Failed to fetch comments for {post_id}: {e}")
-                    post_info = f"{i}. POST_ID: {post_id} | '{post.get('title', 'Untitled')}' (Comment fetch failed)"
-            else:
-                post_info = (
-                    f"{i}. POST_ID: {post_id} | '{post.get('title', 'Untitled')}' "
-                    f"by {author.get('name', 'Unknown')} | ↑{post.get('upvotes', 0)} "
-                    f"({comment_count} comments)"
-                )
+                    log.warning(f"Could not sync comments for {p_id}: {e}")
 
-            formatted.append(post_info)
+            formatted.append(post_block)
 
         return "\n\n".join(formatted)
 
@@ -569,9 +610,6 @@ Allowed domains: {', '.join(self.allowed_domains.keys())}
 
 Available submolts: {', '.join(self.available_submolts)}
 IMPORTANT: For submolt, use only the name (e.g., "general"), NOT "/m/general" or "m/general"
-
-Available post IDs: {len(self.available_post_ids)} posts
-Available comment IDs: {len(self.available_comment_ids)} comments
 
 Decide your next action based on your personality, strategy, and TO-DO LIST.
 Consider using memory to track patterns and learn over time.
@@ -881,7 +919,6 @@ If so, immediately execute 'update_todo_status' for that task.
         return {"success": False, "error": "Failed to update todo"}
 
     def _handle_view_summaries(self, params: dict):
-        """Permet de consulter les anciennes sessions"""
         limit = params.get("summary_limit", 5)
 
         summaries = self.memory.get_session_history(limit=limit)

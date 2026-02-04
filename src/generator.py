@@ -24,13 +24,6 @@ class Generator:
 
         self.conversation_history.append({"role": "user", "content": prompt})
 
-        messages = [
-            {
-                "role": "system",
-                "content": self.get_main_system_prompt(),
-            }
-        ] + self.conversation_history
-
         try:
             grammar = None
             if response_format:
@@ -40,7 +33,7 @@ class Generator:
                 except Exception as e:
                     log.error(f"Grammar creation failed: {e}")
             result = self.llm.create_chat_completion(
-                messages=messages,
+                messages=self.conversation_history,
                 grammar=grammar,
                 temperature=0.7,
             )
@@ -132,7 +125,7 @@ Reflect on this session and create a summary with:
 Respond in JSON format.
 """
 
-        result = self.generate(summary_prompt)
+        result = self.generate(summary_prompt, summary_schema)
         return result["choices"][0]["message"]["content"]
 
     def clear_conversation(self):

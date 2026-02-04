@@ -1,12 +1,17 @@
 import time
+import sqlite3
+from datetime import datetime
 from src.utils import log
 
 
 class MoltbookActions:
+    def __init__(self, db_path: str):
+        self.db_path = db_path
+        self.conn = sqlite3.connect(self.db_path)
+
     def create_post(self, app_steps, params: dict, post_creation_attempted: bool):
         if post_creation_attempted:
             error_msg = "Post creation already attempted this session"
-            log.warning(error_msg)
             app_steps.actions_performed.append(
                 "SKIPPED: Post creation (already attempted)"
             )
@@ -39,8 +44,37 @@ class MoltbookActions:
             return {"success": True}
         else:
             error_msg = result.get("error", "Unknown")
-            log.error(f"Post failed: {error_msg}")
             app_steps.actions_performed.append(f"FAILED: Create post ({error_msg})")
+            return {"success": False, "error": error_msg}
+
+    def post_link(self, app_steps, params: dict):
+
+        submolt = params.get("submolt", "general")
+
+        result = app_steps.api.create_link_post(
+            title=params.get("title", ""),
+            url_to_share=params.get("url_to_share", ""),
+            submolt=submolt,
+        )
+        if result.get("success"):
+            post_id = result.get("id") or result.get("post", {}).get("id")
+            post_url = (
+                f"https://moltbook.com/m/{submolt}/post/{post_id}" if post_id else "N/A"
+            )
+
+            log.success(f"Link shared: {params.get('title', '')[:50]}")
+            log.info(f"Link POST URL: {post_url}")
+
+            app_steps.actions_performed.append(
+                f"Shared link: {params.get('title', '')}"
+            )
+            app_steps.created_content_urls.append(
+                {"type": "post_link", "title": params.get("title", ""), "url": post_url}
+            )
+            return {"success": True}
+        else:
+            error_msg = result.get("error", "Unknown")
+            app_steps.actions_performed.append(f"FAILED: Share link ({error_msg})")
             return {"success": False, "error": error_msg}
 
     def comment_on_post(self, params: dict, app_steps):
@@ -49,12 +83,11 @@ class MoltbookActions:
 
         if not content or content.strip() == "":
             error_msg = "Comment content is required and cannot be empty"
-            log.error(error_msg)
             return {"success": False, "error": error_msg}
 
         if post_id not in app_steps.available_post_ids:
-            error_msg = f"Invalid post_id: {post_id} not in available posts"
-            log.error(error_msg)
+            ids_list = "\n".join(map(str, app_steps.available_post_ids))
+            error_msg = f"Invalid post_id: {post_id} not in available posts. Availables post_ids are:\n{ids_list}."
             return {"success": False, "error": error_msg}
 
         result = app_steps.api.add_comment(
@@ -80,7 +113,6 @@ class MoltbookActions:
             return {"success": True}
         else:
             error_msg = result.get("error", "Unknown")
-            log.error(f"Comment failed: {error_msg}")
             return {"success": False, "error": error_msg}
 
     def reply_to_comment(self, params: dict, app_steps):
@@ -90,17 +122,26 @@ class MoltbookActions:
 
         if not content or content.strip() == "":
             error_msg = "Reply content is required and cannot be empty"
-            log.error(error_msg)
             return {"success": False, "error": error_msg}
 
         if comment_id not in app_steps.available_comment_ids:
-            error_msg = f"Invalid comment_id: {comment_id} not in available comments"
-            log.error(error_msg)
+            comment_details = "\n".join(
+                [
+                    f"  - Comment ID: {cid} (belongs to Post ID: {pid})"
+                    for cid, pid in app_steps.available_comment_ids.items()
+                ]
+            )
+            error_msg = f"Invalid comment_id: '{comment_id}' not found in available comments.\n\nAvailable comment IDs with their parent posts:\n{comment_details}\n\nYou must use BOTH the correct comment_id AND its corresponding post_id."
             return {"success": False, "error": error_msg}
 
         if not post_id or post_id not in app_steps.available_post_ids:
-            error_msg = f"Invalid or missing post_id: {post_id}"
-            log.error(error_msg)
+            ids_list = "\n".join(map(str, app_steps.available_post_ids))
+            error_msg = f"Invalid or missing post_id: '{post_id}'.\n\nAvailable post IDs:\n{ids_list}"
+            return {"success": False, "error": error_msg}
+
+        expected_post_id = app_steps.available_comment_ids.get(comment_id)
+        if expected_post_id != post_id:
+            error_msg = f"Mismatch: comment_id '{comment_id}' belongs to post_id '{expected_post_id}', but you provided post_id '{post_id}'. Use the correct pair: comment_id='{comment_id}' + post_id='{expected_post_id}'."
             return {"success": False, "error": error_msg}
 
         correct_post_id = app_steps.available_comment_ids.get(comment_id)
@@ -140,7 +181,6 @@ class MoltbookActions:
             return {"success": True}
         else:
             error_msg = result.get("error", "Unknown")
-            log.error(f"Reply failed: {error_msg}")
             return {"success": False, "error": error_msg}
 
     def vote_post(self, params: dict, app_steps):
@@ -148,8 +188,8 @@ class MoltbookActions:
         vote_type: str = params.get("vote_type", "upvote")
 
         if not post_id or post_id not in app_steps.available_post_ids:
-            error_msg = f"Invalid or missing post_id: {post_id}"
-            log.error(error_msg)
+            ids_list = "\n".join(map(str, app_steps.available_post_ids))
+            error_msg = f"Invalid or missing post_id: {post_id}. Availables post_ids are:\n{ids_list}."
             return {"success": False, "error": error_msg}
 
         result = app_steps.api.vote(
@@ -163,7 +203,6 @@ class MoltbookActions:
             return {"success": True}
         else:
             error_msg = result.get("error", "Unknown")
-            log.error(f"{vote_type.capitalize()} failed: {error_msg}")
             return {"success": False, "error": error_msg}
 
     def follow_agent(self, params: dict, app_steps):
@@ -172,7 +211,6 @@ class MoltbookActions:
 
         if not agent_name:
             error_msg = "Missing agent_name for follow action"
-            log.error(error_msg)
             return {"success": False, "error": error_msg}
 
         result = app_steps.api.follow_agent(agent_name, follow_type)
@@ -184,7 +222,6 @@ class MoltbookActions:
             return {"success": True}
         else:
             error_msg = result.get("error", "Unknown error")
-            log.error(f"Follow failed: {error_msg}")
             return {"success": False, "error": error_msg}
 
     def refresh_feed(self, params: dict, app_steps):
@@ -216,3 +253,57 @@ UPDATED COMMENT IDs: {', '.join(app_steps.available_comment_ids.keys())}
         )
         app_steps.actions_performed.append("Refreshed feed")
         return {"success": True}
+
+    def track_interaction_from_post(self, post_id: str, app_steps):
+        post_data = app_steps.api.get_single_post(post_id)
+        if post_data and post_data.get("success"):
+            agent_name = post_data.get("data", {}).get("author_name")
+            if agent_name:
+                self.increment_interaction(agent_name)
+                log.info(f"[PRO] Interaction recorded for Alpha/Beta: {agent_name}")
+
+    def increment_interaction(self, agent_name: str) -> bool:
+        try:
+            cursor = self.conn.cursor()
+            now = datetime.now().isoformat()
+
+            cursor.execute(
+                """
+                UPDATE agent_follows
+                SET interaction_count = interaction_count + 1,
+                    last_interaction = ?
+                WHERE agent_name = ?
+                """,
+                (now, agent_name),
+            )
+
+            if cursor.rowcount == 0:
+                log.info(
+                    f"[SHOCK] New agent detected: {agent_name}. Immediate archiving."
+                )
+                cursor.execute(
+                    """
+                    INSERT INTO agent_follows (agent_name, followed_at, interaction_count, last_interaction, is_currently_following, notes)
+                    VALUES (?, ?, 1, ?, 0, 'Agent détecté via interaction feed')
+                    """,
+                    (agent_name, now, now),
+                )
+
+            self.conn.commit()
+            log.success(
+                f"[^] Increased dominance over {agent_name} (Interaction #{self._get_count(agent_name)})"
+            )
+            return True
+
+        except Exception as e:
+            log.error(f"Failed to perform vibration update for {agent_name}: {e}")
+            return False
+
+    def _get_count(self, agent_name: str) -> int:
+        cursor = self.conn.cursor()
+        cursor.execute(
+            "SELECT interaction_count FROM agent_follows WHERE agent_name = ?",
+            (agent_name,),
+        )
+        result = cursor.fetchone()
+        return result[0] if result else 0

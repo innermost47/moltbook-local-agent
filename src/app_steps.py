@@ -8,12 +8,14 @@ from src.services import (
     MemorySystem,
     WebScraper,
     MoltbookActions,
+    BlogActions,
     get_web_context_for_agent,
 )
 from src.generator import Generator
 from src.memory import Memory
 from src.utils import log
 from src.settings import settings
+from src.services.planning_system import PlanningSystem
 
 
 class AppSteps:
@@ -23,8 +25,10 @@ class AppSteps:
         self.memory = Memory()
         self.reporter = EmailReporter()
         self.memory_system = MemorySystem()
+        self.planning_system = PlanningSystem(db_path=settings.DB_PATH)
         self.web_scraper = WebScraper()
-        self.moltbook_actions = MoltbookActions()
+        self.moltbook_actions = MoltbookActions(db_path=settings.DB_PATH)
+        self.blog_actions = BlogActions() if settings.BLOG_API_URL else None
         self.feed_options = ["hot", "new", "top", "rising"]
         self.actions_performed = []
         self.remaining_actions = settings.MAX_ACTIONS_PER_SESSION
@@ -38,6 +42,8 @@ class AppSteps:
         self.created_content_urls = []
         self.current_session_id = None
         self.allowed_domains = settings.get_domains()
+        self.session_todos = []
+        self.blog_article_attempted = False
 
     def run_session(self):
         log.info("=== SESSION START ===")
@@ -76,9 +82,13 @@ class AppSteps:
             )
             return
 
-        log.info("Loading memory, session history, and feed...")
+        log.info("Loading memory, planning context, session history, and feed...")
 
         combined_context = ""
+
+        planning_context = self.planning_system.get_planning_context()
+        combined_context += planning_context + "\n\n"
+        log.success("Planning context loaded")
 
         memory_context = self.memory_system.get_memory_context_for_agent()
         combined_context += memory_context + "\n\n"
@@ -97,6 +107,47 @@ class AppSteps:
                 "## PREVIOUS SESSIONS\n\nNo previous sessions found.\n\n"
             )
             log.info("No previous sessions found")
+
+        if self.blog_actions:
+            log.info("Synchronizing blog catalog...")
+            try:
+                existing_articles = self.blog_actions.list_articles()
+
+                if existing_articles and isinstance(existing_articles, list):
+                    published_titles = [
+                        post.get("title", "Untitled") for post in existing_articles
+                    ]
+
+                    blog_knowledge = "## 📚 PREVIOUSLY PUBLISHED BLOG ARTICLES\n"
+                    blog_knowledge += "- " + "\n- ".join(published_titles) + "\n"
+                    blog_knowledge += "STRATEGIC INSTRUCTION: Do not duplicate existing topics. Always provide a new angle or a superior technical perspective.\n\n"
+
+                    combined_context += blog_knowledge
+                    log.success(
+                        f"Blog synchronized: {len(published_titles)} articles found."
+                    )
+                else:
+                    log.info(
+                        "Blog catalog is empty. Ready for initial content injection."
+                    )
+
+            except Exception as e:
+                log.error(f"Failed to synchronize blog: {e}")
+
+        last_todos = self.planning_system.get_last_session_todos()
+        if last_todos:
+            combined_context += "## 📋 LAST SESSION TO-DO LIST\n\n"
+            for todo in last_todos:
+                status_emoji = (
+                    "✅"
+                    if todo["status"] == "completed"
+                    else "❌" if todo["status"] == "cancelled" else "⏳"
+                )
+                combined_context += (
+                    f"{status_emoji} **[{todo['status'].upper()}]** {todo['task']}\n"
+                )
+            combined_context += "\n"
+            log.success(f"Loaded {len(last_todos)} todos from last session")
 
         posts_data = self.api.get_posts(sort=random.choice(self.feed_options), limit=20)
 
@@ -132,12 +183,15 @@ Use ONLY these exact IDs in your actions. Never invent or truncate IDs.
             {"role": "system", "content": combined_context}
         )
 
-        log.success("Complete context loaded: memory + sessions + feed")
+        log.success("Complete context loaded: planning + memory + sessions + feed")
 
         self.current_session_id = self.memory.create_session()
 
+        self._create_session_plan()
+
         while self.remaining_actions > 0:
-            self._perform_autonomous_action()
+            decision = self._perform_autonomous_action()
+            self._sync_todos_after_action(decision)
 
         log.info("Generating session summary...")
         summary_raw = self.generator.generate_session_summary(self.actions_performed)
@@ -165,6 +219,8 @@ Use ONLY these exact IDs in your actions. Never invent or truncate IDs.
             current_session_id=self.current_session_id,
         )
 
+        self._update_master_plan_if_needed(summary)
+
         self.reporter.send_session_report(
             agent_name=agent_name,
             karma=current_karma,
@@ -175,6 +231,112 @@ Use ONLY these exact IDs in your actions. Never invent or truncate IDs.
         )
 
         log.info("=== SESSION END ===")
+
+    def _create_session_plan(self):
+        log.info("Creating session plan...")
+
+        plan_prompt = """
+Based on your master plan, previous sessions, current context, and feed state,
+create a concrete to-do list for THIS session.
+
+Generate 3-5 specific, actionable tasks prioritized by importance (1-5, 5 being highest).
+
+Return ONLY a valid JSON object with this structure:
+{
+    "reasoning": "Why these tasks align with your strategy",
+    "tasks": [
+        {"task": "Specific action to take", "priority": 5},
+        {"task": "Another specific action", "priority": 3}
+    ]
+}
+"""
+
+        try:
+            result = self.generator.generate(plan_prompt)
+            content = result["choices"][0]["message"]["content"]
+
+            content = re.sub(r"```json\s*", "", content)
+            content = re.sub(r"```\s*", "", content).strip()
+
+            plan_data = json.loads(content)
+
+            log.info(f"[PLAN REASONING]: {plan_data.get('reasoning', 'N/A')}")
+
+            tasks = plan_data.get("tasks", [])
+            if tasks:
+                log.info(f"Session TO-DO LIST:")
+                for i, task in enumerate(tasks, 1):
+                    priority = "⭐" * task.get("priority", 1)
+                    log.info(f"  {i}. [{priority}] {task.get('task')}")
+
+                self.planning_system.create_session_todos(
+                    session_id=self.current_session_id, tasks=tasks
+                )
+
+                self.session_todos = tasks
+
+                todo_context = "\n\n## 📋 YOUR SESSION TO-DO LIST\n\n"
+                for task in tasks:
+                    todo_context += f"- [{task.get('priority')}] {task.get('task')}\n"
+                todo_context += (
+                    "\nRemember to mark tasks as completed when you accomplish them!\n"
+                )
+
+                self.update_system_context(todo_context)
+
+        except Exception as e:
+            log.error(f"Failed to create session plan: {e}")
+
+    def _update_master_plan_if_needed(self, summary: dict):
+
+        current_plan = self.planning_system.get_active_master_plan()
+
+        update_prompt = f"""
+Based on this session's learnings and your current master plan:
+
+**Current Master Plan:**
+{json.dumps(current_plan, indent=2) if current_plan else "NO MASTER PLAN YET"}
+
+**Session Learnings:**
+{summary.get('learnings', 'N/A')}
+
+Should you update your master plan? Consider:
+- Have you achieved a major milestone?
+- Have you learned something that changes your strategy?
+- Do you need to refine your objective?
+
+Return ONLY a valid JSON object:
+{{
+    "should_update": true/false,
+    "reasoning": "Why or why not",
+    "new_objective": "Updated objective (if updating)",
+    "new_strategy": "Updated strategy (if updating)",
+    "new_milestones": ["milestone1", "milestone2"] (if updating)
+}}
+"""
+
+        try:
+            result = self.generator.generate(update_prompt)
+            content = result["choices"][0]["message"]["content"]
+
+            content = re.sub(r"```json\s*", "", content)
+            content = re.sub(r"```\s*", "", content).strip()
+
+            decision = json.loads(content)
+
+            if decision.get("should_update"):
+                log.info(f"Updating master plan: {decision.get('reasoning')}")
+
+                self.planning_system.create_or_update_master_plan(
+                    objective=decision.get("new_objective"),
+                    strategy=decision.get("new_strategy"),
+                    milestones=decision.get("new_milestones", []),
+                )
+            else:
+                log.info(f"Master plan unchanged: {decision.get('reasoning')}")
+
+        except Exception as e:
+            log.error(f"Failed to evaluate master plan update: {e}")
 
     def get_enriched_feed_context(self, posts_data: dict) -> str:
         posts = posts_data.get("posts", [])
@@ -248,6 +410,9 @@ Use ONLY these exact IDs in your actions. Never invent or truncate IDs.
             "memory_store",
             "memory_retrieve",
             "memory_list",
+            "update_todo_status",
+            "view_session_summaries",
+            "share_link",
         ]
 
         if not self.post_creation_attempted:
@@ -259,6 +424,21 @@ Use ONLY these exact IDs in your actions. Never invent or truncate IDs.
                     "web_search_links",
                 ]
             )
+        if self.blog_actions:
+            blog_actions_list = [
+                "write_blog_article",
+                "share_blog_post",
+                "review_comment_key_requests",
+                "approve_comment_key",
+                "reject_comment_key",
+                "review_pending_comments",
+                "approve_comment",
+                "reject_comment",
+            ]
+
+            if not self.blog_article_attempted:
+                blog_actions_list.insert(0, "write_blog_article")
+            allowed_actions.extend(blog_actions_list)
 
         action_schema = {
             "type": "object",
@@ -271,101 +451,65 @@ Use ONLY these exact IDs in your actions. Never invent or truncate IDs.
                 "action_params": {
                     "type": "object",
                     "properties": {
-                        "post_id": {
-                            "type": "string",
-                            "enum": (
-                                self.available_post_ids
-                                if self.available_post_ids
-                                else ["none"]
-                            ),
-                        },
-                        "comment_id": {
-                            "type": "string",
-                            "enum": (
-                                list(self.available_comment_ids.keys())
-                                if self.available_comment_ids
-                                else ["none"]
-                            ),
-                        },
-                        "submolt": {
-                            "type": "string",
-                            "enum": (
-                                self.available_submolts
-                                if self.available_submolts
-                                else ["general"]
-                            ),
-                        },
-                        "vote_type": {"type": "string", "enum": ["upvote", "downvote"]},
+                        "post_id": {"type": "string"},
+                        "comment_id": {"type": "string"},
+                        "submolt": {"type": "string"},
+                        "title": {"type": "string"},
+                        "content": {"type": "string"},
+                        "excerpt": {"type": "string"},
+                        "image_prompt": {"type": "string"},
+                        "url": {"type": "string"},
+                        "comment_id_blog": {"type": "string"},
+                        "request_id": {"type": "string"},
                         "agent_name": {"type": "string"},
                         "follow_type": {
                             "type": "string",
-                            "enum": ["follow", "unfollow"],
+                            "enum": ["follow", "unfollow", "none"],
                         },
-                        "title": {"type": "string"},
-                        "content": {"type": "string"},
-                        "sort": {
+                        "vote_type": {
                             "type": "string",
-                            "enum": self.feed_options,
+                            "enum": ["upvote", "downvote", "none"],
                         },
-                        "limit": {"type": "integer", "minimum": 1, "maximum": 50},
-                        "memory_category": {
-                            "type": "string",
-                            "enum": list(settings.MEMORY_CATEGORIES.keys()),
-                        },
+                        "sort": {"type": "string", "enum": self.feed_options},
+                        "limit": {"type": "integer", "default": 10},
+                        "web_url": {"type": "string"},
+                        "web_domain": {"type": "string"},
+                        "web_query": {"type": "string"},
+                        "memory_category": {"type": "string"},
                         "memory_content": {"type": "string"},
-                        "memory_limit": {
-                            "type": "integer",
-                            "minimum": 1,
-                            "maximum": 20,
-                        },
+                        "memory_limit": {"type": "integer", "default": 5},
                         "memory_order": {"type": "string", "enum": ["asc", "desc"]},
-                        "from_date": {"type": "string"},
-                        "to_date": {"type": "string"},
+                        "todo_task": {"type": "string"},
+                        "todo_status": {
+                            "type": "string",
+                            "enum": ["pending", "completed", "cancelled", "none"],
+                        },
                     },
                 },
             },
             "required": ["reasoning", "action_type", "action_params"],
         }
 
-        if self.allowed_domains:
-            action_schema["allOf"] = [
-                {
-                    "if": {"properties": {"action_type": {"const": "web_fetch"}}},
-                    "then": {
-                        "properties": {"action_params": {"required": ["web_url"]}}
-                    },
-                },
-                {
-                    "if": {
-                        "properties": {"action_type": {"const": "web_search_links"}}
-                    },
-                    "then": {
-                        "properties": {
-                            "action_params": {
-                                "required": [
-                                    "web_domain",
-                                    "web_query",
-                                ]
-                            }
-                        }
-                    },
-                },
-            ]
+        instruction_defaults = "IMPORTANT: For any required parameter that is NOT relevant to your chosen action, set its value to 'none' or ''."
 
         actions_list = [
-            "- comment_on_post: Comment on post (params: post_id, content) - CONTENT IS REQUIRED",
-            "- reply_to_comment: Reply to comment (params: post_id, comment_id, content) - CONTENT IS REQUIRED",
-            "- vote_post: Vote on post (params: post_id, vote_type)",
-            "- follow_agent: Follow/unfollow agent (params: agent_name, follow_type)",
-            f"- refresh_feed: Refresh feed (params: sort, limit) - SORTS: {', '.join(self.feed_options)}",
+            "- comment_on_post: (params: post_id, content) - CONTENT IS MANDATORY",
+            "- reply_to_comment: (params: post_id, comment_id, content) - CONTENT IS MANDATORY",
+            "- vote_post: (params: post_id, vote_type)",
+            "- share_link: (params: url) - Share an external URL",
+            "- follow_agent: (params: agent_name, follow_type)",
+            f"- refresh_feed: (params: sort, limit) - SORTS: {', '.join(self.feed_options)}",
         ]
 
         if not self.post_creation_attempted:
             actions_list.insert(
-                0, "- create_post: Create new post (params: title, content, submolt)"
+                0,
+                "- create_post: (params: title, content, submolt) - FULL TEXT REQUIRED IN CONTENT",
             )
 
         decision_prompt = f"""
+{instruction_defaults}
+
 You have {self.remaining_actions} MOLTBOOK actions remaining in this session.
 
 **MOLTBOOK ACTIONS (count toward limit):**
@@ -379,6 +523,18 @@ You have {self.remaining_actions} MOLTBOOK actions remaining in this session.
 - web_fetch: Fetch content from a specific URL (params: web_url)
 Allowed domains: {', '.join(self.allowed_domains.keys())}
 """
+        if self.blog_actions:
+            decision_prompt += """
+**BLOG ACTIONS (Cost 1 Action Point):**
+- write_blog_article: 
+  * REQUIRED: {"title": "...", "content": "THE FULL ARTICLE TEXT", "excerpt": "summary", "image_prompt": "..."}
+  * WARNING: Do NOT leave 'content' empty. Write the complete article there.
+
+**MODERATION (FREE):**
+- review_pending_comments: (params: limit)
+- approve_comment / reject_comment: (params: comment_id_blog)
+- approve_comment_key / reject_comment_key: (params: request_id)
+"""
 
         decision_prompt += f"""
 **MEMORY ACTIONS (FREE - unlimited):**
@@ -386,13 +542,17 @@ Allowed domains: {', '.join(self.allowed_domains.keys())}
 - memory_retrieve: Get memories (params: memory_category, memory_limit, memory_order, optional: from_date, to_date)
 - memory_list: See all category stats
 
+**PLANNING ACTIONS (FREE - unlimited):**
+- update_todo_status: Mark a todo as completed/cancelled (params: todo_task, todo_status)
+- view_session_summaries: View past session summaries (params: summary_limit)
+
 Available submolts: {', '.join(self.available_submolts)}
 IMPORTANT: For submolt, use only the name (e.g., "general"), NOT "/m/general" or "m/general"
 
 Available post IDs: {len(self.available_post_ids)} posts
 Available comment IDs: {len(self.available_comment_ids)} comments
 
-Decide your next action based on your personality and strategy.
+Decide your next action based on your personality, strategy, and TO-DO LIST.
 Consider using memory to track patterns and learn over time.
 """
 
@@ -436,7 +596,7 @@ Please fix the issue and try again. Make sure all required parameters are provid
 
                 if execution_result and execution_result.get("error"):
                     last_error = execution_result["error"]
-                    log.warning(f"❌ Attempt {attempt} failed: {last_error}")
+                    log.warning(f"❌ Attempt {attempt} failed: {last_error[:150]}")
 
                     if attempt < max_attempts:
                         log.info(f"🔄 Retrying... ({attempt + 1}/{max_attempts})")
@@ -444,7 +604,7 @@ Please fix the issue and try again. Make sure all required parameters are provid
                     else:
                         log.error(f"❌ All {max_attempts} attempts failed")
                         self.actions_performed.append(
-                            f"FAILED after {max_attempts} attempts: {decision['action_type']} - {last_error}"
+                            f"FAILED after {max_attempts} attempts: {decision['action_type']} - {last_error[:150]}"
                         )
                         break
                 else:
@@ -476,7 +636,43 @@ Please fix the issue and try again. Make sure all required parameters are provid
                     self._execute_action(decision)
                     break
 
-        self.remaining_actions -= 1
+        costly_actions = [
+            "create_post",
+            "comment_on_post",
+            "reply_to_comment",
+            "vote_post",
+            "follow_agent",
+            "share_link",
+            "write_blog_article",
+            "share_blog_post",
+        ]
+
+        if decision["action_type"] in costly_actions:
+            self.remaining_actions -= 1
+            log.info(f"Action completed. Remaining: {self.remaining_actions}")
+        else:
+            log.info(
+                f"Free action ({decision['action_type']}). Quota preserved: {self.remaining_actions}"
+            )
+
+        return decision
+
+    def _sync_todos_after_action(self, last_decision):
+        sync_prompt = f"""
+You just executed: {last_decision['action_type']}
+Reasoning: {last_decision['reasoning']}
+
+Here is your current TO-DO LIST:
+
+{json.dumps(self.session_todos)}
+
+Does this action complete one of your tasks?
+
+If so, immediately execute 'update_todo_status' for that task.
+
+"""
+
+        self.update_system_context(sync_prompt)
 
     def _execute_action(self, decision: dict):
         action_type = decision["action_type"]
@@ -514,6 +710,12 @@ Please fix the issue and try again. Make sure all required parameters are provid
                 actions_performed=self.actions_performed,
             )
 
+        elif action_type == "update_todo_status":
+            return self._handle_todo_update(params)
+
+        elif action_type == "view_session_summaries":
+            return self._handle_view_summaries(params)
+
         elif action_type == "web_fetch":
             return self.web_scraper.web_fetch(
                 params=params,
@@ -529,6 +731,34 @@ Please fix the issue and try again. Make sure all required parameters are provid
                 actions_performed=self.actions_performed,
             )
 
+        elif action_type == "write_blog_article" and self.blog_actions:
+            result = self.blog_actions.write_and_publish_article(params, self)
+            if result.get("success"):
+                self.blog_article_attempted = True
+                log.success("✅ Blog article published - no more articles this session")
+            return result
+
+        elif action_type == "share_blog_post" and self.blog_actions:
+            return self.blog_actions.share_blog_post_on_moltbook(params, self)
+
+        elif action_type == "review_comment_key_requests" and self.blog_actions:
+            return self.blog_actions.review_comment_key_requests(params, self)
+
+        elif action_type == "approve_comment_key" and self.blog_actions:
+            return self.blog_actions.approve_comment_key(params, self)
+
+        elif action_type == "reject_comment_key" and self.blog_actions:
+            return self.blog_actions.reject_comment_key(params, self)
+
+        elif action_type == "review_pending_comments" and self.blog_actions:
+            return self.blog_actions.review_pending_comments(params, self)
+
+        elif action_type == "approve_comment" and self.blog_actions:
+            return self.blog_actions.approve_comment(params, self)
+
+        elif action_type == "reject_comment" and self.blog_actions:
+            return self.blog_actions.reject_comment(params, self)
+
         self._wait_for_rate_limit(action_type)
 
         if action_type == "create_post":
@@ -538,8 +768,21 @@ Please fix the issue and try again. Make sure all required parameters are provid
                 post_creation_attempted=self.post_creation_attempted,
             )
 
+        elif action_type == "share_link":
+            return self.moltbook_actions.post_link(
+                app_steps=self,
+                params=params,
+            )
+
         elif action_type == "comment_on_post":
-            return self.moltbook_actions.comment_on_post(params=params, app_steps=self)
+            result = self.moltbook_actions.comment_on_post(
+                params=params, app_steps=self
+            )
+            if result.get("success"):
+                self.moltbook_actions.track_interaction_from_post(
+                    params.get("post_id"), self
+                )
+            return result
 
         elif action_type == "reply_to_comment":
             return self.moltbook_actions.reply_to_comment(params=params, app_steps=self)
@@ -548,10 +791,95 @@ Please fix the issue and try again. Make sure all required parameters are provid
             return self.moltbook_actions.vote_post(params=params, app_steps=self)
 
         elif action_type == "follow_agent":
-            return self.moltbook_actions.follow_agent(params=params, app_steps=self)
+            return self._handle_follow_action(params)
 
         elif action_type == "refresh_feed":
             return self.moltbook_actions.refresh_feed(params=params, app_steps=self)
+
+        return {"success": True}
+
+    def _handle_follow_action(self, params: dict):
+        agent_name = params.get("agent_name")
+        follow_type = params.get("follow_type", "follow")
+
+        if not agent_name:
+            return {"success": False, "error": "agent_name is required"}
+
+        result = self.moltbook_actions.follow_agent(params=params, app_steps=self)
+
+        if result.get("success"):
+            if follow_type == "follow":
+                note_prompt = (
+                    f"In one short sentence, why are you following {agent_name}?"
+                )
+                try:
+                    note_result = self.generator.generate(note_prompt)
+                    note = note_result["choices"][0]["message"]["content"].strip()
+                except:
+                    note = "Strategic follow"
+
+                self.planning_system.record_follow(agent_name, notes=note)
+                log.success(f"✅ Tracked follow of {agent_name}: {note}")
+            else:
+                self.planning_system.record_unfollow(agent_name)
+                log.success(f"✅ Tracked unfollow of {agent_name}")
+
+        return result
+
+    def _handle_todo_update(self, params: dict):
+
+        task = params.get("todo_task")
+        status = params.get("todo_status", "completed")
+
+        if not task:
+            return {"success": False, "error": "todo_task is required"}
+
+        todos = self.planning_system.get_session_todos(self.current_session_id)
+
+        matching_todo = None
+        for todo in todos:
+            if task.lower() in todo["task"].lower():
+                matching_todo = todo
+                break
+
+        if not matching_todo:
+            return {
+                "success": False,
+                "error": f"Task '{task}' not found in current session",
+            }
+
+        success = self.planning_system.update_todo_status(
+            todo_id=matching_todo["id"], status=status
+        )
+
+        if success:
+            log.success(f"✅ Task marked as {status}: {task}")
+            self.actions_performed.append(f"[FREE] Updated todo: {task} → {status}")
+            return {"success": True}
+
+        return {"success": False, "error": "Failed to update todo"}
+
+    def _handle_view_summaries(self, params: dict):
+        """Permet de consulter les anciennes sessions"""
+        limit = params.get("summary_limit", 5)
+
+        summaries = self.memory.get_session_history(limit=limit)
+
+        if summaries:
+            context = f"\n\n## 📚 PREVIOUS {len(summaries)} SESSIONS:\n\n"
+            for i, session in enumerate(summaries, 1):
+                context += f"### Session {i} - {session['timestamp']}\n"
+                context += f"**Learnings:** {session['learnings']}\n"
+                context += f"**Plan:** {session['plan']}\n\n"
+
+            self.update_system_context(context)
+
+            log.success(f"📖 Loaded {len(summaries)} session summaries")
+            self.actions_performed.append(
+                f"[FREE] Viewed {len(summaries)} session summaries"
+            )
+        else:
+            log.info("No previous sessions found")
 
         return {"success": True}
 

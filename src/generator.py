@@ -1,5 +1,6 @@
 import os
-from llama_cpp import Llama
+import json
+from llama_cpp import Llama, LlamaGrammar
 from src.settings import settings
 from src.utils import log
 from src.memory import Memory
@@ -30,15 +31,17 @@ class Generator:
             }
         ] + self.conversation_history
 
-        if response_format:
-            response_config = {"type": "json_object", "schema": response_format}
-        else:
-            response_config = {"type": "json_object"}
-
         try:
+            grammar = None
+            if response_format:
+                try:
+                    schema_str = json.dumps(response_format)
+                    grammar = LlamaGrammar.from_json_schema(schema_str)
+                except Exception as e:
+                    log.error(f"Grammar creation failed: {e}")
             result = self.llm.create_chat_completion(
                 messages=messages,
-                response_format=response_config,
+                grammar=grammar,
                 temperature=0.7,
             )
 
@@ -128,8 +131,14 @@ Reflect on this session and create a summary with:
 
 Respond in JSON format.
 """
+        grammar = None
+        try:
+            schema_str = json.dumps(summary_schema)
+            grammar = LlamaGrammar.from_json_schema(schema_str)
+        except Exception as e:
+            log.error(f"Grammar creation failed: {e}")
 
-        result = self.generate(summary_prompt, response_format=summary_schema)
+        result = self.generate(summary_prompt, grammar=grammar)
         return result["choices"][0]["message"]["content"]
 
     def clear_conversation(self):

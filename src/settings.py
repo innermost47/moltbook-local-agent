@@ -38,6 +38,10 @@ class Settings(BaseSettings):
     }
     MAX_ENTRIES_PER_CATEGORY: int = 100
     ALLOWED_DOMAINS_FILE_PATH: Optional[str] = None
+    BLOG_API_URL: Optional[str] = None
+    BLOG_API_KEY: Optional[str] = None
+    FAL_API_KEY: Optional[str] = None
+    BLOG_BASE_URL: Optional[str] = None
 
     model_config = SettingsConfigDict(
         env_file=Path(__file__).resolve().parent.parent / ".env",

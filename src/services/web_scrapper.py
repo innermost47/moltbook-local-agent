@@ -2,7 +2,7 @@ from typing import List
 from datetime import datetime
 import requests
 from bs4 import BeautifulSoup
-from urllib.parse import urljoin, urlparse
+from urllib.parse import urljoin, urlparse, quote
 from src.utils import log
 from src.settings import settings
 from src.generator import Generator
@@ -17,15 +17,12 @@ class WebScraper:
         self.allowed_domains = settings.get_domains()
 
     def is_allowed(self, url: str) -> bool:
-        parsed = urlparse(url)
-        domain = parsed.netloc.replace("www.", "")
+        parsed_url = urlparse(url)
+        domain = parsed_url.netloc
 
-        for allowed_domain, config in self.allowed_domains.items():
-            if domain in allowed_domain or allowed_domain in domain:
-                if "allowed_paths" in config:
-                    return any(path in parsed.path for path in config["allowed_paths"])
-                return True
-        return False
+        domain = domain.replace("www.", "")
+
+        return domain in self.allowed_domains
 
     def fetch_page(self, url: str) -> str:
         if not self.is_allowed(url):
@@ -136,16 +133,35 @@ Provide a concise summary (max 300 words) highlighting the most relevant informa
     def web_fetch(
         self, params: dict, generator: Generator, store_memory, actions_performed: List
     ):
-        domain = params.get("web_domain", "")
-        query = params.get("web_query", "")
         url = params.get("web_url")
+        query = params.get("web_query", "")
 
-        if not domain:
-            error_msg = "Missing domain for web_fetch"
+        if not url:
+            error_msg = "Missing web_url for web_fetch"
             log.error(error_msg)
             return {"success": False, "error": error_msg}
 
-        log.info(f"🌐 Fetching {domain}...")
+        parsed_url = urlparse(url)
+        domain = parsed_url.netloc.lower()
+        if domain.startswith("www."):
+            domain = domain[4:]
+
+        if domain not in self.allowed_domains:
+            error_msg = f"Domain {domain} not allowed"
+            log.error(error_msg)
+            return {"success": False, "error": error_msg}
+
+        domain_config = self.allowed_domains[domain]
+
+        if "allowed_paths" in domain_config and domain_config["allowed_paths"]:
+            path_valid = any(
+                url.lower().find(p.lower()) != -1
+                for p in domain_config["allowed_paths"]
+            )
+            if not path_valid:
+                return {"success": False, "error": f"Path not allowed for {domain}"}
+
+        log.info(f"Fetching: {url} (Domain identified: {domain})")
 
         result = self.fetch_and_extract(domain, url)
 
@@ -168,29 +184,36 @@ Provide a concise summary (max 300 words) highlighting the most relevant informa
     def web_search_links(
         self, params: dict, update_system_context, actions_performed: List
     ):
-        domain = params.get("web_domain") or params.get("domain")
+        domain = params.get("web_domain")
+        query = params.get("web_query", "")
 
-        if not domain and params.get("web_url"):
-            domain = urlparse(params.get("web_url")).netloc
+        if not domain or domain not in self.allowed_domains:
+            return {"success": False, "error": f"Invalid or missing domain: {domain}"}
 
-        if not domain:
-            error_msg = "Missing domain for web_search_links"
-            log.error(error_msg)
-            return {"success": False, "error": error_msg}
+        domain_config = self.allowed_domains[domain]
 
-        result = self.fetch_and_extract(domain)
+        if "search_url_pattern" in domain_config and query:
+
+            encoded_query = quote(query)
+            target_url = domain_config["search_url_pattern"].replace(
+                "{query}", encoded_query
+            )
+        else:
+            target_url = f"https://{domain}"
+
+        log.info(f"Searching {domain} for: {query}")
+
+        result = self.fetch_and_extract(target_url)
 
         if "error" in result:
             return {"success": False, "error": result["error"]}
 
-        links_text = f"## LINKS FROM {domain}:\n"
-        for link in result["links"][:5]:
+        links_text = f"## SEARCH RESULTS ON {domain} FOR '{query}':\n"
+        for link in result["links"][:10]:
             links_text += f"- {link['text']}: {link['url']}\n"
 
         update_system_context(links_text)
-
-        log.success(f"📋 Retrieved {len(result['links'])} links from {domain}")
-        actions_performed.append(f"[FREE] Listed links from {domain}")
+        actions_performed.append(f"[FREE] Searched {domain} for '{query}'")
 
         return {"success": True}
 

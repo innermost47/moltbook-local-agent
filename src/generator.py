@@ -131,14 +131,8 @@ Reflect on this session and create a summary with:
 
 Respond in JSON format.
 """
-        grammar = None
-        try:
-            schema_str = json.dumps(summary_schema)
-            grammar = LlamaGrammar.from_json_schema(schema_str)
-        except Exception as e:
-            log.error(f"Grammar creation failed: {e}")
 
-        result = self.generate(summary_prompt, grammar=grammar)
+        result = self.generate(summary_prompt)
         return result["choices"][0]["message"]["content"]
 
     def clear_conversation(self):

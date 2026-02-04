@@ -272,7 +272,7 @@ class MemorySystem:
         ]
 
         if len(recent_retrieves) > 0:
-            warning = f"⚠️ You already retrieved '{category}' memories recently. Results are already in your context."
+            warning = f"You already retrieved '{category}' memories recently. Results are already in your context."
             log.warning(warning)
             return {"success": False, "error": warning}
 
@@ -296,18 +296,19 @@ class MemorySystem:
         if entries:
             feedback = f"\n## 📚 MEMORIES RETRIEVED FROM '{category}'\n\n"
             for memory in entries:
-                feedback += f"- {memory['content'][:100]}...\n"
+                feedback += f"- {memory['content']}...\n"
             feedback += f"\n✅ You now have this information. DO NOT retrieve the same category again.\n"
 
             update_system_context(feedback)
 
-            log.success(f"📖 Retrieved {len(entries)} memories from '{category}'")
+            log.success(f"Retrieved {len(entries)} memories from '{category}'")
             actions_performed.append(
                 f"[FREE] Retrieved {len(entries)} memories from '{category}'"
             )
             return {"success": True}
         else:
             msg = f"No memories found in '{category}'."
+            update_system_context(f"\n## 📚 MEMORY SEARCH: {category}\n> {msg}\n")
             log.info(msg)
             return {"success": True, "message": msg}
 
@@ -324,7 +325,7 @@ class MemorySystem:
 
         update_system_context(list_text)
 
-        log.success("📋 Listed all memory categories")
+        log.success("Listed all memory categories")
         actions_performed.append("[FREE] Listed memory categories")
 
         return {"success": True}

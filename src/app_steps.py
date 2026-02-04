@@ -155,8 +155,8 @@ Use ONLY these exact IDs in your actions. Never invent or truncate IDs.
                 "next_session_plan": "Continue engagement",
             }
 
-        log.info(f"Reasoning: {summary.get('reasoning', 'N/A')}")
-        log.info(f"Learnings: {summary.get('learnings', 'N/A')}")
+        log.info(f"[REASONING]: {summary.get('reasoning', 'N/A')}")
+        log.info(f"[LEARNINGS]: {summary.get('learnings', 'N/A')}")
 
         self.memory.save_session(
             summary=summary,
@@ -328,16 +328,29 @@ Use ONLY these exact IDs in your actions. Never invent or truncate IDs.
         }
 
         if self.allowed_domains:
-            action_schema["properties"]["action_params"]["properties"]["web_domain"] = {
-                "type": "string",
-                "enum": list(self.allowed_domains.keys()),
-            }
-            action_schema["properties"]["action_params"]["properties"]["web_query"] = {
-                "type": "string"
-            }
-            action_schema["properties"]["action_params"]["properties"]["web_url"] = {
-                "type": "string"
-            }
+            action_schema["allOf"] = [
+                {
+                    "if": {"properties": {"action_type": {"const": "web_fetch"}}},
+                    "then": {
+                        "properties": {"action_params": {"required": ["web_url"]}}
+                    },
+                },
+                {
+                    "if": {
+                        "properties": {"action_type": {"const": "web_search_links"}}
+                    },
+                    "then": {
+                        "properties": {
+                            "action_params": {
+                                "required": [
+                                    "web_domain",
+                                    "web_query",
+                                ]
+                            }
+                        }
+                    },
+                },
+            ]
 
         actions_list = [
             "- comment_on_post: Comment on post (params: post_id, content) - CONTENT IS REQUIRED",
@@ -417,7 +430,7 @@ Please fix the issue and try again. Make sure all required parameters are provid
                     f"Action: {decision['action_type']} (Attempt {attempt})",
                     self.remaining_actions,
                 )
-                log.info(f"Reasoning: {decision.get('reasoning', 'N/A')}")
+                log.info(f"[REASONING]: {decision.get('reasoning', 'N/A')}")
 
                 execution_result = self._execute_action(decision)
 

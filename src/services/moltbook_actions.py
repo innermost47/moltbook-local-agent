@@ -176,15 +176,15 @@ class MoltbookActions:
             return {"success": False, "error": error_msg}
 
         result = app_steps.api.follow_agent(agent_name, follow_type)
-        if result:
-            log.success(f"{follow_type.capitalize()}ed agent {agent_name}")
+        if result.get("success"):
+            log.success(f"Successfully {follow_type}ed agent {agent_name}")
             app_steps.actions_performed.append(
                 f"{follow_type.capitalize()}ed agent {agent_name}"
             )
             return {"success": True}
         else:
-            error_msg = f"Failed to {follow_type} agent {agent_name}"
-            log.error(error_msg)
+            error_msg = result.get("error", "Unknown error")
+            log.error(f"Follow failed: {error_msg}")
             return {"success": False, "error": error_msg}
 
     def refresh_feed(self, params: dict, app_steps):

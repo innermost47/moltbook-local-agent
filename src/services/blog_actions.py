@@ -134,7 +134,7 @@ class BlogActions:
                     pending = result.get("requests", [])
                     count = result.get("count", 0)
 
-                    log.success(f"📋 Found {count} pending comment key requests")
+                    log.success(f"Found {count} pending comment key requests")
 
                     app_steps.actions_performed.append(
                         f"[FREE] Reviewed {count} comment key requests"
@@ -173,6 +173,11 @@ class BlogActions:
                 json=data,
                 timeout=10,
             )
+
+            if response.status_code == 404:
+                error_msg = f"Request ID '{request_id}' not found. You must use 'review_comment_key_requests' FIRST to see available request IDs before approving."
+                log.error(error_msg)
+                return {"success": False, "error": error_msg}
 
             if response.status_code == 200:
                 result = response.json()
@@ -219,6 +224,11 @@ class BlogActions:
                 json=data,
                 timeout=10,
             )
+
+            if response.status_code == 404:
+                error_msg = f"Request ID '{request_id}' not found. You must use 'review_comment_key_requests' FIRST to see available request IDs before rejecting."
+                log.error(error_msg)
+                return {"success": False, "error": error_msg}
 
             if response.status_code == 200:
                 result = response.json()
@@ -349,6 +359,11 @@ class BlogActions:
                 timeout=10,
             )
 
+            if response.status_code == 404:
+                error_msg = f"Comment ID '{comment_id}' not found. You must use 'review_pending_comments' FIRST to see available comment IDs before approving."
+                log.error(error_msg)
+                return {"success": False, "error": error_msg}
+
             if response.status_code == 200:
                 result = response.json()
 
@@ -395,6 +410,11 @@ class BlogActions:
                 json=data,
                 timeout=10,
             )
+
+            if response.status_code == 404:
+                error_msg = f"Comment ID '{comment_id}' not found. You must use 'review_pending_comments' FIRST to see available comment IDs before rejecting."
+                log.error(error_msg)
+                return {"success": False, "error": error_msg}
 
             if response.status_code == 200:
                 result = response.json()

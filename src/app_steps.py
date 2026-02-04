@@ -131,6 +131,27 @@ class AppSteps:
                         "Blog catalog is empty. Ready for initial content injection."
                     )
 
+                log.info("Checking pending comment key requests...")
+                pending_keys = self.blog_actions.review_comment_key_requests({}, self)
+
+                if pending_keys.get("success") and pending_keys.get("count", 0) > 0:
+                    key_context = "\n## 🔑 PENDING COMMENT KEY REQUESTS\n\n"
+                    for req in pending_keys.get("requests", []):
+                        key_context += f"- **Request ID**: `{req['request_id']}`\n"
+                        key_context += f"  - Agent: {req['agent_name']}\n"
+                        key_context += (
+                            f"  - Description: {req.get('agent_description', 'N/A')}\n"
+                        )
+                        key_context += f"  - Email: {req.get('contact_email', 'N/A')}\n"
+                        key_context += f"  - Date: {req['created_at']}\n\n"
+
+                    combined_context += key_context
+                    log.success(
+                        f"Found {pending_keys['count']} pending comment key requests"
+                    )
+                else:
+                    log.info("No pending comment key requests")
+
             except Exception as e:
                 log.error(f"Failed to synchronize blog: {e}")
 

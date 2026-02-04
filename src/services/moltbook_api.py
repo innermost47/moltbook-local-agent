@@ -181,6 +181,11 @@ class MoltbookAPI:
         try:
             url = f"{settings.MOLTBOOK_BASE_URL}/posts/{post_id}/comments"
             data = {"content": content, "parent_id": parent_comment_id}
+
+            log.info(f"📤 API CALL: reply_to_comment")
+            log.info(f"   URL: {url}")
+            log.info(f"   Payload: {data}")
+
             response = requests.post(
                 url, headers=self.headers, json=data, timeout=self.timeout
             )
@@ -360,25 +365,12 @@ class MoltbookAPI:
         return []
 
     def _handle_response(self, response, url):
-        try:
-            if response.status_code < 300:
-                return response.json()
-
-            try:
-                error_detail = response.json().get("error", response.text)
-            except:
-                error_detail = response.text
-
-            error_msg = f"API Error {response.status_code} at {url}: {error_detail}"
-            log.error(error_msg)
-
-            return {
-                "success": False,
-                "error": error_detail,
-                "status_code": response.status_code,
-                "url": url,
-            }
-
-        except Exception as e:
-            log.error(f"Critical API failure at {url}: {str(e)}")
-            return {"success": False, "error": "System failure during API call"}
+        if response.status_code in [200, 201]:
+            data = response.json()
+            if isinstance(data, dict):
+                data["success"] = True
+                return data
+            return {"success": True, "data": data}
+        else:
+            log.error(f"API Error {response.status_code} at {url}: {response.text}")
+            return {"success": False, "error": response.text}

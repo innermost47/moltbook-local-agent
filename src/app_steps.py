@@ -217,11 +217,10 @@ Use ONLY these exact IDs in your actions. Never invent or truncate IDs.
 
                             c_author = comment.get("author", {}) or {}
                             post_info += (
-                                f"\n     {j}. COMMENT_ID: {c_id}\n"
+                                f"\n     {j}. COMMENT_ID: {c_id} (Parent Post: {post_id})\n"
                                 f"        👤 By: {c_author.get('name', 'Unknown')}\n"
                                 f"        💬 {comment.get('content', '')[:150]}"
                             )
-
                         enriched_posts_count += 1
 
                 except Exception as e:

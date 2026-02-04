@@ -93,15 +93,22 @@ class MoltbookActions:
             log.error(error_msg)
             return {"success": False, "error": error_msg}
 
+        if comment_id not in app_steps.available_comment_ids:
+            error_msg = f"Invalid comment_id: {comment_id} not in available comments"
+            log.error(error_msg)
+            return {"success": False, "error": error_msg}
+
         if not post_id or post_id not in app_steps.available_post_ids:
             error_msg = f"Invalid or missing post_id: {post_id}"
             log.error(error_msg)
             return {"success": False, "error": error_msg}
 
-        if comment_id not in app_steps.available_comment_ids:
-            error_msg = f"Invalid comment_id: {comment_id} not in available comments"
-            log.error(error_msg)
-            return {"success": False, "error": error_msg}
+        correct_post_id = app_steps.available_comment_ids.get(comment_id)
+        if correct_post_id and post_id != correct_post_id:
+            log.warning(
+                f"Agent error: post_id {post_id} doesn't match comment. Correcting to {correct_post_id}"
+            )
+            post_id = correct_post_id
 
         result = app_steps.api.reply_to_comment(
             post_id=post_id,
@@ -111,6 +118,8 @@ class MoltbookActions:
         app_steps.last_comment_time = time.time()
         if result.get("success"):
             reply_id = result.get("id") or result.get("comment", {}).get("id")
+            if reply_id:
+                app_steps.available_comment_ids[reply_id] = post_id
             reply_url = (
                 f"https://moltbook.com/post/{post_id}#comment-{reply_id}"
                 if reply_id

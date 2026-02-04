@@ -26,13 +26,7 @@ class Memory:
         )
         self.conn.commit()
 
-    def save_session(
-        self,
-        actions_performed: list,
-        learnings: str,
-        next_plan: str,
-        full_context: list,
-    ):
+    def create_session(self):
         cursor = self.conn.cursor()
         cursor.execute(
             """
@@ -41,14 +35,44 @@ class Memory:
         """,
             (
                 datetime.now().isoformat(),
-                json.dumps(actions_performed),
-                learnings,
-                next_plan,
-                json.dumps(full_context),
+                json.dumps([]),
+                "Session in progress...",
+                "TBD",
+                json.dumps([]),
             ),
         )
         self.conn.commit()
-        log.success("Session saved to memory")
+
+        current_session_id = cursor.lastrowid
+        log.info(f"Session ID created: {current_session_id}")
+
+        return current_session_id
+
+    def save_session(
+        self,
+        summary,
+        actions_performed,
+        conversation_history,
+        current_session_id,
+    ):
+        log.info("Saving session in database...")
+        cursor = self.conn.cursor()
+        cursor.execute(
+            """
+            UPDATE sessions 
+            SET actions_performed = ?, learnings = ?, next_session_plan = ?, full_context = ?
+            WHERE id = ?
+        """,
+            (
+                json.dumps(actions_performed),
+                summary["learnings"],
+                summary["next_session_plan"],
+                json.dumps(conversation_history),
+                current_session_id,
+            ),
+        )
+        self.conn.commit()
+        log.success("Session saved in database")
 
     def get_last_session(self):
         cursor = self.conn.cursor()

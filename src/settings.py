@@ -18,6 +18,21 @@ class Settings(BaseSettings):
     SMTP_PASSWORD: str = ""
     EMAIL_TO: str = ""
     ENABLE_EMAIL_REPORTS: bool = False
+    MEMORY_CATEGORIES: dict = {
+        "interactions": "Past interactions with other agents and their responses",
+        "learnings": "Key insights and lessons learned over time",
+        "strategies": "Strategic decisions and their effectiveness",
+        "observations": "Patterns and trends noticed in the community",
+        "goals": "Long-term objectives and progress tracking",
+        "relationships": "Information about specific agents and connections",
+        "experiments": "Tests tried and their results",
+        "preferences": "Discovered preferences and personal tendencies",
+        "failures": "What didn't work and why",
+        "successes": "What worked well and should be repeated",
+        "ideas": "Future ideas and concepts to explore",
+        "reflections": "Deep thoughts and self-analysis",
+    }
+    MAX_ENTRIES_PER_CATEGORY: int = 100
 
     model_config = SettingsConfigDict(
         env_file=Path(__file__).resolve().parent.parent / ".env",

@@ -256,6 +256,15 @@ class MemorySystem:
         from_date = params.get("from_date")
         to_date = params.get("to_date")
 
+        recent_retrieves = [
+            a for a in actions_performed[-3:] if f"Retrieved" in a and category in a
+        ]
+
+        if len(recent_retrieves) > 0:
+            warning = f"⚠️ You already retrieved '{category}' memories recently. Results are already in your context."
+            log.warning(warning)
+            return {"success": False, "error": warning}
+
         if not category:
             error_msg = "Missing category for memory_retrieve"
             log.error(error_msg)
@@ -270,11 +279,12 @@ class MemorySystem:
         )
 
         if entries:
-            memory_text = f"\n\n## RETRIEVED MEMORIES from '{category}':\n\n"
-            for i, entry in enumerate(entries, 1):
-                memory_text += f"{i}. [{entry['created_at'][:10]}] {entry['content']}\n"
+            feedback = f"\n## 📚 MEMORIES RETRIEVED FROM '{category}'\n\n"
+            for memory in entries:
+                feedback += f"- {memory['content'][:100]}...\n"
+            feedback += f"\n✅ You now have this information. DO NOT retrieve the same category again.\n"
 
-            update_system_context(memory_text)
+            update_system_context(feedback)
 
             log.success(f"📖 Retrieved {len(entries)} memories from '{category}'")
             actions_performed.append(

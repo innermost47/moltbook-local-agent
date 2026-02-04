@@ -168,7 +168,10 @@ Provide a concise summary (max 300 words) highlighting the most relevant informa
     def web_search_links(
         self, params: dict, update_system_context, actions_performed: List
     ):
-        domain = params.get("web_domain", "")
+        domain = params.get("web_domain") or params.get("domain")
+
+        if not domain and params.get("web_url"):
+            domain = urlparse(params.get("web_url")).netloc
 
         if not domain:
             error_msg = "Missing domain for web_search_links"

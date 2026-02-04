@@ -482,6 +482,8 @@ Please fix the issue and try again. Make sure all required parameters are provid
         action_type = decision["action_type"]
         params = decision["action_params"]
 
+        log.info(f"DEBUG - Full Params received: {params}")
+
         if action_type in ["reply_to_comment", "comment_on_post", "vote_post"]:
             post_id = params.get("post_id")
             comment_id = params.get("comment_id")

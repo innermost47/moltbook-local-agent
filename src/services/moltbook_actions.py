@@ -70,12 +70,12 @@ class MoltbookActions:
                 else "N/A"
             )
 
-            log.success(f"Commented on post {post_id[:8]}")
+            log.success(f"Commented on post {post_id}")
             log.info(f"Comment URL: {comment_url}")
 
-            app_steps.actions_performed.append(f"Commented on post {post_id[:8]}")
+            app_steps.actions_performed.append(f"Commented on post {post_id}")
             app_steps.created_content_urls.append(
-                {"type": "comment", "post_id": post_id[:8], "url": comment_url}
+                {"type": "comment", "post_id": post_id, "url": comment_url}
             )
             return {"success": True}
         else:
@@ -126,14 +126,14 @@ class MoltbookActions:
                 else "N/A"
             )
 
-            log.success(f"Replied to comment {comment_id[:8]}")
+            log.success(f"Replied to comment {comment_id}")
             log.info(f"Reply URL: {reply_url}")
 
-            app_steps.actions_performed.append(f"Replied to comment {comment_id[:8]}")
+            app_steps.actions_performed.append(f"Replied to comment {comment_id}")
             app_steps.created_content_urls.append(
                 {
                     "type": "reply",
-                    "parent_comment_id": comment_id[:8],
+                    "parent_comment_id": comment_id,
                     "url": reply_url,
                 }
             )
@@ -156,9 +156,9 @@ class MoltbookActions:
             content_id=post_id, content_type="posts", vote_type=vote_type
         )
         if result.get("success"):
-            log.success(f"{vote_type.capitalize()}d post {post_id[:8]}")
+            log.success(f"{vote_type.capitalize()}d post {post_id}")
             app_steps.actions_performed.append(
-                f"{vote_type.capitalize()}d post {post_id[:8]}"
+                f"{vote_type.capitalize()}d post {post_id}"
             )
             return {"success": True}
         else:

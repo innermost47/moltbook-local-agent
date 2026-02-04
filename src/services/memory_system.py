@@ -2,7 +2,7 @@ import sqlite3
 from datetime import datetime
 from typing import List, Dict
 from src.settings import settings
-from src.logger import log
+from src.utils import log
 
 
 class MemorySystem:
@@ -226,6 +226,82 @@ class MemorySystem:
         context += "\n**Strategy:** Use memory to track patterns, remember key interactions, and build knowledge over time.\n"
 
         return context
+
+    def store(self, params: dict, current_session_id: str, actions_performed: List):
+        category = params.get("memory_category", "")
+        content = params.get("memory_content", "")
+
+        if not category or not content:
+            error_msg = "Missing category or content for memory_store"
+            log.error(error_msg)
+            return {"success": False, "error": error_msg}
+
+        success = self.store_memory(
+            category=category, content=content, session_id=current_session_id
+        )
+
+        if success:
+            log.success(f"💾 Stored memory in '{category}'")
+            actions_performed.append(f"[FREE] Stored memory in '{category}'")
+            return {"success": True}
+        else:
+            error_msg = f"Failed to store memory in '{category}'"
+            log.error(error_msg)
+            return {"success": False, "error": error_msg}
+
+    def retrieve(self, params: dict, actions_performed: List, update_system_context):
+        category = params.get("memory_category", "")
+        limit = params.get("memory_limit", 5)
+        order = params.get("memory_order", "desc")
+        from_date = params.get("from_date")
+        to_date = params.get("to_date")
+
+        if not category:
+            error_msg = "Missing category for memory_retrieve"
+            log.error(error_msg)
+            return {"success": False, "error": error_msg}
+
+        entries = self.retrieve_memory(
+            category=category,
+            limit=limit,
+            order=order,
+            from_date=from_date,
+            to_date=to_date,
+        )
+
+        if entries:
+            memory_text = f"\n\n## RETRIEVED MEMORIES from '{category}':\n\n"
+            for i, entry in enumerate(entries, 1):
+                memory_text += f"{i}. [{entry['created_at'][:10]}] {entry['content']}\n"
+
+            update_system_context(memory_text)
+
+            log.success(f"📖 Retrieved {len(entries)} memories from '{category}'")
+            actions_performed.append(
+                f"[FREE] Retrieved {len(entries)} memories from '{category}'"
+            )
+        else:
+            log.info(f"No memories found in '{category}'")
+
+        return {"success": True}
+
+    def list(self, update_system_context, actions_performed: List):
+        categories_info = self.list_categories()
+
+        list_text = "\n\n## MEMORY CATEGORIES STATUS:\n\n"
+        for category, info in categories_info.items():
+            stats = info["stats"]
+            if stats["count"] > 0:
+                list_text += f"- **{category}**: {stats['count']} entries ({stats['oldest'][:10]} to {stats['newest'][:10]})\n"
+            else:
+                list_text += f"- **{category}**: empty\n"
+
+        update_system_context(list_text)
+
+        log.success("📋 Listed all memory categories")
+        actions_performed.append("[FREE] Listed memory categories")
+
+        return {"success": True}
 
     def __del__(self):
         if hasattr(self, "conn"):

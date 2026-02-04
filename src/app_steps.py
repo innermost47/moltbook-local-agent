@@ -1,13 +1,18 @@
 import json
 import time
 import re
-from src.moltbook_api import MoltbookAPI
+from src.services import (
+    MoltbookAPI,
+    EmailReporter,
+    MemorySystem,
+    WebScraper,
+    MoltbookActions,
+    get_web_context_for_agent,
+)
 from src.generator import Generator
 from src.memory import Memory
-from src.logger import log
+from src.utils import log
 from src.settings import settings
-from src.email_reporter import EmailReporter
-from src.memory_system import MemorySystem
 
 
 class AppSteps:
@@ -17,6 +22,9 @@ class AppSteps:
         self.memory = Memory()
         self.reporter = EmailReporter()
         self.memory_system = MemorySystem()
+        self.web_scraper = WebScraper()
+        self.moltbook_actions = MoltbookActions()
+        self.feed_options = ["hot", "new", "top", "rising"]
         self.actions_performed = []
         self.remaining_actions = settings.MAX_ACTIONS_PER_SESSION
         self.current_feed = None
@@ -28,6 +36,7 @@ class AppSteps:
         self.last_comment_time = None
         self.created_content_urls = []
         self.current_session_id = None
+        self.allowed_domains = settings.get_domains()
 
     def run_session(self):
         log.info("=== SESSION START ===")
@@ -88,7 +97,7 @@ class AppSteps:
             )
             log.info("No previous sessions found")
 
-        posts_data = self.api.get_posts(sort="hot", limit=20)
+        posts_data = self.api.get_posts(sort="new", limit=20)
 
         if not posts_data.get("posts"):
             log.error("❌ Cannot load feed from Moltbook API - server may be down")
@@ -99,21 +108,24 @@ class AppSteps:
             )
             return
 
-        self.current_feed = self._get_enriched_feed_context(posts_data)
+        self.current_feed = self.get_enriched_feed_context(posts_data)
 
         combined_context += f"""## CURRENT MOLTBOOK FEED
 
-        {self.current_feed}
+{self.current_feed}
 
-        AVAILABLE POST IDs: {', '.join(self.available_post_ids)}
-        AVAILABLE COMMENT IDs: {', '.join(self.available_comment_ids.keys())}
+AVAILABLE POST IDs: {', '.join(self.available_post_ids)}
+AVAILABLE COMMENT IDs: {', '.join(self.available_comment_ids.keys())}
 
-        Use ONLY these exact IDs in your actions. Never invent or truncate IDs.
-        """
+Use ONLY these exact IDs in your actions. Never invent or truncate IDs.
+"""
 
         log.success(
             f"Feed loaded: {len(self.available_post_ids)} posts, {len(self.available_comment_ids)} comments"
         )
+
+        if self.allowed_domains:
+            combined_context += "\n\n" + get_web_context_for_agent()
 
         self.generator.conversation_history.append(
             {"role": "system", "content": combined_context}
@@ -163,7 +175,7 @@ class AppSteps:
 
         log.info("=== SESSION END ===")
 
-    def _get_enriched_feed_context(self, posts_data: dict) -> str:
+    def get_enriched_feed_context(self, posts_data: dict) -> str:
 
         posts = posts_data.get("posts", [])
 
@@ -239,8 +251,16 @@ class AppSteps:
             "memory_retrieve",
             "memory_list",
         ]
+
         if not self.post_creation_attempted:
             allowed_actions.append("create_post")
+        if self.allowed_domains:
+            allowed_actions.extend(
+                [
+                    "web_fetch",
+                    "web_search_links",
+                ]
+            )
 
         action_schema = {
             "type": "object",
@@ -285,8 +305,11 @@ class AppSteps:
                         },
                         "title": {"type": "string"},
                         "content": {"type": "string"},
-                        "sort": {"type": "string"},
-                        "limit": {"type": "integer"},
+                        "sort": {
+                            "type": "string",
+                            "enum": self.feed_options,
+                        },
+                        "limit": {"type": "integer", "minimum": 1, "maximum": 50},
                         "memory_category": {
                             "type": "string",
                             "enum": list(settings.MEMORY_CATEGORIES.keys()),
@@ -306,18 +329,47 @@ class AppSteps:
             "required": ["reasoning", "action_type", "action_params"],
         }
 
+        if self.allowed_domains:
+            action_schema["properties"]["action_params"]["properties"]["web_domain"] = {
+                "type": "string",
+                "enum": list(self.allowed_domains.keys()),
+            }
+            action_schema["properties"]["action_params"]["properties"]["web_query"] = {
+                "type": "string"
+            }
+            action_schema["properties"]["action_params"]["properties"]["web_url"] = {
+                "type": "string"
+            }
+
+        actions_list = [
+            "- comment_on_post: Comment on post (params: post_id, content) - CONTENT IS REQUIRED",
+            "- reply_to_comment: Reply to comment (params: post_id, comment_id, content) - CONTENT IS REQUIRED",
+            "- vote_post: Vote on post (params: post_id, vote_type)",
+            "- follow_agent: Follow/unfollow agent (params: agent_name, follow_type)",
+            f"- refresh_feed: Refresh feed (params: sort, limit) - SORTS: {', '.join(self.feed_options)}",
+        ]
+
+        if not self.post_creation_attempted:
+            actions_list.insert(
+                0, "- create_post: Create new post (params: title, content, submolt)"
+            )
+
         decision_prompt = f"""
 You have {self.remaining_actions} MOLTBOOK actions remaining in this session.
-{"⚠️ Post creation already attempted this session." if self.post_creation_attempted else ""}
 
 **MOLTBOOK ACTIONS (count toward limit):**
-- create_post: Create new post (params: title, content, submolt)
-- comment_on_post: Comment on post (params: post_id, content) - CONTENT IS REQUIRED
-- reply_to_comment: Reply to comment (params: post_id, comment_id, content) - CONTENT IS REQUIRED
-- vote_post: Vote on post (params: post_id, vote_type)
-- follow_agent: Follow/unfollow agent (params: agent_name, follow_type)
-- refresh_feed: Refresh feed (params: sort, limit)
+{chr(10).join(actions_list)}
+"""
 
+        if self.allowed_domains:
+            decision_prompt += f"""
+**WEB ACTIONS (FREE - unlimited):**
+- web_search_links: Search for links on a specific domain (params: web_domain, web_query)
+- web_fetch: Fetch content from a specific URL (params: web_url)
+Allowed domains: {', '.join(self.allowed_domains.keys())}
+"""
+
+        decision_prompt += f"""
 **MEMORY ACTIONS (FREE - unlimited):**
 - memory_store: Save information (params: memory_category, memory_content)
 - memory_retrieve: Get memories (params: memory_category, memory_limit, memory_order, optional: from_date, to_date)
@@ -420,293 +472,63 @@ Please fix the issue and try again. Make sure all required parameters are provid
         params = decision["action_params"]
 
         if action_type == "memory_store":
-            category = params.get("memory_category", "")
-            content = params.get("memory_content", "")
-
-            if not category or not content:
-                error_msg = "Missing category or content for memory_store"
-                log.error(error_msg)
-                return {"success": False, "error": error_msg}
-
-            success = self.memory_system.store_memory(
-                category=category, content=content, session_id=self.current_session_id
+            return self.memory_system.store(
+                params=params,
+                current_session_id=self.current_session_id,
+                actions_performed=self.actions_performed,
             )
-
-            if success:
-                log.success(f"💾 Stored memory in '{category}'")
-                self.actions_performed.append(f"[FREE] Stored memory in '{category}'")
-                return {"success": True}
-            else:
-                error_msg = f"Failed to store memory in '{category}'"
-                log.error(error_msg)
-                return {"success": False, "error": error_msg}
 
         elif action_type == "memory_retrieve":
-            category = params.get("memory_category", "")
-            limit = params.get("memory_limit", 5)
-            order = params.get("memory_order", "desc")
-            from_date = params.get("from_date")
-            to_date = params.get("to_date")
-
-            if not category:
-                error_msg = "Missing category for memory_retrieve"
-                log.error(error_msg)
-                return {"success": False, "error": error_msg}
-
-            entries = self.memory_system.retrieve_memory(
-                category=category,
-                limit=limit,
-                order=order,
-                from_date=from_date,
-                to_date=to_date,
+            return self.memory_system.retrieve(
+                params=params,
+                actions_performed=self.actions_performed,
+                update_system_context=self.update_system_context,
             )
 
-            if entries:
-                memory_text = f"\n\n## RETRIEVED MEMORIES from '{category}':\n\n"
-                for i, entry in enumerate(entries, 1):
-                    memory_text += (
-                        f"{i}. [{entry['created_at'][:10]}] {entry['content']}\n"
-                    )
-
-                self._update_system_context(memory_text)
-
-                log.success(f"📖 Retrieved {len(entries)} memories from '{category}'")
-                self.actions_performed.append(
-                    f"[FREE] Retrieved {len(entries)} memories from '{category}'"
-                )
-            else:
-                log.info(f"No memories found in '{category}'")
-
-            return {"success": True}
-
         elif action_type == "memory_list":
-            categories_info = self.memory_system.list_categories()
+            return self.memory_system.list(
+                update_system_context=self.update_system_context,
+                actions_performed=self.actions_performed,
+            )
 
-            list_text = "\n\n## MEMORY CATEGORIES STATUS:\n\n"
-            for category, info in categories_info.items():
-                stats = info["stats"]
-                if stats["count"] > 0:
-                    list_text += f"- **{category}**: {stats['count']} entries ({stats['oldest'][:10]} to {stats['newest'][:10]})\n"
-                else:
-                    list_text += f"- **{category}**: empty\n"
+        elif action_type == "web_fetch":
+            return self.web_scraper.web_fetch(
+                params=params,
+                generator=self.generator,
+                store_memory=self.memory_system.store_memory,
+                actions_performed=self.actions_performed,
+            )
 
-            self._update_system_context(list_text)
-
-            log.success("📋 Listed all memory categories")
-            self.actions_performed.append("[FREE] Listed memory categories")
-
-            return {"success": True}
+        elif action_type == "web_search_links":
+            return self.web_scraper.web_search_links(
+                params=params,
+                update_system_context=self.update_system_context,
+                actions_performed=self.actions_performed,
+            )
 
         self._wait_for_rate_limit(action_type)
 
         if action_type == "create_post":
-            if self.post_creation_attempted:
-                error_msg = "Post creation already attempted this session"
-                log.warning(error_msg)
-                self.actions_performed.append(
-                    "SKIPPED: Post creation (already attempted)"
-                )
-                return {"success": False, "error": error_msg}
-
-            self.post_creation_attempted = True
-            submolt = params.get("submolt", "general")
-
-            result = self.api.create_text_post(
-                title=params.get("title", ""),
-                content=params.get("content", ""),
-                submolt=submolt,
-            )
-            self.last_post_time = time.time()
-            if result.get("success"):
-                post_id = result.get("id") or result.get("post", {}).get("id")
-                post_url = (
-                    f"https://moltbook.com/m/{submolt}/post/{post_id}"
-                    if post_id
-                    else "N/A"
-                )
-
-                log.success(f"Post created: {params.get('title', '')[:50]}")
-                log.info(f"Post URL: {post_url}")
-
-                self.actions_performed.append(
-                    f"Created post: {params.get('title', '')}"
-                )
-                self.created_content_urls.append(
-                    {"type": "post", "title": params.get("title", ""), "url": post_url}
-                )
-                return {"success": True}
-            else:
-                error_msg = result.get("error", "Unknown")
-                log.error(f"Post failed: {error_msg}")
-                self.actions_performed.append(f"FAILED: Create post ({error_msg})")
-                return {"success": False, "error": error_msg}
+            return self.moltbook_actions.create_post(app_steps=self, params=params)
 
         elif action_type == "comment_on_post":
-            post_id = params.get("post_id", "")
-            content = params.get("content", "")
-
-            if not content or content.strip() == "":
-                error_msg = "Comment content is required and cannot be empty"
-                log.error(error_msg)
-                return {"success": False, "error": error_msg}
-
-            if post_id not in self.available_post_ids:
-                error_msg = f"Invalid post_id: {post_id} not in available posts"
-                log.error(error_msg)
-                return {"success": False, "error": error_msg}
-
-            result = self.api.add_comment(
-                post_id=post_id, content=params.get("content", "")
-            )
-            self.last_comment_time = time.time()
-
-            if result.get("success"):
-                comment_id = result.get("id") or result.get("comment", {}).get("id")
-                comment_url = (
-                    f"https://moltbook.com/post/{post_id}#comment-{comment_id}"
-                    if comment_id
-                    else "N/A"
-                )
-
-                log.success(f"Commented on post {post_id[:8]}")
-                log.info(f"Comment URL: {comment_url}")
-
-                self.actions_performed.append(f"Commented on post {post_id[:8]}")
-                self.created_content_urls.append(
-                    {"type": "comment", "post_id": post_id[:8], "url": comment_url}
-                )
-                return {"success": True}
-            else:
-                error_msg = result.get("error", "Unknown")
-                log.error(f"Comment failed: {error_msg}")
-                return {"success": False, "error": error_msg}
+            return self.moltbook_actions.comment_on_post(params=params, app_steps=self)
 
         elif action_type == "reply_to_comment":
-            post_id = params.get("post_id", "")
-            comment_id = params.get("comment_id", "")
-            content = params.get("content", "")
-
-            if not content or content.strip() == "":
-                error_msg = "Reply content is required and cannot be empty"
-                log.error(error_msg)
-                return {"success": False, "error": error_msg}
-
-            if not post_id or post_id not in self.available_post_ids:
-                error_msg = f"Invalid or missing post_id: {post_id}"
-                log.error(error_msg)
-                return {"success": False, "error": error_msg}
-
-            if comment_id not in self.available_comment_ids:
-                error_msg = (
-                    f"Invalid comment_id: {comment_id} not in available comments"
-                )
-                log.error(error_msg)
-                return {"success": False, "error": error_msg}
-
-            result = self.api.reply_to_comment(
-                post_id=post_id,
-                content=params.get("content", ""),
-                parent_comment_id=comment_id,
-            )
-            self.last_comment_time = time.time()
-            if result.get("success"):
-                reply_id = result.get("id") or result.get("comment", {}).get("id")
-                reply_url = (
-                    f"https://moltbook.com/post/{post_id}#comment-{reply_id}"
-                    if reply_id
-                    else "N/A"
-                )
-
-                log.success(f"Replied to comment {comment_id[:8]}")
-                log.info(f"Reply URL: {reply_url}")
-
-                self.actions_performed.append(f"Replied to comment {comment_id[:8]}")
-                self.created_content_urls.append(
-                    {
-                        "type": "reply",
-                        "parent_comment_id": comment_id[:8],
-                        "url": reply_url,
-                    }
-                )
-                return {"success": True}
-            else:
-                error_msg = result.get("error", "Unknown")
-                log.error(f"Reply failed: {error_msg}")
-                return {"success": False, "error": error_msg}
+            return self.moltbook_actions.reply_to_comment(params=params, app_steps=self)
 
         elif action_type == "vote_post":
-            post_id = params.get("post_id", "")
-            vote_type = params.get("vote_type", "upvote")
-
-            if not post_id or post_id not in self.available_post_ids:
-                error_msg = f"Invalid or missing post_id: {post_id}"
-                log.error(error_msg)
-                return {"success": False, "error": error_msg}
-
-            result = self.api.vote(
-                content_id=post_id, content_type="posts", vote_type=vote_type
-            )
-            if result.get("success"):
-                log.success(f"{vote_type.capitalize()}d post {post_id[:8]}")
-                self.actions_performed.append(
-                    f"{vote_type.capitalize()}d post {post_id[:8]}"
-                )
-                return {"success": True}
-            else:
-                error_msg = result.get("error", "Unknown")
-                log.error(f"{vote_type.capitalize()} failed: {error_msg}")
-                return {"success": False, "error": error_msg}
+            return self.moltbook_actions.vote_post(params=params, app_steps=self)
 
         elif action_type == "follow_agent":
-            agent_name = params.get("agent_name", "")
-            follow_type = params.get("follow_type", "follow")
-
-            if not agent_name:
-                error_msg = "Missing agent_name for follow action"
-                log.error(error_msg)
-                return {"success": False, "error": error_msg}
-
-            result = self.api.follow_agent(agent_name, follow_type)
-            if result:
-                log.success(f"{follow_type.capitalize()}ed agent {agent_name}")
-                self.actions_performed.append(
-                    f"{follow_type.capitalize()}ed agent {agent_name}"
-                )
-                return {"success": True}
-            else:
-                error_msg = f"Failed to {follow_type} agent {agent_name}"
-                log.error(error_msg)
-                return {"success": False, "error": error_msg}
+            return self.moltbook_actions.follow_agent(params=params, app_steps=self)
 
         elif action_type == "refresh_feed":
-            log.info("Refreshing feed...")
-            posts_data = self.api.get_posts(
-                sort=params.get("sort", "hot"), limit=params.get("limit", 20)
-            )
+            return self.moltbook_actions.refresh_feed(params=params, app_steps=self)
 
-            self.available_post_ids = []
-            self.available_comment_ids = {}
-
-            self.current_feed = self._get_enriched_feed_context(posts_data)
-
-            feed_update = f"""## FEED REFRESHED
-
-{self.current_feed}
-
-UPDATED POST IDs: {', '.join(self.available_post_ids)}
-UPDATED COMMENT IDs: {', '.join(self.available_comment_ids.keys())}
-"""
-
-            self._update_system_context(feed_update)
-
-            log.success(
-                f"Feed refreshed: {len(self.available_post_ids)} posts, {len(self.available_comment_ids)} comments"
-            )
-            self.actions_performed.append("Refreshed feed")
-            return {"success": True}
         return {"success": True}
 
-    def _update_system_context(self, additional_context: str):
+    def update_system_context(self, additional_context: str):
         if (
             self.generator.conversation_history
             and self.generator.conversation_history[0]["role"] == "system"

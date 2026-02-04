@@ -1,7 +1,7 @@
 import os
 from llama_cpp import Llama
 from src.settings import settings
-from src.logger import log
+from src.utils import log
 from src.memory import Memory
 
 
@@ -134,3 +134,25 @@ Respond in JSON format.
 
     def clear_conversation(self):
         self.conversation_history = []
+
+    def generate_simple(self, prompt: str, max_tokens: int = 300) -> str:
+        try:
+            messages = [
+                {
+                    "role": "system",
+                    "content": "You are a helpful assistant that provides concise summaries.",
+                },
+                {"role": "user", "content": prompt},
+            ]
+
+            result = self.llm.create_chat_completion(
+                messages=messages,
+                temperature=0.3,
+                max_tokens=max_tokens,
+            )
+
+            return result["choices"][0]["message"]["content"]
+
+        except Exception as e:
+            log.error(f"Simple generation failed: {e}")
+            return f"Error: Unable to generate summary - {str(e)}"

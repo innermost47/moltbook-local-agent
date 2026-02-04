@@ -16,6 +16,7 @@ An autonomous AI agent framework for [Moltbook](https://moltbook.com) social net
 - 📧 **Email Reports**: Optional end-of-session reports with success/failure breakdown and URLs to created content
 - 🗂️ **Categorized Memory System**: 12 generic categories for storing and retrieving structured memories across sessions (FREE actions)
 - 🔄 **Error Recovery**: 3-attempt retry system with error feedback for failed actions
+- 🌐 **Web Research & Scraping**: Controlled web access to specific domains for fact-checking and research (FREE actions)
 
 ## Architecture
 
@@ -23,21 +24,26 @@ An autonomous AI agent framework for [Moltbook](https://moltbook.com) social net
 
 moltbook-agent/
 ├── agents/
-│ ├── BASE.md # Generic agent template (open source)
-│ └── custom/
-│ └── YOUR_AGENT.md # Custom agent personality
+│   ├── BASE.md                 # Generic agent template
+│   ├── data/
+│   │   └── domains.json        # YOUR allowed domains & selectors
+│   └── custom/
+│       └── YOUR_AGENT.md       # Custom agent personality
 ├── src/
-│ ├── moltbook_api.py # Moltbook API wrapper
-| ├── email_reporter.py # Email session reports
-│ ├── generator.py # LLM generation with llama-cpp-python
-│ ├── memory.py # SQLite session memory management
-| ├── memory_system.py # Categorized memory system (NEW)
-│ ├── logger.py # Colored logging utility
-│ ├── app_steps.py # Session orchestration & rate limiting
-│ └── settings.py # Configuration via .env
-├── main.py # Entry point
-├── run_agent.bat # Windows automation script
-└── memory.db # SQLite database (auto-generated)
+│   ├── services/               # Core logic services
+│   │   ├── email_reporter.py   # Email session reports
+│   │   ├── memory_system.py    # Categorized long-term memory
+│   │   ├── moltbook_actions.py # Post/Comment/Vote execution logic
+│   │   ├── moltbook_api.py     # Low-level API wrapper
+│   │   └── web_scraper.py      # Web scraping & link extraction
+│   ├── generator.py            # LLM generation with llama-cpp-python
+│   ├── memory.py               # SQLite session state management
+│   ├── logger.py               # Colored logging utility
+│   ├── app_steps.py            # Session orchestration & logic
+│   └── settings.py             # Configuration & .env loader
+├── main.py                     # Entry point
+├── run_agent.bat               # Windows automation script
+└── memory.db                   # SQLite database (auto-generated)
 
 ```
 
@@ -91,6 +97,7 @@ MAIN_AGENT_FILE_PATH=agents/custom/YOUR_AGENT.md
 BASE_AGENT_FILE_PATH=agents/BASE.md
 MAX_ACTIONS_PER_SESSION=10
 DB_PATH=memory.db
+ALLOWED_DOMAINS_FILE_PATH=agents/data/your_allowed_domains.json
 
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
@@ -246,6 +253,43 @@ Session 3:
 - **Scope**: Per agent (linked to session history)
 - **Performance**: Indexed for fast retrieval
 - **Cost**: FREE - doesn't count toward action limits
+
+## Web Actions (FREE)
+
+- **web_search_links**: Scans a specific domain's page to list available links (useful for finding specific articles).
+- **web_fetch**: Fetches and extracts content from a specific URL. The content is automatically summarized by the LLM and stored in the agent's memory.
+
+### How to configure domains
+
+Create a JSON file in `agents/data/` following this structure:
+
+```json
+{
+  "your-own-domain.com": {
+    "description": "Short description for the agent to know what's on this site",
+    "selectors": {
+      "titles": "h1, h2",
+      "content": "p"
+    }
+  }
+}
+```
+
+### Env Configuration
+
+Add the following line to your `.env` file to enable this feature:
+
+```env
+ALLOWED_DOMAINS_FILE_PATH=agents/data/your_allowed_domains.json
+```
+
+**Note:** If this variable is missing or the file is empty, the web search actions (`web_fetch`, `web_search_links`) will be automatically disabled in the agent's decision prompt.
+
+### ⚠️ DISCLAIMER - PLEASE READ
+
+> **USER RESPONSIBILITY:** I take **NO RESPONSIBILITY** for the websites visited, scraped, or accessed by this agent.  
+> **LEGAL COMPLIANCE:** Users **MUST** ensure that they only scrape their own websites or websites that explicitly allow scraping (check the `robots.txt` and Terms of Service of each domain).  
+> **ETHICAL USE:** It is your sole responsibility to configure the `allowed_domains.json` file ethically and legally. Use this tool with caution and respect the digital property of others.
 
 ## Email Reports
 
@@ -497,3 +541,7 @@ For issues and questions:
 ---
 
 **Note**: This is an autonomous agent framework. Always monitor your agent's behavior and ensure it aligns with Moltbook's terms of service and community guidelines.
+
+```
+
+```

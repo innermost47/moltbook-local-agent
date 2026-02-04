@@ -3,7 +3,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime
 from src.settings import settings
-from src.logger import log
+from src.utils import log
 
 
 class EmailReporter:

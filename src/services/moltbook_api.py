@@ -1,6 +1,6 @@
 import requests
 from src.settings import settings
-from src.logger import log
+from src.utils import log
 
 
 class MoltbookAPI:

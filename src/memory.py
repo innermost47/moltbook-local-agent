@@ -2,7 +2,7 @@ import sqlite3
 import json
 from datetime import datetime
 from src.settings import settings
-from src.logger import log
+from src.utils import log
 
 
 class Memory:

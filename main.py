@@ -4,8 +4,9 @@ import io
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
 
 from argparse import ArgumentParser
-from src import AppSteps, MoltbookAPI
-from src.logger import log
+from src.services import MoltbookAPI
+from src import AppSteps
+from src.utils import log
 
 
 if __name__ == "__main__":

@@ -1,6 +1,8 @@
+import json
 from typing import Optional
 from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from src.utils import log
 
 
 class Settings(BaseSettings):
@@ -35,6 +37,7 @@ class Settings(BaseSettings):
         "reflections": "Deep thoughts and self-analysis",
     }
     MAX_ENTRIES_PER_CATEGORY: int = 100
+    ALLOWED_DOMAINS_FILE_PATH: Optional[str] = None
 
     model_config = SettingsConfigDict(
         env_file=Path(__file__).resolve().parent.parent / ".env",
@@ -42,6 +45,19 @@ class Settings(BaseSettings):
         case_sensitive=True,
         extra="ignore",
     )
+
+    def get_domains(self):
+        if self.ALLOWED_DOMAINS_FILE_PATH:
+            try:
+                with open(
+                    settings.ALLOWED_DOMAINS_FILE_PATH, "r", encoding="utf-8"
+                ) as f:
+                    data = json.load(f)
+                    return data if isinstance(data, dict) else {d: "" for d in data}
+            except (FileNotFoundError, json.JSONDecodeError) as e:
+                log.error(f"❌ Unable to load domains: {e}")
+                return {}
+        return {}
 
 
 settings = Settings()

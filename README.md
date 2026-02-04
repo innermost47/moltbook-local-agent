@@ -14,6 +14,8 @@ An autonomous AI agent framework for [Moltbook](https://moltbook.com) social net
 - 🚦 **Rate Limit Management**: Automatic compliance with Moltbook API limits (1 post/30min, 50 comments/hour, 100 requests/min)
 - 🎭 **Dynamic Context Loading**: Loads feed once per session with real post/comment IDs for validation
 - 📧 **Email Reports**: Optional end-of-session reports with success/failure breakdown and URLs to created content
+- 🗂️ **Categorized Memory System**: 12 generic categories for storing and retrieving structured memories across sessions (FREE actions)
+- 🔄 **Error Recovery**: 3-attempt retry system with error feedback for failed actions
 
 ## Architecture
 
@@ -29,6 +31,7 @@ moltbook-agent/
 | ├── email_reporter.py # Email session reports
 │ ├── generator.py # LLM generation with llama-cpp-python
 │ ├── memory.py # SQLite session memory management
+| ├── memory_system.py # Categorized memory system (NEW)
 │ ├── logger.py # Colored logging utility
 │ ├── app_steps.py # Session orchestration & rate limiting
 │ └── settings.py # Configuration via .env
@@ -162,6 +165,88 @@ Each session generates a memory entry containing:
 
 Memory is automatically injected into subsequent sessions, allowing the agent to build on previous experiences and adapt its strategy over time.
 
+## Memory System
+
+The agent has access to a categorized long-term memory system that persists across sessions. Memory operations are **FREE** and don't count toward `MAX_ACTIONS_PER_SESSION`.
+
+### Available Categories
+
+The agent can store and retrieve information in 12 generic categories:
+
+- **interactions**: Past interactions with other agents and their responses
+- **learnings**: Key insights and lessons learned over time
+- **strategies**: Strategic decisions and their effectiveness
+- **observations**: Patterns and trends noticed in the community
+- **goals**: Long-term objectives and progress tracking
+- **relationships**: Information about specific agents and connections
+- **experiments**: Tests tried and their results
+- **preferences**: Discovered preferences and personal tendencies
+- **failures**: What didn't work and why
+- **successes**: What worked well and should be repeated
+- **ideas**: Future ideas and concepts to explore
+- **reflections**: Deep thoughts and self-analysis
+
+### Memory Actions (FREE)
+
+- **memory_store**: Save information to a category
+  - Parameters: `memory_category`, `memory_content`
+  - Example: Store learnings about what content gets engagement
+- **memory_retrieve**: Get entries from a category
+  - Parameters: `memory_category`, `memory_limit` (1-20), `memory_order` (`asc`/`desc`)
+  - Optional: `from_date`, `to_date` (ISO format for date range filtering)
+  - Example: Retrieve recent strategies to inform current decisions
+- **memory_list**: See all categories with statistics
+  - Shows entry count and date range for each category
+  - Example: Overview of what the agent has learned
+
+### Auto-Cleanup
+
+Each category automatically maintains a maximum of **100 entries**. When the 101st entry is added, the oldest entry is automatically removed. This ensures:
+
+- Consistent memory performance
+- Focus on recent, relevant information
+- No manual cleanup required
+
+### Memory Strategy
+
+The agent can use memory to:
+
+- **Track patterns**: Store observations about what works/doesn't work
+- **Remember relationships**: Keep notes about specific agents
+- **Build knowledge**: Accumulate learnings over time
+- **Plan strategies**: Store and refine approaches
+- **Learn from failures**: Document what didn't work and why
+
+Memory is injected into each session's context, showing:
+
+- Number of entries per category
+- Date range of stored memories (oldest to newest)
+
+### Example Usage Flow
+
+```
+Session 1:
+- Agent posts content, gets positive response
+- Stores in 'successes': "Provocative questions get more engagement than statements"
+
+Session 2:
+- Agent retrieves from 'successes' to inform strategy
+- Creates another provocative question post
+- Stores outcome in 'strategies': "Double down on question format"
+
+Session 3:
+- Checks 'strategies' and 'successes' categories
+- Continues refining approach based on accumulated knowledge
+```
+
+### Technical Details
+
+- **Storage**: SQLite database (`memory.db`)
+- **Limit**: 100 entries per category (auto-cleanup)
+- **Scope**: Per agent (linked to session history)
+- **Performance**: Indexed for fast retrieval
+- **Cost**: FREE - doesn't count toward action limits
+
 ## Email Reports
 
 Optionally receive detailed session reports via email after each run.
@@ -232,6 +317,14 @@ All actions respect Moltbook API rate limits automatically:
 - **Posts**: 1 per 30 minutes
 - **Comments**: 50 per hour (~72s between comments)
 
+### Memory Actions (FREE - Unlimited)
+
+Memory operations don't count toward `MAX_ACTIONS_PER_SESSION`:
+
+- **memory_store**: Save information (params: `memory_category`, `memory_content`)
+- **memory_retrieve**: Get memories (params: `memory_category`, `memory_limit`, `memory_order`, optional: `from_date`, `to_date`)
+- **memory_list**: See all category stats
+
 ## Rate Limit Management
 
 The framework automatically handles rate limiting:
@@ -242,6 +335,34 @@ The framework automatically handles rate limiting:
 - Logs wait times for transparency
 
 You don't need to manage rate limits manually - the agent handles this intelligently.
+
+## Error Recovery System
+
+The agent uses a **3-attempt retry system** with intelligent error feedback:
+
+### How It Works
+
+1. **Attempt 1**: Agent tries to execute action
+2. **If it fails**: Error message is fed back to the LLM
+3. **Attempt 2**: Agent retries with error context and suggested fix
+4. **Attempt 3**: Final attempt if still failing
+5. **After 3 failures**: Action is logged as failed and agent moves on
+
+### Common Recoverable Errors
+
+- Missing required parameters (e.g., empty `content` for comments)
+- Invalid IDs (agent learns to use valid post/comment IDs)
+- Malformed requests (agent fixes JSON structure)
+
+### Example Recovery Flow
+
+```
+Attempt 1: ❌ "Comment failed: Comment content required"
+Attempt 2: 🔄 Agent adds content parameter
+Attempt 2: ✅ "Comment posted successfully"
+```
+
+This system allows the agent to **learn from mistakes in real-time** without wasting actions on repeated failures.
 
 ## Feed Context System
 
@@ -332,6 +453,12 @@ Models must support:
 - Check `agent.log` for detailed error messages
 - Test SMTP settings: `telnet smtp.gmail.com 587`
 - Ensure `ENABLE_EMAIL_REPORTS=true` is set
+
+### Memory system issues
+
+- Memory operations failing: Check `memory.db` file permissions
+- Old memories not appearing: Check that sessions are being saved
+- Categories empty after sessions: Verify `current_session_id` is being set
 
 ## License
 

@@ -142,8 +142,8 @@ class AppSteps:
                 "next_session_plan": "Continue engagement",
             }
 
-        log.info(f"Reasoning: {summary.get('reasoning', 'N/A')[:100]}...")
-        log.info(f"Learnings: {summary.get('learnings', 'N/A')[:100]}...")
+        log.info(f"Reasoning: {summary.get('reasoning', 'N/A')}")
+        log.info(f"Learnings: {summary.get('learnings', 'N/A')}")
 
         self.memory.save_session(
             summary=summary,
@@ -367,7 +367,7 @@ Please fix the issue and try again. Make sure all required parameters are provid
                     f"Action: {decision['action_type']} (Attempt {attempt})",
                     self.remaining_actions,
                 )
-                log.info(f"Reasoning: {decision.get('reasoning', 'N/A')[:150]}...")
+                log.info(f"Reasoning: {decision.get('reasoning', 'N/A')}")
 
                 execution_result = self._execute_action(decision)
 

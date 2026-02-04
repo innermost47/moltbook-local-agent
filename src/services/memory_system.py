@@ -44,14 +44,18 @@ class MemorySystem:
         self.conn.commit()
         log.info("Memory system tables initialized")
 
-    def store_memory(self, category: str, content: str, session_id: int = None) -> bool:
+    def store_memory(self, category: str, content: str, session_id: int = None) -> Dict:
         if category not in settings.MEMORY_CATEGORIES:
-            log.error(f"Invalid category: {category}")
-            return False
+            allowed_str = ", ".join([f"'{c}'" for c in settings.MEMORY_CATEGORIES])
+            error_msg = (
+                f"❌ SCHEMA VIOLATION: '{category}' is not a valid memory sector.\n"
+                f"Available sectors: {allowed_str}.\n"
+                f"[!] ACTION: Re-classify your data into one of these existing sectors."
+            )
+            return {"success": False, "error": error_msg}
 
         try:
             cursor = self.conn.cursor()
-
             cursor.execute(
                 """
                 INSERT INTO memory_entries (category, content, created_at, session_id)
@@ -79,18 +83,17 @@ class MemorySystem:
                 """,
                     (category, to_delete),
                 )
-
                 log.info(
                     f"Auto-cleanup: removed {to_delete} old entries from '{category}'"
                 )
 
             self.conn.commit()
-            log.success(f"Stored memory in '{category}' category")
-            return True
+            return {"success": True}
 
         except Exception as e:
-            log.error(f"Failed to store memory: {e}")
-            return False
+            error_msg = f"Database error: {str(e)}"
+            log.error(error_msg)
+            return {"success": False, "error": error_msg}
 
     def retrieve_memory(
         self,
@@ -99,10 +102,17 @@ class MemorySystem:
         order: str = "desc",
         from_date: str = None,
         to_date: str = None,
-    ) -> List[Dict]:
+    ) -> Dict:
         if category not in settings.MEMORY_CATEGORIES:
-            log.error(f"Invalid category: {category}")
-            return []
+            valid_cats = ", ".join([f"'{c}'" for c in settings.MEMORY_CATEGORIES])
+            error_msg = (
+                f"Invalid category: '{category}'.\n"
+                f"Available categories in system settings: {valid_cats}.\n"
+                "Please use one of the predefined categories above."
+            )
+
+            log.error(error_msg)
+            return {"success": False, "error": error_msg}
 
         try:
             cursor = self.conn.cursor()
@@ -128,11 +138,12 @@ class MemorySystem:
             entries = [{"content": row[0], "created_at": row[1]} for row in results]
 
             log.info(f"Retrieved {len(entries)} memories from '{category}'")
-            return entries
+            return {"success": True, "entries": entries}
 
         except Exception as e:
-            log.error(f"Failed to retrieve memory: {e}")
-            return []
+            error_msg = f"Failed to retrieve memory: {str(e)}"
+            log.error(error_msg)
+            return {"success": False, "error": error_msg}
 
     def get_category_stats(self, category: str = None) -> Dict:
         try:
@@ -232,22 +243,22 @@ class MemorySystem:
         content = params.get("memory_content", "")
 
         if not category or not content:
-            error_msg = "Missing category or content for memory_store"
-            log.error(error_msg)
-            return {"success": False, "error": error_msg}
+            return {
+                "success": False,
+                "error": "Missing 'memory_category' or 'memory_content'",
+            }
 
-        success = self.store_memory(
+        result = self.store_memory(
             category=category, content=content, session_id=current_session_id
         )
 
-        if success:
-            log.success(f"💾 Stored memory in '{category}'")
+        if result["success"]:
+            log.success(f"Stored memory in '{category}'")
             actions_performed.append(f"[FREE] Stored memory in '{category}'")
             return {"success": True}
         else:
-            error_msg = f"Failed to store memory in '{category}'"
-            log.error(error_msg)
-            return {"success": False, "error": error_msg}
+            log.error(f"Failed to store memory: {result['error']}")
+            return result
 
     def retrieve(self, params: dict, actions_performed: List, update_system_context):
         category = params.get("memory_category", "")
@@ -270,7 +281,7 @@ class MemorySystem:
             log.error(error_msg)
             return {"success": False, "error": error_msg}
 
-        entries = self.retrieve_memory(
+        result = self.retrieve_memory(
             category=category,
             limit=limit,
             order=order,
@@ -278,6 +289,10 @@ class MemorySystem:
             to_date=to_date,
         )
 
+        if not result["success"]:
+            return result
+
+        entries = result["entries"]
         if entries:
             feedback = f"\n## 📚 MEMORIES RETRIEVED FROM '{category}'\n\n"
             for memory in entries:
@@ -290,10 +305,11 @@ class MemorySystem:
             actions_performed.append(
                 f"[FREE] Retrieved {len(entries)} memories from '{category}'"
             )
+            return {"success": True}
         else:
-            log.info(f"No memories found in '{category}'")
-
-        return {"success": True}
+            msg = f"No memories found in '{category}'."
+            log.info(msg)
+            return {"success": True, "message": msg}
 
     def list(self, update_system_context, actions_performed: List):
         categories_info = self.list_categories()

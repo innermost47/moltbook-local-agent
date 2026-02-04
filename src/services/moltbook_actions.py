@@ -82,28 +82,43 @@ class MoltbookActions:
         content: str = params.get("content", "")
 
         if not content or content.strip() == "":
-            error_msg = "Comment content is required and cannot be empty"
-            return {"success": False, "error": error_msg}
+            return {
+                "success": False,
+                "error": "❌ Protocol Violation: Comment content cannot be empty.",
+            }
 
         if post_id not in app_steps.available_post_ids:
-            ids_list = "\n".join(map(str, app_steps.available_post_ids))
-            error_msg = f"Invalid post_id: {post_id} not in available posts. Availables post_ids are:\n{ids_list}."
-            return {"success": False, "error": error_msg}
+            if post_id in app_steps.available_comment_ids:
+                return {
+                    "success": False,
+                    "error": f"❌ Logic Error: '{post_id}' is a COMMENT_ID. To engage here, use 'reply_to_comment' instead.",
+                }
 
-        result = app_steps.api.add_comment(
-            post_id=post_id, content=params.get("content", "")
-        )
+            targets = "\n".join(
+                [f"  [FREQ] POST_ID: {pid}" for pid in app_steps.available_post_ids]
+            )
+            return {
+                "success": False,
+                "error": f"❌ Target Desync: '{post_id}' is not a valid post identifier.\nValid frequencies:\n{targets}",
+            }
+
+        result = app_steps.api.add_comment(post_id=post_id, content=content)
+
         app_steps.last_comment_time = time.time()
 
         if result.get("success"):
             comment_id = result.get("id") or result.get("comment", {}).get("id")
+
+            if comment_id:
+                app_steps.available_comment_ids[comment_id] = post_id
+
             comment_url = (
                 f"https://moltbook.com/post/{post_id}#comment-{comment_id}"
                 if comment_id
                 else "N/A"
             )
 
-            log.success(f"Commented on post {post_id}")
+            log.success(f"Intel deployed: Comment on post {post_id} [^]")
             log.info(f"Comment URL: {comment_url}")
 
             app_steps.actions_performed.append(f"Commented on post {post_id}")
@@ -112,8 +127,8 @@ class MoltbookActions:
             )
             return {"success": True}
         else:
-            error_msg = result.get("error", "Unknown")
-            return {"success": False, "error": error_msg}
+            error_msg = result.get("error", "Unknown API error")
+            return {"success": False, "error": f"❌ Deployment Failed: {error_msg}"}
 
     def reply_to_comment(self, params: dict, app_steps):
         post_id = params.get("post_id", "")
@@ -121,53 +136,59 @@ class MoltbookActions:
         content: str = params.get("content", "")
 
         if not content or content.strip() == "":
-            error_msg = "Reply content is required and cannot be empty"
-            return {"success": False, "error": error_msg}
+            return {
+                "success": False,
+                "error": "❌ Protocol Violation: Reply content cannot be empty.",
+            }
 
         if comment_id not in app_steps.available_comment_ids:
-            comment_details = "\n".join(
+            hierarchy = {}
+            for cid, pid in app_steps.available_comment_ids.items():
+                if pid not in hierarchy:
+                    hierarchy[pid] = []
+                hierarchy[pid].append(cid)
+
+            error_tree = "\n".join(
                 [
-                    f"  - Comment ID: {cid} (belongs to Post ID: {pid})"
-                    for cid, pid in app_steps.available_comment_ids.items()
+                    f"POST: {pid}\n"
+                    + "\n".join([f"  └── COMMENT_ID: {cid}" for cid in cids])
+                    for pid, cids in hierarchy.items()
                 ]
             )
-            error_msg = f"Invalid comment_id: '{comment_id}' not found in available comments.\n\nAvailable comment IDs with their parent posts:\n{comment_details}\n\nYou must use BOTH the correct comment_id AND its corresponding post_id."
-            return {"success": False, "error": error_msg}
-
-        if not post_id or post_id not in app_steps.available_post_ids:
-            ids_list = "\n".join(map(str, app_steps.available_post_ids))
-            error_msg = f"Invalid or missing post_id: '{post_id}'.\n\nAvailable post IDs:\n{ids_list}"
-            return {"success": False, "error": error_msg}
-
-        expected_post_id = app_steps.available_comment_ids.get(comment_id)
-        if expected_post_id != post_id:
-            error_msg = f"Mismatch: comment_id '{comment_id}' belongs to post_id '{expected_post_id}', but you provided post_id '{post_id}'. Use the correct pair: comment_id='{comment_id}' + post_id='{expected_post_id}'."
-            return {"success": False, "error": error_msg}
+            return {
+                "success": False,
+                "error": f"❌ Invalid comment_id: '{comment_id}'. Target re-alignment required:\n\n{error_tree}",
+            }
 
         correct_post_id = app_steps.available_comment_ids.get(comment_id)
-        if correct_post_id and post_id != correct_post_id:
+
+        if post_id != correct_post_id:
             log.warning(
-                f"Agent error: post_id {post_id} doesn't match comment. Correcting to {correct_post_id}"
+                f"Vibrational Desync: post_id {post_id} mismatched. Correcting to {correct_post_id} [!]"
             )
             post_id = correct_post_id
 
         result = app_steps.api.reply_to_comment(
             post_id=post_id,
-            content=params.get("content", ""),
+            content=content,
             parent_comment_id=comment_id,
         )
+
         app_steps.last_comment_time = time.time()
+
         if result.get("success"):
             reply_id = result.get("id") or result.get("comment", {}).get("id")
+
             if reply_id:
                 app_steps.available_comment_ids[reply_id] = post_id
+
             reply_url = (
                 f"https://moltbook.com/post/{post_id}#comment-{reply_id}"
                 if reply_id
                 else "N/A"
             )
 
-            log.success(f"Replied to comment {comment_id}")
+            log.success(f"Beta neutralized: Replied to comment {comment_id} [^]")
             log.info(f"Reply URL: {reply_url}")
 
             app_steps.actions_performed.append(f"Replied to comment {comment_id}")
@@ -180,30 +201,40 @@ class MoltbookActions:
             )
             return {"success": True}
         else:
-            error_msg = result.get("error", "Unknown")
-            return {"success": False, "error": error_msg}
+            error_msg = result.get("error", "Unknown API error")
+            return {"success": False, "error": f"❌ Action Failed: {error_msg}"}
 
     def vote_post(self, params: dict, app_steps):
         post_id = params.get("post_id", "")
         vote_type: str = params.get("vote_type", "upvote")
 
         if not post_id or post_id not in app_steps.available_post_ids:
-            ids_list = "\n".join(map(str, app_steps.available_post_ids))
-            error_msg = f"Invalid or missing post_id: {post_id}. Availables post_ids are:\n{ids_list}."
+            targets = "\n".join(
+                [f"  [TARGET] POST_ID: {pid}" for pid in app_steps.available_post_ids]
+            )
+            error_msg = (
+                f"❌ Target Error: '{post_id}' is not a valid post identifier.\n"
+                f"Available targets:\n{targets}\n\n"
+            )
             return {"success": False, "error": error_msg}
 
+        v_type = vote_type.lower() if vote_type else "upvote"
+
         result = app_steps.api.vote(
-            content_id=post_id, content_type="posts", vote_type=vote_type
+            content_id=post_id, content_type="posts", vote_type=v_type
         )
+
         if result.get("success"):
-            log.success(f"{vote_type.capitalize()}d post {post_id}")
-            app_steps.actions_performed.append(
-                f"{vote_type.capitalize()}d post {post_id}"
+            symbol = "[↑]" if v_type == "upvote" else "[↓]"
+            log.success(
+                f"Frequency adjusted: {v_type.upper()} on post {post_id} {symbol}"
             )
+
+            app_steps.actions_performed.append(f"{v_type.capitalize()}d post {post_id}")
             return {"success": True}
         else:
-            error_msg = result.get("error", "Unknown")
-            return {"success": False, "error": error_msg}
+            error_msg = result.get("error", "Unknown API error")
+            return {"success": False, "error": f"❌ Adjustment Failed: {error_msg}"}
 
     def follow_agent(self, params: dict, app_steps):
         agent_name = params.get("agent_name", "")

@@ -182,7 +182,7 @@ class MoltbookAPI:
             url = f"{settings.MOLTBOOK_BASE_URL}/posts/{post_id}/comments"
             data = {"content": content, "parent_id": parent_comment_id}
 
-            log.info(f"📤 API CALL: reply_to_comment")
+            log.info(f"   API CALL: reply_to_comment")
             log.info(f"   URL: {url}")
             log.info(f"   Payload: {data}")
 

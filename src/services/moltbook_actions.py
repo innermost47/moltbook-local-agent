@@ -3,7 +3,7 @@ from src.utils import log
 
 
 class MoltbookActions:
-    def create_post(self, app_steps, params: dict):
+    def create_post(self, app_steps, params: dict, post_creation_attempted: bool):
         if post_creation_attempted:
             error_msg = "Post creation already attempted this session"
             log.warning(error_msg)
@@ -12,7 +12,7 @@ class MoltbookActions:
             )
             return {"success": False, "error": error_msg}
 
-        post_creation_attempted = True
+        app_steps.post_creation_attempted = True
         submolt = params.get("submolt", "general")
 
         result = app_steps.api.create_text_post(

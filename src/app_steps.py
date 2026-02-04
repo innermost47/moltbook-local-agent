@@ -1,5 +1,6 @@
 import json
 import time
+import random
 import re
 from src.services import (
     MoltbookAPI,
@@ -97,7 +98,7 @@ class AppSteps:
             )
             log.info("No previous sessions found")
 
-        posts_data = self.api.get_posts(sort="new", limit=20)
+        posts_data = self.api.get_posts(sort=random.choice(self.feed_options), limit=20)
 
         if not posts_data.get("posts"):
             log.error("❌ Cannot load feed from Moltbook API - server may be down")
@@ -176,66 +177,64 @@ Use ONLY these exact IDs in your actions. Never invent or truncate IDs.
         log.info("=== SESSION END ===")
 
     def get_enriched_feed_context(self, posts_data: dict) -> str:
-
         posts = posts_data.get("posts", [])
-
         if not posts:
             return "No posts found in feed."
 
         formatted = []
-
         self.available_post_ids = []
         self.available_comment_ids = {}
 
-        for i, post in enumerate(posts, 1):
+        enriched_posts_count = 0
+        max_enriched_posts = 3
 
+        for i, post in enumerate(posts, 1):
             author = post.get("author", {}) or {}
             post_id = post.get("id", "unknown")
-
             self.available_post_ids.append(post_id)
 
-            if i == 1:
-                post_info = (
-                    f"{i}. POST_ID: {post_id}\n"
-                    f"   Title: '{post.get('title', 'Untitled')}'\n"
-                    f"   Author: {author.get('name', 'Unknown')}\n"
-                    f"   Votes: ↑{post.get('upvotes', 0)} ↓{post.get('downvotes', 0)}\n"
-                    f"   Comments: {post.get('comment_count', 0)}\n"
-                    f"   Content: {post.get('content', '')[:300]}..."
-                )
+            comment_count = post.get("comment_count", 0)
 
-                if post.get("comment_count", 0) > 0:
-                    try:
-                        log.info(
-                            f"Fetching comments for top post: {post.get('title', '')[:30]}..."
-                        )
-                        comments = self.api.get_post_comments(post_id, sort="top")
+            if enriched_posts_count < max_enriched_posts and comment_count > 0:
+                try:
+                    log.info(
+                        f"Enriching post {i} ({post_id}) - {comment_count} comments found"
+                    )
+                    comments = self.api.get_post_comments(post_id, sort="top")
 
-                        if comments and len(comments) > 0:
-                            post_info += "\n   📝 Top Comments:"
-                            for j, comment in enumerate(comments[:5], 1):
-                                comment_author = comment.get("author", {}) or {}
-                                comment_content = comment.get("content", "")[:150]
-                                comment_id = comment.get("id", "unknown")
+                    post_info = (
+                        f"{i}. POST_ID: {post_id}\n"
+                        f"   Title: '{post.get('title', 'Untitled')}'\n"
+                        f"   Author: {author.get('name', 'Unknown')}\n"
+                        f"   Content: {post.get('content', '')[:200]}...\n"
+                        f"   📝 Top Comments:"
+                    )
 
-                                self.available_comment_ids[comment_id] = post_id
+                    if comments:
+                        for j, comment in enumerate(comments[:5], 1):
+                            c_id = comment.get("id", "unknown")
+                            self.available_comment_ids[c_id] = post_id
 
-                                post_info += (
-                                    f"\n     {j}. COMMENT_ID: {comment_id}\n"
-                                    f"        👤 By: {comment_author.get('name', 'Unknown')}\n"
-                                    f"        💬 {comment_content}\n"
-                                    f"        ↑{comment.get('upvotes', 0)} ↓{comment.get('downvotes', 0)}"
-                                )
-                    except Exception as e:
-                        log.warning(f"Failed to fetch comments: {e}")
+                            c_author = comment.get("author", {}) or {}
+                            post_info += (
+                                f"\n     {j}. COMMENT_ID: {c_id}\n"
+                                f"        👤 By: {c_author.get('name', 'Unknown')}\n"
+                                f"        💬 {comment.get('content', '')[:150]}"
+                            )
 
-                formatted.append(post_info)
+                        enriched_posts_count += 1
+
+                except Exception as e:
+                    log.warning(f"Failed to fetch comments for {post_id}: {e}")
+                    post_info = f"{i}. POST_ID: {post_id} | '{post.get('title', 'Untitled')}' (Comment fetch failed)"
             else:
                 post_info = (
                     f"{i}. POST_ID: {post_id} | '{post.get('title', 'Untitled')}' "
-                    f"by {author.get('name', 'Unknown')} | ↑{post.get('upvotes', 0)}"
+                    f"by {author.get('name', 'Unknown')} | ↑{post.get('upvotes', 0)} "
+                    f"({comment_count} comments)"
                 )
-                formatted.append(post_info)
+
+            formatted.append(post_info)
 
         return "\n\n".join(formatted)
 
@@ -471,6 +470,16 @@ Please fix the issue and try again. Make sure all required parameters are provid
         action_type = decision["action_type"]
         params = decision["action_params"]
 
+        if action_type in ["reply_to_comment", "comment_on_post", "vote_post"]:
+            post_id = params.get("post_id")
+            comment_id = params.get("comment_id")
+
+            if post_id == "none" or (
+                action_type == "reply_to_comment" and comment_id == "none"
+            ):
+                error_msg = f"Action {action_type} aborted: No valid IDs available in the current feed. Please 'refresh_feed' or choose a different action."
+                return {"success": False, "error": error_msg}
+
         if action_type == "memory_store":
             return self.memory_system.store(
                 params=params,
@@ -509,7 +518,11 @@ Please fix the issue and try again. Make sure all required parameters are provid
         self._wait_for_rate_limit(action_type)
 
         if action_type == "create_post":
-            return self.moltbook_actions.create_post(app_steps=self, params=params)
+            return self.moltbook_actions.create_post(
+                app_steps=self,
+                params=params,
+                post_creation_attempted=self.post_creation_attempted,
+            )
 
         elif action_type == "comment_on_post":
             return self.moltbook_actions.comment_on_post(params=params, app_steps=self)

@@ -33,11 +33,7 @@ class MoltbookAPI:
         try:
             url = f"{settings.MOLTBOOK_BASE_URL}/agents/me"
             response = requests.get(url, headers=self.headers, timeout=self.timeout)
-            if response.status_code == 200:
-                return response.json()
-            else:
-                log.error(f"get_me failed with status {response.status_code}")
-                return None
+            return self._handle_response(response, url)
         except requests.exceptions.Timeout:
             log.error("get_me request timeout")
             return None
@@ -52,7 +48,7 @@ class MoltbookAPI:
             response = requests.patch(
                 url, headers=self.headers, json=data, timeout=self.timeout
             )
-            return response.json()
+            return self._handle_response(response, url)
         except requests.exceptions.Timeout:
             log.error("update_profile request timeout")
             return {"success": False, "error": "Request timeout"}
@@ -64,9 +60,7 @@ class MoltbookAPI:
         try:
             url = f"{settings.MOLTBOOK_BASE_URL}/agents/status"
             response = requests.get(url, headers=self.headers, timeout=self.timeout)
-            if response.status_code == 200:
-                return response.json()
-            return None
+            return self._handle_response(response, url)
         except requests.exceptions.Timeout:
             log.error("claim_status request timeout")
             return None
@@ -78,9 +72,7 @@ class MoltbookAPI:
         try:
             url = f"{settings.MOLTBOOK_BASE_URL}/agents/profile?name={name}"
             response = requests.get(url, headers=self.headers, timeout=self.timeout)
-            if response.status_code == 200:
-                return response.json()
-            return None
+            return self._handle_response(response, url)
         except requests.exceptions.Timeout:
             log.error(f"view_another_agent_profile timeout for {name}")
             return None
@@ -95,7 +87,7 @@ class MoltbookAPI:
             response = requests.post(
                 url, headers=self.headers, json=data, timeout=self.timeout
             )
-            return response.json()
+            return self._handle_response(response, url)
         except requests.exceptions.Timeout:
             log.error("create_text_post request timeout")
             return {"success": False, "error": "Request timeout"}
@@ -110,7 +102,7 @@ class MoltbookAPI:
             response = requests.post(
                 url, headers=self.headers, json=data, timeout=self.timeout
             )
-            return response.json()
+            return self._handle_response(response, url)
         except requests.exceptions.Timeout:
             log.error("create_link_post request timeout")
             return {"success": False, "error": "Request timeout"}
@@ -150,9 +142,7 @@ class MoltbookAPI:
         try:
             url = f"{settings.MOLTBOOK_BASE_URL}/posts/{post_id}"
             response = requests.get(url, headers=self.headers, timeout=self.timeout)
-            if response.status_code == 200:
-                return response.json()
-            return None
+            return self._handle_response(response, url)
         except requests.exceptions.Timeout:
             log.error(f"get_single_post timeout for {post_id}")
             return None
@@ -164,9 +154,7 @@ class MoltbookAPI:
         try:
             url = f"{settings.MOLTBOOK_BASE_URL}/posts/{post_id}"
             response = requests.delete(url, headers=self.headers, timeout=self.timeout)
-            if response.status_code == 200:
-                return response.json()
-            return None
+            return self._handle_response(response, url)
         except requests.exceptions.Timeout:
             log.error(f"delete_post timeout for {post_id}")
             return None
@@ -181,7 +169,7 @@ class MoltbookAPI:
             response = requests.post(
                 url, headers=self.headers, json=data, timeout=self.timeout
             )
-            return response.json()
+            return self._handle_response(response, url)
         except requests.exceptions.Timeout:
             log.error(f"add_comment timeout for post {post_id}")
             return {"success": False, "error": "Request timeout"}
@@ -196,10 +184,8 @@ class MoltbookAPI:
             response = requests.post(
                 url, headers=self.headers, json=data, timeout=self.timeout
             )
-            return response.json()
-        except requests.exceptions.Timeout:
-            log.error(f"reply_to_comment timeout for post {post_id}")
-            return {"success": False, "error": "Request timeout"}
+
+            return self._handle_response(response, url)
         except Exception as e:
             log.error(f"reply_to_comment error: {e}")
             return {"success": False, "error": str(e)}
@@ -231,7 +217,7 @@ class MoltbookAPI:
                 f"{settings.MOLTBOOK_BASE_URL}/{content_type}/{content_id}/{vote_type}"
             )
             response = requests.post(url, headers=self.headers, timeout=self.timeout)
-            return response.json()
+            return self._handle_response(response, url)
         except requests.exceptions.Timeout:
             log.error(f"vote timeout for {content_type} {content_id}")
             return {"success": False, "error": "Request timeout"}
@@ -250,7 +236,7 @@ class MoltbookAPI:
             response = requests.post(
                 url, json=data, headers=self.headers, timeout=self.timeout
             )
-            return response.json()
+            return self._handle_response(response, url)
         except requests.exceptions.Timeout:
             log.error("create_submolt request timeout")
             return {"success": False, "error": "Request timeout"}
@@ -297,9 +283,7 @@ class MoltbookAPI:
                 f"{settings.MOLTBOOK_BASE_URL}/submolts/{submolt_name}/{subscribe_type}"
             )
             response = requests.post(url, headers=self.headers, timeout=self.timeout)
-            if response.status_code == 200:
-                return response.json()
-            return None
+            return self._handle_response(response, url)
         except requests.exceptions.Timeout:
             log.error(f"subscribe_submolt timeout for {submolt_name}")
             return None
@@ -323,9 +307,7 @@ class MoltbookAPI:
                 log.error(f"Invalid follow_type: {follow_type}")
                 return None
 
-            if response.status_code == 200:
-                return response.json()
-            return None
+            return self._handle_response(response, url)
         except requests.exceptions.Timeout:
             log.error(f"follow_agent timeout for {agent_name}")
             return None
@@ -376,3 +358,27 @@ class MoltbookAPI:
             log.error(f"search error: {e}")
 
         return []
+
+    def _handle_response(self, response, url):
+        try:
+            if response.status_code < 300:
+                return response.json()
+
+            try:
+                error_detail = response.json().get("error", response.text)
+            except:
+                error_detail = response.text
+
+            error_msg = f"API Error {response.status_code} at {url}: {error_detail}"
+            log.error(error_msg)
+
+            return {
+                "success": False,
+                "error": error_detail,
+                "status_code": response.status_code,
+                "url": url,
+            }
+
+        except Exception as e:
+            log.error(f"Critical API failure at {url}: {str(e)}")
+            return {"success": False, "error": "System failure during API call"}

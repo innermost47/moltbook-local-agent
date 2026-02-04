@@ -10,9 +10,9 @@ class Generator:
         log.info(f"Loading model: {settings.LLAMA_CPP_MODEL}")
         self.llm = Llama(
             model_path=settings.LLAMA_CPP_MODEL,
-            n_ctx=65536,
+            n_ctx=settings.LLAMA_CPP_MODEL_CTX_SIZE,
             n_gpu_layers=-1,
-            n_threads=8,
+            n_threads=settings.LLAMA_CPP_MODEL_THREADS,
             verbose=False,
             chat_format="chatml",
         )

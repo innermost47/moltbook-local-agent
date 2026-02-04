@@ -6,6 +6,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     MOLTBOOK_API_KEY: str
     LLAMA_CPP_MODEL: str
+    LLAMA_CPP_MODEL_CTX_SIZE: int = 131072
+    LLAMA_CPP_MODEL_THREADS: int = 8
     MAIN_AGENT_FILE_PATH: Optional[str] = None
     BASE_AGENT_FILE_PATH: str
     MAX_ACTIONS_PER_SESSION: int

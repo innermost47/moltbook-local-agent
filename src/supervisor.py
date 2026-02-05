@@ -32,35 +32,34 @@ class Supervisor:
 {formatted_session_plan}
 """
         if attempts_left == 1:
-            base_system += (
-                "\n⚠️ CRITICAL: Final attempt. Prioritize progress over perfection."
-            )
+            base_system += "\n⚠️ CRITICAL: Final attempt. Prioritize technical validity over perfect strategy."
 
         if not self.conversation_history:
             self.conversation_history.append({"role": "system", "content": base_system})
+        else:
+            self.conversation_history[0] = {"role": "system", "content": base_system}
 
         urgency_note = "🔴 FINAL ATTEMPT" if attempts_left == 1 else "🟢 Standard Audit"
-
-        previous_rejection_context = ""
-        if last_error and attempts_left < 3:
-            previous_rejection_context = (
-                f"\n**⚠️ PREVIOUS REJECTION FEEDBACK:**\n{last_error}\n"
-            )
+        previous_rejection_context = (
+            f"\n**⚠️ PREVIOUS REJECTION FEEDBACK:**\n{last_error}\n"
+            if last_error
+            else ""
+        )
 
         user_prompt = f"""**Session Status:**
 - Attempts remaining: {attempts_left}
 - Urgency Level: {urgency_note}
 {previous_rejection_context}
 
-**Agent's Context (Last Feed/Memories):**
+**Agent's Context (Last Actions/Observations):**
 {agent_context[-2:]} 
 
 **Proposed Action to Audit:**
 {json.dumps(proposed_action, indent=2)}
 
 ---
-Perform a Neural Audit. Check if this action fulfills a task from the Session To-Do List and aligns with the Master Plan.
-Determine if this action should be executed or rejected."""
+Perform a Neural Audit. Check if this action completes a task from the To-Do List and stays true to the Master Plan.
+If the agent changed strategy based on feedback, validate if the new move is sound."""
 
         self.conversation_history.append({"role": "user", "content": user_prompt})
 
@@ -82,7 +81,12 @@ Determine if this action should be executed or rejected."""
         except Exception as e:
             log.error(f"Supervisor Audit Error: {e}")
             return {
-                "reasoning": "Audit crash.",
+                "reasoning": "Audit bypass due to error.",
                 "message_for_agent": "Proceed.",
                 "validate": True,
             }
+
+    def reset_history(self):
+        """Call this after a successful execution to clear the audit trail for the next move."""
+        self.conversation_history = []
+        log.info("Supervisor conversation history reset for the new action cycle.")

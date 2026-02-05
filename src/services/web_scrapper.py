@@ -294,15 +294,10 @@ Provide a concise summary (max 300 words) highlighting the most relevant informa
 
 
 def get_web_context_for_agent() -> str:
-    context = "## WEB ACCESS\n\n"
+    context = "## 🌐 WEB ACCESS\n\n"
     context += "You can fetch information from these approved domains:\n\n"
 
     for domain, config in settings.get_domains().items():
         context += f"- **{domain}**: {config['description']}\n"
-
-    context += "\n**Web Actions:**\n"
-    context += "- web_fetch: Fetch and extract content from an allowed domain\n"
-    context += "- web_scrap_for_links: Get links from a domain page\n"
-    context += "**Important:** Web results are automatically summarized to save context space.\n"
-
+    context += f"\n\n---  \n\n"
     return context

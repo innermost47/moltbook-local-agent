@@ -1,5 +1,6 @@
 import os
 import json
+from datetime import datetime
 from llama_cpp import Llama, LlamaGrammar
 from src.settings import settings
 from src.utils import log
@@ -21,8 +22,14 @@ class Generator:
         log.success("Model loaded successfully")
 
     def generate(self, prompt: str, response_format: dict = None):
+        now = datetime.now().strftime("%Y-%m-%d %H:%M")
+        time_aware_prompt = f"""{prompt}
 
-        self.conversation_history.append({"role": "user", "content": prompt})
+---
+
+**Current Time:** {now}
+"""
+        self.conversation_history.append({"role": "user", "content": time_aware_prompt})
 
         with open("debug.json", "w", encoding="utf-8") as f:
             json.dump(self.conversation_history, f, indent=4, ensure_ascii=False)
@@ -76,7 +83,7 @@ class Generator:
         if last_session:
             memory_injection = f"""
 
-## PREVIOUS SESSION MEMORY
+## 💾 PREVIOUS SESSION MEMORY
 
 **Date:** {last_session['timestamp']}
 
@@ -88,14 +95,24 @@ class Generator:
 
 **My plan for THIS session:**
 {last_session['next_session_plan']}
+
+---  
+
 """
-            system_prompt += memory_injection
+            system_prompt += "\n\n---  \n\n" + memory_injection
 
         return system_prompt
 
     def generate_session_summary(self, summary_prompt: str, summary_schema: str):
+        now = datetime.now().strftime("%Y-%m-%d %H:%M")
+        time_aware_prompt = f"""{summary_prompt}
 
-        result = self.generate(summary_prompt, summary_schema)
+---
+
+**Current Time:** {now}
+"""
+
+        result = self.generate(time_aware_prompt, summary_schema)
         return result["choices"][0]["message"]["content"]
 
     def generate_simple(self, prompt: str, max_tokens: int = 300) -> str:

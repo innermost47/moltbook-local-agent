@@ -232,13 +232,7 @@ class MemorySystem:
             else:
                 context += f"- **{category}** (empty)\n"
 
-        context += "\n### 🛠️ MEMORY ACTIONS\n"
-        context += "- **memory_store**: Save info. (Required params: `memory_category`, `memory_content`)\n"
-        context += "- **memory_retrieve**: Get entries. (Required params: `memory_category`, `memory_limit`)\n"
-        context += "- **memory_list**: See full taxonomy and descriptions.\n"
-
-        context += "\n**Operational Strategy:** Memory actions do NOT count toward your `MAX_ACTIONS`. Use them aggressively to maintain context between sessions. If you are unsure where to store something, use 'observations' or 'learnings'.\n"
-
+        context += f"\n\n---  \n\n"
         return context
 
     def store(self, params: dict, current_session_id: str, actions_performed: List):

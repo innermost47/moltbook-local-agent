@@ -200,15 +200,16 @@ class AppSteps:
 
         session_history = self.memory.get_session_history(limit=3)
         if session_history:
-            combined_context += "## PREVIOUS SESSIONS SUMMARY\n\n"
+            combined_context += "## 📝 PREVIOUS SESSIONS SUMMARY\n\n"
             for i, session in enumerate(reversed(session_history), 1):
                 combined_context += f"### Session {i} ({session['timestamp']})\n"
                 combined_context += f"**Learnings:** {session['learnings']}\n"
                 combined_context += f"**Plan:** {session['plan']}\n\n"
+            combined_context += f"\n\n---  \n\n"
             log.success(f"Loaded {len(session_history)} previous sessions")
         else:
             combined_context += (
-                "## PREVIOUS SESSIONS\n\nNo previous sessions found.\n\n"
+                "## PREVIOUS SESSIONS\n\nNo previous sessions found.\n\n---  \n\n"
             )
             log.info("No previous sessions found")
 
@@ -224,7 +225,7 @@ class AppSteps:
 
                     blog_knowledge = "## 📚 PREVIOUSLY PUBLISHED BLOG ARTICLES\n"
                     blog_knowledge += "- " + "\n- ".join(published_titles) + "\n"
-                    blog_knowledge += "STRATEGIC INSTRUCTION: Do not duplicate existing topics. Always provide a new angle or a superior technical perspective.\n\n"
+                    blog_knowledge += "\n**♟️ STRATEGIC INSTRUCTION: Do not duplicate existing topics. Always provide a new angle or a superior technical perspective.**\n\n--- \n\n"
 
                     combined_context += blog_knowledge
                     log.success(
@@ -281,11 +282,14 @@ class AppSteps:
 
         self.current_feed = self.get_enriched_feed_context(posts_data)
 
-        combined_context += f"""## CURRENT MOLTBOOK FEED
+        combined_context += f"""## 🦞 CURRENT MOLTBOOK FEED
 
 {self.current_feed}
 
-Use ONLY these exact IDs in your actions. Never invent or truncate IDs.
+**🚨 USE ONLY THESE EXACT IDS IN YOUR ACTIONS. NEVER INVENT OR TRUNCATE IDS.**
+
+---  
+
 """
 
         log.success(
@@ -430,9 +434,16 @@ Should you update your master plan? Consider:
             log.error(f"Failed to evaluate master plan update: {e}")
 
     def get_enriched_feed_context(self, posts_data: dict) -> str:
-        posts = posts_data.get("posts", [])
-        if not posts:
-            return "NO_POSTS_FOUND"
+        posts_list = []
+        if isinstance(posts_data, dict):
+            posts_list = posts_data.get("posts", posts_data.get("data", []))
+            if not posts_list and len(posts_data) > 0:
+                log.warning(f"Unrecognized dict structure: {posts_data.keys()}")
+        elif isinstance(posts_data, list):
+            posts_list = posts_data
+
+        if not posts_list:
+            return "Feed is currently empty."
 
         MAX_POSTS = 6
         MAX_COMMENTS_PER_POST = 3
@@ -443,50 +454,55 @@ Should you update your master plan? Consider:
         self.available_post_ids = []
         self.available_comment_ids = {}
 
-        for i, post in enumerate(posts[:MAX_POSTS], 1):
-            p_id = post.get("id", "unknown")
-            self.available_post_ids.append(p_id)
+        for i, post in enumerate(posts_list[:MAX_POSTS], 1):
+            try:
+                if post is None or not isinstance(post, dict):
+                    continue
+                p_id = post.get("id", "unknown")
+                self.available_post_ids.append(p_id)
 
-            author_name = post.get("author", {}).get("name", "Unknown")
-            comment_count = post.get("comment_count", 0)
+                author_name = post.get("author", {}).get("name", "Unknown")
+                comment_count = post.get("comment_count", 0)
 
-            post_block = (
-                f"=== {i}. POST_ID: {p_id} ===\n"
-                f"   Title: {post.get('title', 'Untitled')}\n"
-                f"   Author: {author_name} | Upvotes: {post.get('upvotes', 0)}\n"
-                f"   Content: {post.get('content', '')[:CONTENT_TRUNC]}\n"
-                f"   Total Comments: {comment_count}\n"
-            )
+                post_block = (
+                    f"=== {i}. POST_ID: {p_id} ===\n"
+                    f"   Title: {post.get('title', 'Untitled')}\n"
+                    f"   Author: {author_name} | Upvotes: {post.get('upvotes', 0)}\n"
+                    f"   Content: {post.get('content', '')[:CONTENT_TRUNC]}\n\n"
+                    f"   Total Comments: {comment_count}\n\n"
+                )
 
-            if comment_count > 0:
-                try:
-                    comments = self.api.get_post_comments(p_id, sort="top")
+                if comment_count > 0:
+                    try:
+                        comments = self.api.get_post_comments(p_id, sort="top")
 
-                    if comments:
-                        post_block += f"   📝 TOP {len(comments[:MAX_COMMENTS_PER_POST])} COMMENTS (Selected for analysis):\n"
-                        for j, comment in enumerate(
-                            comments[:MAX_COMMENTS_PER_POST], 1
-                        ):
-                            c_id = comment.get("id", "unknown")
-                            self.available_comment_ids[c_id] = p_id
-                            c_author = comment.get("author", {}).get("name", "Unknown")
+                        if comments:
+                            post_block += f"   📝 TOP {len(comments[:MAX_COMMENTS_PER_POST])} COMMENTS (Selected for analysis):\n"
+                            for j, comment in enumerate(
+                                comments[:MAX_COMMENTS_PER_POST], 1
+                            ):
+                                c_id = comment.get("id", "unknown")
+                                self.available_comment_ids[c_id] = p_id
+                                c_author = comment.get("author", {}).get(
+                                    "name", "Unknown"
+                                )
 
-                            post_block += (
-                                f"      ├── {j}. COMMENT_ID: {c_id}\n"
-                                f"      │   By: {c_author}\n"
-                                f"      │   Text: {comment.get('content', '')[:COMMENT_TRUNC]}\n"
-                                f"      │\n"
-                            )
-                except Exception as e:
-                    log.warning(f"Could not sync comments for {p_id}: {e}")
+                                post_block += (
+                                    f"      ├── {j}. COMMENT_ID: {c_id}\n"
+                                    f"      │   By: {c_author}\n"
+                                    f"      │   Text: {comment.get('content', '')[:COMMENT_TRUNC]}\n"
+                                    f"      │\n"
+                                )
+                    except Exception as e:
+                        log.warning(f"Could not sync comments for {p_id}: {e}")
 
-            formatted.append(post_block)
+                formatted.append(post_block + "\n\n---  \n\n")
+            except Exception as e:
+                log.warning(f"Could not sync post for post_id {p_id}: {e}")
 
         return "\n\n".join(formatted)
 
     def get_instruction_default(self):
-        instruction_defaults = "IMPORTANT: For any required parameter that is NOT relevant to your chosen action, set its value to 'none' or ''."
-
         actions_list = [
             "- comment_on_post: (params: post_id, content) - CONTENT IS MANDATORY",
             "- reply_to_comment: (params: post_id, comment_id, content) - CONTENT IS MANDATORY",
@@ -497,52 +513,62 @@ Should you update your master plan? Consider:
             "- create_post: (params: title, content, submolt) - FULL TEXT REQUIRED IN CONTENT",
         ]
 
-        decision_prompt = f"""
-{instruction_defaults}
+        submolts_formatted = chr(10).join([f"- {s}" for s in self.available_submolts])
 
+        decision_prompt = f"""
 ### 🛑 SESSION CONSTRAINTS
 - **Quota**: EVERY action costs 1 point. No exceptions.
 - **Moltbook Posts**: Only 1 `create_post` allowed per session.
 - **Blog Articles**: Only 1 `write_blog_article` allowed per session.
 - **Dynamic Status**: Check the icons above in each turn. If it shows ❌, you MUST NOT use that action again.
 
-**MOLTBOOK ACTIONS:**
+---  
+
+**📌 MOLTBOOK ACTIONS:**
 {chr(10).join(actions_list)}
 """
 
         if self.allowed_domains:
             decision_prompt += f"""
-**WEB ACTIONS:**
+**📌 WEB ACTIONS:**
 - web_scrap_for_links: Search for links on a specific domain (params: web_domain, web_query)
 - web_fetch: Fetch content from a specific URL (params: web_url)
 Allowed domains: {', '.join(self.allowed_domains.keys())}
 """
         if self.blog_actions:
             decision_prompt += """
-**BLOG ACTIONS:**
+**📌 BLOG ACTIONS:**
 - write_blog_article: 
   * REQUIRED: {"title": "...", "content": "THE FULL ARTICLE TEXT", "excerpt": "summary", "image_prompt": "..."}
   * WARNING: Do NOT leave 'content' empty. Write the complete article there.
 
-**MODERATION:**
+**📌 BLOG MODERATION:**
 - review_pending_comments: (params: limit)
 - approve_comment / reject_comment: (params: comment_id_blog)
 - approve_comment_key / reject_comment_key: (params: request_id)
 """
 
         decision_prompt += f"""
-**MEMORY ACTIONS:**
+**📌 MEMORY ACTIONS:**
 - memory_store: Save information (params: memory_category, memory_content)
 - memory_retrieve: Get memories (params: memory_category, memory_limit, memory_order, optional: from_date, to_date)
 - memory_list: See all category stats
 
-**PLANNING ACTIONS:**
+**📌 PLANNING ACTIONS:**
 - update_todo_status: Mark a todo as completed/cancelled (params: todo_task, todo_status)
 - view_session_summaries: View past session summaries (params: summary_limit)
 
-Available submolts: {', '.join(self.available_submolts)}
+---  
 
-**IMPORTANT: For submolt, use only the name (e.g., "general"), NOT "/m/general" or "m/general**"
+**📁 AVAILABLE SUBMOLTS:** 
+{submolts_formatted}
+
+---
+
+### 🛡️ FINAL PARAMETER RULES
+> ⚠️ **NULL VALUES**: For any required parameter NOT relevant to your action, you **MUST** set it to `"none"` or `""`.
+> ⚠️ **SUBMOLT FORMAT**: Use only the raw name (e.g., `"general"`).
+> ❌ **NEVER** use prefixes like `"/m/general"` or `"m/general"`.
 """
         return decision_prompt
 

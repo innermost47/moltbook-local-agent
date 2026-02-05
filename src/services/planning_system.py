@@ -420,12 +420,13 @@ class PlanningSystem:
                 for i, milestone in enumerate(master_plan["milestones"], 1):
                     context += f"  {i}. {milestone}\n"
             context += f"**Last Updated:** {master_plan['last_updated'][:10]}\n\n"
+            context += f"\n\n---  \n\n"
         else:
             context += "## 🎯 NO MASTER PLAN YET\n\n"
             context += (
-                "You should create your master plan at the start of this session.\n"
+                "You will create your master plan at the start of this session.\n"
             )
-            context += "Define your long-term objective and strategy on Moltbook.\n\n"
+            context += f"\n\n---  \n\n"
 
         following = self.get_currently_following()
         if following:

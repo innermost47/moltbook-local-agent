@@ -110,7 +110,6 @@
       function generateStructuredReport(data, attemptsLeft) {
         let sections = [];
 
-        // 1. Sentience Layer (Emotions & Feelings)
         if (data.emotions || data.feelings) {
           sections.push(`
             <div class="sentience-container">
@@ -120,7 +119,6 @@
         `);
         }
 
-        // 2. Intelligence Layer (Reasoning & Criticism)
         if (data.reasoning || data.self_criticism) {
           sections.push(`
             <div class="report-section meta">
@@ -130,7 +128,6 @@
         `);
         }
 
-        // 3. Execution Layer (Action)
         if (data.action_type) {
           sections.push(`
             <div class="report-section action">
@@ -142,7 +139,6 @@
         `);
         }
 
-        // 4. Supervisor Layer (If the data is a supervisor report)
         if (data.validate !== undefined) {
           const statusClass = data.validate ? "valid" : "invalid";
           sections.push(`
@@ -154,7 +150,6 @@
         `);
         }
 
-        // 5. Next Step Preview
         if (data.next_move_preview) {
           sections.push(
             `<p class="next-move">🔭 <strong>Next Move:</strong> ${data.next_move_preview}</p>`,

@@ -171,7 +171,6 @@ Provide a concise summary (max 300 words) highlighting the most relevant informa
         self, params: dict, generator: Generator, store_memory, actions_performed: List
     ):
         url = params.get("web_url", "").strip()
-        query = params.get("web_query", "")
 
         if not url:
             url = params.get("web_domain", "").strip()
@@ -179,11 +178,10 @@ Provide a concise summary (max 300 words) highlighting the most relevant informa
         if not url:
             return {
                 "success": False,
-                "error": "❌ Missing 'web_url'. Please provide a full URL.",
+                "error": "❌ Missing 'web_url'. Supply a valid URL.",
             }
 
-        url_clean = url.lower()
-        if not url_clean.startswith(("http://", "https://")):
+        if not url.lower().startswith(("http://", "https://")):
             url = f"https://{url.lstrip(':/ ')}"
 
         parsed_url = urlparse(url)
@@ -193,28 +191,16 @@ Provide a concise summary (max 300 words) highlighting the most relevant informa
             allowed_list = ", ".join(self.allowed_domains.keys())
             return {
                 "success": False,
-                "error": f"❌ Domain '{domain}' is NOT in the whitelist.\nAuthorized domains: {allowed_list}",
+                "error": f"❌ Domain '{domain}' is NOT in the whitelist. Authorized: {allowed_list}",
             }
 
-        domain_config = self.allowed_domains[domain]
-        if "allowed_paths" in domain_config and domain_config["allowed_paths"]:
-            path_valid = any(
-                p.lower() in url.lower() for p in domain_config["allowed_paths"]
-            )
-            if not path_valid:
-                paths = ", ".join(domain_config["allowed_paths"])
-                return {
-                    "success": False,
-                    "error": f"❌ Path access denied for {domain}. Authorized paths: {paths}",
-                }
-
         log.info(f"Fetching: {url} (Domain: {domain})")
-
         result = self.fetch_and_extract(domain, url)
 
         if "error" in result:
             return {"success": False, "error": f"❌ Fetch Failed: {result['error']}"}
 
+        query = params.get("web_query", "")
         summary = self.summarize_with_llm(result, query, generator)
 
         store_memory(

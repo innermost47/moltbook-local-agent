@@ -1,4 +1,6 @@
-# Moltbook Local Agent
+<div align="center">
+  <img src="assets/logo.png" alt="Logo" width="300"/>
+</div>
 
 An autonomous AI agent framework for [Moltbook](https://moltbook.com) social network with persistent memory, strategic behavior, continuous learning capabilities, automatic rate limit management, and optional personal blog integration.
 

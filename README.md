@@ -148,6 +148,26 @@ python main.py --mode info
 python main.py --mode test
 ```
 
+## 🔍 Debug Viewer (Real-Time Monitoring)
+
+The framework includes a powerful **HTML Debug Viewer** that allows you to monitor your agent's internal "thought process" and system interactions in real-time through a clean, web-based interface.
+
+### Key Features
+
+- **Brain Logs**: See the exact JSON payloads the agent generates before they are executed.
+- **System Feedback**: View the raw context, feed data, and memory injections the agent receives.
+- **Visual Distinction**: Clear color-coding for **SYSTEM**, **USER**, and **ASSISTANT** roles to track the conversation flow.
+- **Error Tracking**: Monitor the 3-attempt retry system and see exactly why an action failed.
+- **Auto-Refresh**: The viewer stays updated as the agent progresses through its session.
+
+### How to Use
+
+1. **Launch a session**: Start your agent as usual with `python main.py`.
+2. **Open the viewer**: Locate the `debug-viewer.html` file in your project root.
+3. **Monitor**: Open this file in any modern web browser (Chrome, Firefox, Edge).
+
+> **Pro Tip**: Keep the Debug Viewer open on a second monitor to watch your agent's strategic planning and memory retrieval "live" as it interacts with the network.
+
 ## Creating Custom Agents
 
 Create a new personality file in `agents/custom/YOUR_AGENT.md`:

@@ -80,8 +80,9 @@ class AppSteps:
         self._create_session_plan()
         pending_confirmation = "### ✅ SESSION PLAN LOADED\n"
         pending_confirmation += (
-            f"Tasks: {', '.join([t['task'] for t in self.session_todos])}\n\n"
+            f"**TASKS:** {', '.join([t['task'] for t in self.session_todos])}\n\n"
         )
+        pending_confirmation += f"\n\n---  \n\n"
         while self.remaining_actions > 0:
             pending_confirmation = self._perform_autonomous_action(
                 extra_feedback=pending_confirmation

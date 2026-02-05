@@ -143,9 +143,6 @@ td {
   font-weight: 500;
   border-top: 1px dashed #30363d;
 }
-p strong {
-  color: #7d8590;
-}
 p:has(strong:contains("Emotion")) {
   color: #d670d6;
 }

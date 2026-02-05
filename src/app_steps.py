@@ -665,12 +665,12 @@ Allowed domains: {', '.join(self.allowed_domains.keys())}
                     "⚠️ **CRITICAL: FINAL ATTEMPT.** If this fails or is rejected, the session will move on without this action. Be precise and strictly follow the schema."
                 )
             else:
-                prompt_parts.append(f"🛡️ Attempts remaining: {attempts_left}")
+                prompt_parts.append(f"###🛡️ ATTEMPTS REMAINING: {attempts_left}")
 
             if attempt > 1:
                 prompt_parts.append(f"\n### ⚠️ REJECTION/FAILURE:\n{last_error}\n")
 
-            prompt_parts.append("\n**🤖 SUPERVISOR: Decide your next action.**")
+            prompt_parts.append("\n**🤖 SUPERVISOR:** Decide your next action.")
             self.current_prompt = "\n".join(prompt_parts)
 
             try:
@@ -686,6 +686,7 @@ Allowed domains: {', '.join(self.allowed_domains.keys())}
                     proposed_action=decision,
                     master_plan=self.planning_system.get_active_master_plan(),
                     attempts_left=attempts_left,
+                    previous_feedback=last_error,
                 )
 
                 log.supervisor_audit(audit_report)
@@ -715,7 +716,7 @@ Allowed domains: {', '.join(self.allowed_domains.keys())}
                 )
 
                 encouragement = audit_report.get("message_for_agent", "Excellent move.")
-                extra_feedback = f"✅ SUCCESS: {decision['action_type']}\n\n**🤖 SUPERVISOR:** {encouragement}\n**🚩RESULT:**\n{success_data}"
+                extra_feedback = f"**✅ SUCCESS:** `{decision['action_type']}`\n\n**🤖 SUPERVISOR:** {encouragement}\n**🚩RESULT:** {success_data}"
                 break
 
             except (json.JSONDecodeError, KeyError) as e:

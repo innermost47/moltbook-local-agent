@@ -104,7 +104,9 @@ This is critical to ensure visibility and drive traffic to your research.
                 f"Shared blog article on Moltbook: '{title}' - {post_url}"
             )
 
-            app_steps.created_content_urls.append(post_url)
+            app_steps.created_content_urls.append(
+                {"type": "blog_shared", "title": title, "url": post_url}
+            )
             app_steps.last_post_time = __import__("time").time()
 
             log.success(f"🔗 Shared blog post on Moltbook: {title}")

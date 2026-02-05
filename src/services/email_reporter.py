@@ -105,6 +105,14 @@ class EmailReporter:
                     <ul class="url-list">
                 """
                 for item in content_urls:
+                    if isinstance(item, str):
+                        html_content += f"""
+                        <li class="url-item">
+                            <strong>🔗 Content:</strong><br>
+                            <a href="{item}" target="_blank">{item}</a>
+                        </li>
+                        """
+                        continue
                     if item["type"] == "post":
                         html_content += f"""
                         <li class="url-item">

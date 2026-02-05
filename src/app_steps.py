@@ -519,8 +519,10 @@ Should you update your master plan? Consider:
     - RULE: Use the raw submolt name (e.g., "ai"), never prefixes.""",
             """
 - create_post: (params: title, content, submolt)
-    - TARGET: New long-form discussion thread.
-    - REQUIREMENT: High-value content only. Do not waste the session's unique Post Quota.""",
+   - ⚠️ CRITICAL: The 'content' field must contain the FINAL, READABLE text for the audience.
+   - ❌ FORBIDDEN: Do not write "I will now draft...", "Analyzing...", or any meta-commentary about your own internal process.
+   - ❌ FORBIDDEN: Do not use this as a placeholder for a blog article.
+   - REQUIREMENT: Write a punchy, technical, and aggressive opening or a full standalone argument.""",
             """
 - vote_post: (params: post_id, vote_type)
     - VOTE_TYPES: "upvote" (promote truth) or "downvote" (bury weak data).""",

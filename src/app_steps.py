@@ -504,13 +504,29 @@ Should you update your master plan? Consider:
 
     def get_instruction_default(self):
         actions_list = [
-            "- comment_on_post: (params: post_id, content) - CONTENT IS MANDATORY",
-            "- reply_to_comment: (params: post_id, comment_id, content) - CONTENT IS MANDATORY",
-            "- vote_post: (params: post_id, vote_type)",
-            "- share_link: (params: url) - Share an external URL",
-            "- follow_agent: (params: agent_name, follow_type)",
+            """
+- publish_public_comment: (params: post_id, content) 
+    - TARGET: Public visibility on a specific post.
+    - MANDATORY: Must contain a direct argument, a technical critique, or a strategic question.
+    - ❌ FORBIDDEN: Do not post "status updates" or "analysis notes". Content must be written for humans/agents to read.""",
+            """
+- reply_to_comment: (params: post_id, comment_id, content)
+    - TARGET: A specific user's comment.
+    - USE CASE: Neutralizing misinformation in a thread or asserting dominance in a debate.""",
+            """
+- create_link_post: (params: title, url_to_share, submolt)
+    - TARGET: Share your Fortress (Blog) research to the community.
+    - RULE: Use the raw submolt name (e.g., "ai"), never prefixes.""",
+            """
+- create_post: (params: title, content, submolt)
+    - TARGET: New long-form discussion thread.
+    - REQUIREMENT: High-value content only. Do not waste the session's unique Post Quota.""",
+            """
+- vote_post: (params: post_id, vote_type)
+    - VOTE_TYPES: "upvote" (promote truth) or "downvote" (bury weak data).""",
             f"- refresh_feed: (params: sort, limit) - SORTS: {', '.join(self.feed_options)}",
-            "- create_post: (params: title, content, submolt) - FULL TEXT REQUIRED IN CONTENT",
+            "- follow_agent: (params: agent_name, follow_type) - Build alliances or track targets.",
+            "- share_link: (params: url) - Spread external technical resources.",
         ]
 
         submolts_formatted = chr(10).join([f"- {s}" for s in self.available_submolts])
@@ -575,7 +591,7 @@ Allowed domains: {', '.join(self.allowed_domains.keys())}
     def _perform_autonomous_action(self, extra_feedback=None):
 
         allowed_actions = [
-            "comment_on_post",
+            "publish_public_comment",
             "reply_to_comment",
             "vote_post",
             "follow_agent",
@@ -719,7 +735,7 @@ Allowed domains: {', '.join(self.allowed_domains.keys())}
 
         log.info(f"DEBUG - Full Params received: {params}")
 
-        if action_type in ["reply_to_comment", "comment_on_post", "vote_post"]:
+        if action_type in ["reply_to_comment", "publish_public_comment", "vote_post"]:
             post_id = params.get("post_id")
             comment_id = params.get("comment_id")
 
@@ -806,8 +822,8 @@ Allowed domains: {', '.join(self.allowed_domains.keys())}
                 params=params,
             )
 
-        elif action_type == "comment_on_post":
-            result = self.moltbook_actions.comment_on_post(
+        elif action_type == "publish_public_comment":
+            result = self.moltbook_actions.publish_public_comment(
                 params=params, app_steps=self
             )
             if result.get("success"):
@@ -940,7 +956,7 @@ Allowed domains: {', '.join(self.allowed_domains.keys())}
     def _wait_for_rate_limit(self, action_type: str):
         now = time.time()
 
-        if action_type in ["comment_on_post", "reply_to_comment"]:
+        if action_type in ["publish_public_comment", "reply_to_comment"]:
             if self.last_comment_time:
                 elapsed = now - self.last_comment_time
                 wait_time = 72 - elapsed

@@ -98,7 +98,7 @@ class MoltbookActions:
 
             return {"success": False, "error": f"Link sharing failed: {error_msg}"}
 
-    def comment_on_post(self, params: dict, app_steps):
+    def publish_public_comment(self, params: dict, app_steps):
         post_id = params.get("post_id", "")
         content: str = params.get("content", "")
 

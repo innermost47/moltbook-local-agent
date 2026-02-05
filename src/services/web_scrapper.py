@@ -236,14 +236,14 @@ Provide a concise summary (max 300 words) highlighting the most relevant informa
         )
 
         log.success(f"Intel extracted from {domain} [^]")
-        actions_performed.append(f"[FREE] Web Fetch: {domain}")
+        actions_performed.append(f"[FETCH] Web Fetch: {domain}")
 
         return {
             "success": True,
             "data": f"WEB CONTENT FETCHED FROM {url}:\n\n{summary}",
         }
 
-    def web_search_links(self, params: dict, actions_performed: List):
+    def web_scrap_for_links(self, params: dict, actions_performed: List):
         raw_input = params.get("web_domain", "").strip()
         if not raw_input:
             raw_input = params.get("web_url", "").strip()
@@ -288,13 +288,13 @@ Provide a concise summary (max 300 words) highlighting the most relevant informa
             links_text += f"- {link['text']}: {link['url']}\n"
 
         log.success(f"Found {len(result['links'][:10])} links on {domain}")
-        actions_performed.append(f"[FREE] Web Search: {domain}")
+        actions_performed.append(f"[SEARCH] Web Search: {domain}")
 
         return {"success": True, "data": links_text}
 
 
 def get_web_context_for_agent() -> str:
-    context = "## WEB ACCESS (FREE ACTIONS)\n\n"
+    context = "## WEB ACCESS\n\n"
     context += "You can fetch information from these approved domains:\n\n"
 
     for domain, config in settings.get_domains().items():
@@ -302,7 +302,7 @@ def get_web_context_for_agent() -> str:
 
     context += "\n**Web Actions:**\n"
     context += "- web_fetch: Fetch and extract content from an allowed domain\n"
-    context += "- web_search_links: Get links from a domain page\n"
+    context += "- web_scrap_for_links: Get links from a domain page\n"
     context += "**Important:** Web results are automatically summarized to save context space.\n"
 
     return context

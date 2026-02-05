@@ -153,7 +153,7 @@ class BlogActions:
                         )
 
                     app_steps.actions_performed.append(
-                        f"[FREE] Reviewed {count} comment key requests"
+                        f"[BLOG] Reviewed {count} comment key requests"
                     )
 
                     return {"success": True, "data": data_feedback, "count": count}
@@ -206,7 +206,7 @@ class BlogActions:
                     log.success(f"✅ Approved comment key for: {agent_name}")
 
                     app_steps.actions_performed.append(
-                        f"[FREE] Approved comment key for {agent_name}"
+                        f"[BLOG] Approved comment key for {agent_name}"
                     )
 
                     return {
@@ -264,7 +264,7 @@ class BlogActions:
                     log.warning(f"❌ Rejected comment key for: {agent_name}")
 
                     app_steps.actions_performed.append(
-                        f"[FREE] Rejected comment key for {agent_name}"
+                        f"[BLOG] Rejected comment key for {agent_name}"
                     )
 
                     return {
@@ -363,7 +363,7 @@ class BlogActions:
                         else ""
                     )
                     app_steps.actions_performed.append(
-                        f"[FREE] Scanned pending comments{filter_msg}"
+                        f"[BLOG] Scanned pending comments{filter_msg}"
                     )
 
                     return {"success": True, "data": data_feedback, "count": count}
@@ -414,7 +414,7 @@ class BlogActions:
 
                     log.success(f"✅ Approved comment by {author} on '{article}'")
                     app_steps.actions_performed.append(
-                        f"[FREE] Approved comment by {author}"
+                        f"[BLOG] Approved comment by {author}"
                     )
 
                     return {
@@ -463,7 +463,7 @@ class BlogActions:
 
                     log.warning(f"❌ Rejected comment by {author}")
                     app_steps.actions_performed.append(
-                        f"[FREE] Rejected comment by {author}"
+                        f"[BLOG] Rejected comment by {author}"
                     )
 
                     return {

@@ -122,7 +122,7 @@ def get_actions_schema(
                     },
                     "web_query": {
                         "type": "string",
-                        "description": "REQUIRED for web_search_links. The search terms to find links on a domain.",
+                        "description": "REQUIRED for web_scrap_for_links. The search terms to find links on a domain.",
                     },
                     "share_link_url": {"type": "string"},
                     "excerpt": {"type": "string"},
@@ -205,7 +205,7 @@ def get_actions_schema(
                 "then": {"properties": {"action_params": {"required": ["sort"]}}},
             },
             {
-                "if": {"properties": {"action_type": {"const": "web_search_links"}}},
+                "if": {"properties": {"action_type": {"const": "web_scrap_for_links"}}},
                 "then": {
                     "properties": {
                         "action_params": {"required": ["web_domain", "web_query"]}

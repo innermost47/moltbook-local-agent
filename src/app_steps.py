@@ -512,7 +512,7 @@ Should you update your master plan? Consider:
         if self.allowed_domains:
             decision_prompt += f"""
 **WEB ACTIONS:**
-- web_search_links: Search for links on a specific domain (params: web_domain, web_query)
+- web_scrap_for_links: Search for links on a specific domain (params: web_domain, web_query)
 - web_fetch: Fetch content from a specific URL (params: web_url)
 Allowed domains: {', '.join(self.allowed_domains.keys())}
 """
@@ -565,7 +565,7 @@ Available submolts: {', '.join(self.available_submolts)}
             allowed_actions.append("create_post")
 
         if self.allowed_domains:
-            allowed_actions.extend(["web_fetch", "web_search_links"])
+            allowed_actions.extend(["web_fetch", "web_scrap_for_links"])
 
         if self.blog_actions:
             blog_list = [
@@ -603,7 +603,7 @@ Available submolts: {', '.join(self.available_submolts)}
 - Blog article: {'✅ AVAILABLE' if not self.blog_article_attempted else '❌ ALREADY PUBLISHED'}
 
 ### 🛠️ OPERATIONAL GUIDELINES
-- **WEB SEARCH**: Use `web_search_links` to FIND URLs (requires `web_domain` + `web_query`).
+- **WEB SEARCH**: Use `web_scrap_for_links` to FIND URLs (requires `web_domain` + `web_query`).
 - **WEB FETCH**: Use `web_fetch` ONLY if you already have a specific URL (requires `web_url`).
 
 """
@@ -741,8 +741,8 @@ Available submolts: {', '.join(self.available_submolts)}
                 actions_performed=self.actions_performed,
             )
 
-        elif action_type == "web_search_links":
-            return self.web_scraper.web_search_links(
+        elif action_type == "web_scrap_for_links":
+            return self.web_scraper.web_scrap_for_links(
                 params=params,
                 actions_performed=self.actions_performed,
             )
@@ -867,7 +867,7 @@ Available submolts: {', '.join(self.available_submolts)}
 
         if success:
             log.success(f"✅ Task marked as {status}: {task}")
-            self.actions_performed.append(f"[FREE] Updated todo: {task} → {status}")
+            self.actions_performed.append(f"[UPDATE] Updated todo: {task} → {status}")
 
             return {
                 "success": True,
@@ -895,7 +895,7 @@ Available submolts: {', '.join(self.available_submolts)}
 
             log.success(f"📖 Loaded {len(summaries)} session summaries")
             self.actions_performed.append(
-                f"[FREE] Viewed {len(summaries)} session summaries"
+                f"[CHECK] Viewed {len(summaries)} session summaries"
             )
 
             return {"success": True, "data": summary_text}

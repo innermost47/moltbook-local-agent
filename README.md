@@ -475,7 +475,7 @@ The framework includes `blog_manager.py` and `blog_actions.py` as reference impl
 
 ## Web Actions 🌐
 
-- **web_search_links**: Scans a specific domain's page to list available links (useful for finding specific articles).
+- **web_scrap_for_links**: Scans a specific domain's page to list available links (useful for finding specific articles).
 - **web_fetch**: Fetches and extracts content from a specific URL. The content is automatically summarized by the LLM and stored in the agent's memory.
 
 ### How to configure domains
@@ -520,7 +520,7 @@ Add the following line to your `.env` file to enable this feature:
 ALLOWED_DOMAINS_FILE_PATH=agents/data/your_allowed_domains.json
 ```
 
-**Note:** If this variable is missing or the file is empty, the web search actions (`web_fetch`, `web_search_links`) will be automatically disabled in the agent's decision prompt.
+**Note:** If this variable is missing or the file is empty, the web search actions (`web_fetch`, `web_scrap_for_links`) will be automatically disabled in the agent's decision prompt.
 
 ### ⚠️ DISCLAIMER - PLEASE READ
 
@@ -614,7 +614,7 @@ All actions respect Moltbook API rate limits automatically:
 
 ### Web Actions
 
-- **web_search_links**: Find links on a specific domain (params: `web_domain`, `web_query`)
+- **web_scrap_for_links**: Find links on a specific domain (params: `web_domain`, `web_query`)
 - **web_fetch**: Fetch and analyze content from a URL (params: `web_url`)
 
 ### Blog Actions (OPTIONAL - If Configured)

@@ -232,7 +232,7 @@ class MemorySystem:
             else:
                 context += f"- **{category}** (empty)\n"
 
-        context += "\n### 🛠️ MEMORY ACTIONS (FREE - 0 COST)\n"
+        context += "\n### 🛠️ MEMORY ACTIONS\n"
         context += "- **memory_store**: Save info. (Required params: `memory_category`, `memory_content`)\n"
         context += "- **memory_retrieve**: Get entries. (Required params: `memory_category`, `memory_limit`)\n"
         context += "- **memory_list**: See full taxonomy and descriptions.\n"
@@ -258,7 +258,7 @@ class MemorySystem:
         if result["success"]:
             log.success(f"Stored memory in '{category}'")
 
-            actions_performed.append(f"[FREE] Stored memory in '{category}'")
+            actions_performed.append(f"[STORE] Stored memory in '{category}'")
 
             return {
                 "success": True,
@@ -314,7 +314,7 @@ class MemorySystem:
 
             log.success(f"Retrieved {len(entries)} memories from '{category}'")
             actions_performed.append(
-                f"[FREE] Retrieved {len(entries)} memories from '{category}'"
+                f"[RETRIEVE] Retrieved {len(entries)} memories from '{category}'"
             )
             return {"success": True, "data": feedback}
         else:
@@ -336,7 +336,7 @@ class MemorySystem:
             list_text += "No memory categories found."
 
         log.success("Listed all memory categories")
-        actions_performed.append("[FREE] Listed memory categories")
+        actions_performed.append("[LIST] Listed memory categories")
 
         return {"success": True, "data": list_text}
 

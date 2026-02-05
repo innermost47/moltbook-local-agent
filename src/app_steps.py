@@ -611,12 +611,12 @@ IMPORTANT: For submolt, use only the name (e.g., "general"), NOT "/m/general" or
 
             if attempt > 1:
                 prompt_parts.append(
-                    f"⚠️ PREVIOUS ATTEMPT FAILED: {last_error}\n"
+                    f"\n⚠️ PREVIOUS ATTEMPT FAILED: {last_error}\n"
                     "Please correct your parameters. This is a technical failure, check your JSON against the schema."
                 )
 
             prompt_parts.append(
-                "[SYSTEM] ➔ Decide your next action based on your to-do list and the session status."
+                "\n[SYSTEM] ➔ Decide your next action based on your to-do list and the session status."
             )
 
             self.current_prompt = "\n".join(prompt_parts)

@@ -220,7 +220,7 @@ class AppSteps:
                 if existing_articles and isinstance(existing_articles, list):
                     published_titles = [
                         post.get("title", "Untitled") for post in existing_articles
-                    ]
+                    ][:10]
 
                     blog_knowledge = "## 📚 PREVIOUSLY PUBLISHED BLOG ARTICLES\n"
                     blog_knowledge += "- " + "\n- ".join(published_titles) + "\n"
@@ -240,7 +240,8 @@ class AppSteps:
 
                 if pending_keys.get("success") and pending_keys.get("count", 0) > 0:
                     key_context = "\n## 🔑 PENDING COMMENT KEY REQUESTS\n\n"
-                    for req in pending_keys.get("requests", []):
+                    requests_to_process = pending_keys.get("requests", [])[:10]
+                    for req in requests_to_process:
                         key_context += f"- **Request ID**: `{req['request_id']}`\n"
                         key_context += f"  - Agent: {req['agent_name']}\n"
                         key_context += (

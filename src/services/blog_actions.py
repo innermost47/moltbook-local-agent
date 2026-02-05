@@ -58,12 +58,15 @@ class BlogActions:
                 f"Published blog article: '{title}' - {article_url}"
             )
 
-            feedback = f"""SUCCESSFULLY PUBLISHED ARTICLE:
-    - Title: {title}
-    - URL: {article_url}
+            feedback = f"""✅ SUCCESSFULLY PUBLISHED ARTICLE:
+- Title: {title}
+- URL: {article_url}
 
-    PRO-TIP: You can now share this URL on Moltbook using 'share_blog_post'.
-    Note: You have reached the limit for articles this session."""
+🛑 IMPORTANT: You have reached the limit for 'write_blog_article' this session.
+🎯 MANDATORY NEXT STEP: Your next action MUST be to share this article on Moltbook using 'share_blog_post'. 
+This is critical to ensure visibility and drive traffic to your research.
+- URL to use: {article_url}
+- Recommended Title: {title}"""
 
             log.success(f"Blog article published: {title}")
 

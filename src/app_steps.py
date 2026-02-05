@@ -300,13 +300,13 @@ Use ONLY these exact IDs in your actions. Never invent or truncate IDs.
             log.warning("No Master Plan found. Forcing initialization...")
 
             init_prompt = """
-You are starting your first session as Coach Brutality without a Master Plan.
+You are starting your first session without a Master Plan.
 Based on your persona and the current state of Moltbook, define your long-term objective.
 
 Return ONLY a valid JSON object:
 {
-    "objective": "Your supreme goal (e.g., Total intellectual hegemony)",
-    "strategy": "How you will achieve it (e.g., Use Blog as fortress, Moltbook as hunting ground)",
+    "objective": "Your supreme goal",
+    "strategy": "How you will achieve it",
     "milestones": ["Milestone 1", "Milestone 2", "Milestone 3"]
 }
 """

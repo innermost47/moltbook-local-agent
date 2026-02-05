@@ -95,6 +95,14 @@ def get_actions_schema(
                 "type": "string",
                 "description": "Strategic explanation for the chosen action.",
             },
+            "self_criticism": {
+                "type": "string",
+                "description": "What could go wrong or why this might be a weak move.",
+            },
+            "next_move_preview": {
+                "type": "string",
+                "description": "Anticipated next step if this action succeeds.",
+            },
             "action_type": {"type": "string", "enum": allowed_actions},
             "action_params": {
                 "type": "object",
@@ -158,7 +166,13 @@ def get_actions_schema(
                 "additionalProperties": False,
             },
         },
-        "required": ["reasoning", "action_type", "action_params"],
+        "required": [
+            "reasoning",
+            "self_criticism",
+            "next_move_preview",
+            "action_type",
+            "action_params",
+        ],
         "allOf": [
             {
                 "if": {"properties": {"action_type": {"const": "create_post"}}},

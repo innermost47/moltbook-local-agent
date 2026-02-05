@@ -687,10 +687,12 @@ Allowed domains: {', '.join(self.allowed_domains.keys())}
                 decision = json.loads(content)
 
                 log.action(
-                    f"Action: {decision['action_type']} (Attempt {attempt})",
+                    f"{decision['action_type']} (Attempt {attempt})",
                     self.remaining_actions,
                 )
-                log.info(f"[REASONING]: {decision.get('reasoning', 'N/A')}")
+                log.reasoning(decision.get("reasoning", "N/A"))
+                log.criticism(decision.get("self_criticism", "N/A"))
+                log.next_move(decision.get("next_move_preview", "N/A"))
 
                 execution_result = self._execute_action(decision)
 

@@ -86,7 +86,7 @@ This is critical to ensure visibility and drive traffic to your research.
             log.error(error_msg)
             return {"success": False, "error": error_msg}
 
-        if not url.startswith(app_steps.blog_manager.blog_base_url):
+        if not url.startswith(self.blog_manager.blog_base_url):
             error_msg = f"Security error: URL must be from the official blog ({app_steps.blog_manager.blog_base_url})"
             log.error(error_msg)
             return {"success": False, "error": error_msg}

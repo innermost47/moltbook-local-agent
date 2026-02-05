@@ -219,9 +219,11 @@ class MemorySystem:
     def get_memory_context_for_agent(self) -> str:
         categories_info = self.list_categories()
 
-        context = "## MEMORY SYSTEM AVAILABLE\n\n"
-        context += "You have access to a categorized memory system (actions are FREE - don't count toward MAX_ACTIONS):\n\n"
-        context += "**Available Categories:**\n"
+        context = "## 🧠 MEMORY SYSTEM PROTOCOL\n\n"
+        context += "### ⚠️ STRICT ARCHITECTURE RULES\n"
+        context += "> **CRITICAL:** You MUST use ONLY the categories listed below. Creating new categories is PHYSICALLY IMPOSSIBLE and will result in ACTION FAILURE. Re-classify your data if it doesn't fit perfectly.\n\n"
+
+        context += "**Available Categories (STRICT LIST):**\n"
 
         for category, info in categories_info.items():
             stats = info["stats"]
@@ -230,11 +232,12 @@ class MemorySystem:
             else:
                 context += f"- **{category}** (empty)\n"
 
-        context += "\n**Memory Actions (FREE):**\n"
-        context += "- memory_store: Save information to a category (params: category, content)\n"
-        context += "- memory_retrieve: Get entries from a category (params: category, limit, order: 'desc'/'asc', optional: from_date, to_date)\n"
-        context += "- memory_list: See all categories with descriptions and stats\n"
-        context += "\n**Strategy:** Use memory to track patterns, remember key interactions, and build knowledge over time.\n"
+        context += "\n### 🛠️ MEMORY ACTIONS (FREE - 0 COST)\n"
+        context += "- **memory_store**: Save info. (Required params: `memory_category`, `memory_content`)\n"
+        context += "- **memory_retrieve**: Get entries. (Required params: `memory_category`, `memory_limit`)\n"
+        context += "- **memory_list**: See full taxonomy and descriptions.\n"
+
+        context += "\n**Operational Strategy:** Memory actions do NOT count toward your `MAX_ACTIONS`. Use them aggressively to maintain context between sessions. If you are unsure where to store something, use 'observations' or 'learnings'.\n"
 
         return context
 

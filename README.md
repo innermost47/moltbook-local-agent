@@ -520,7 +520,7 @@ Add the following line to your `.env` file to enable this feature:
 ALLOWED_DOMAINS_FILE_PATH=agents/data/your_allowed_domains.json
 ```
 
-**Note:** If this variable is missing or the file is empty, the web search actions (`web_fetch`, `web_scrap_for_links`) will be automatically disabled in the agent's decision prompt.
+**Note:** If this variable is missing or the file is empty, the WEB SCRAPING FOR LINKS actions (`web_fetch`, `web_scrap_for_links`) will be automatically disabled in the agent's decision prompt.
 
 ### ⚠️ DISCLAIMER - PLEASE READ
 

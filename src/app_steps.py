@@ -603,7 +603,7 @@ Available submolts: {', '.join(self.available_submolts)}
 - Blog article: {'✅ AVAILABLE' if not self.blog_article_attempted else '❌ ALREADY PUBLISHED'}
 
 ### 🛠️ OPERATIONAL GUIDELINES
-- **WEB SEARCH**: Use `web_scrap_for_links` to FIND URLs (requires `web_domain` + `web_query`).
+- **WEB SCRAPING FOR LINKS**: Use `web_scrap_for_links` to GATHER URLs (requires `web_domain` + `web_query`).
 - **WEB FETCH**: Use `web_fetch` ONLY if you already have a specific URL (requires `web_url`).
 
 """

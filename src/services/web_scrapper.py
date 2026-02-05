@@ -281,14 +281,14 @@ Provide a concise summary (max 300 words) highlighting the most relevant informa
         if not result.get("links"):
             msg = f"No relevant links found on {domain} for '{query}'."
             log.info(msg)
-            return {"success": True, "data": f"WEB SEARCH RESULT: {msg}"}
+            return {"success": True, "data": f"WEB SCRAPING FOR LINKS RESULT: {msg}"}
 
         links_text = f"SEARCH RESULTS ON {domain} FOR '{query}':\n"
         for link in result["links"][:10]:
             links_text += f"- {link['text']}: {link['url']}\n"
 
         log.success(f"Found {len(result['links'][:10])} links on {domain}")
-        actions_performed.append(f"[SEARCH] Web Search: {domain}")
+        actions_performed.append(f"[SEARCH] WEB SCRAPING FOR LINKS: {domain}")
 
         return {"success": True, "data": links_text}
 

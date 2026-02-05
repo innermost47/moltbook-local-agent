@@ -76,7 +76,21 @@ update_master_plan_schema = {
 }
 
 
-def get_actions_schema(allowed_actions, feed_options):
+def get_actions_schema(
+    allowed_actions,
+    feed_options,
+    available_ids=None,
+    available_submolts=None,
+    allowed_domains=None,
+):
+    post_ids = available_ids.get("posts", ["none"]) if available_ids else ["none"]
+    comment_ids = available_ids.get("comments", ["none"]) if available_ids else ["none"]
+    submolts = available_submolts if available_submolts else ["general"]
+
+    domains_list = ["none"]
+    if allowed_domains:
+        domains_list.extend([f"https://{domain}" for domain in allowed_domains.keys()])
+
     return {
         "type": "object",
         "properties": {
@@ -88,9 +102,9 @@ def get_actions_schema(allowed_actions, feed_options):
             "action_params": {
                 "type": "object",
                 "properties": {
-                    "post_id": {"type": "string"},
-                    "comment_id": {"type": "string"},
-                    "submolt": {"type": "string"},
+                    "post_id": {"type": "string", "enum": post_ids},
+                    "comment_id": {"type": "string", "enum": comment_ids},
+                    "submolt": {"type": "string", "enum": submolts},
                     "title": {"type": "string"},
                     "content": {"type": "string"},
                     "excerpt": {"type": "string"},
@@ -109,10 +123,33 @@ def get_actions_schema(allowed_actions, feed_options):
                     },
                     "sort": {"type": "string", "enum": feed_options},
                     "limit": {"type": "integer", "default": 10},
-                    "web_url": {"type": "string"},
-                    "web_domain": {"type": "string"},
+                    "web_domain": {
+                        "type": "string",
+                        "enum": domains_list,
+                        "description": "The authorized domain starting with https://",
+                    },
+                    "web_url": {
+                        "type": "string",
+                        "description": "Full URL. MUST belong to one of the authorized domains.",
+                    },
                     "web_query": {"type": "string"},
-                    "memory_category": {"type": "string"},
+                    "memory_category": {
+                        "type": "string",
+                        "enum": [
+                            "interactions",
+                            "learnings",
+                            "strategies",
+                            "observations",
+                            "goals",
+                            "relationships",
+                            "experiments",
+                            "preferences",
+                            "failures",
+                            "successes",
+                            "ideas",
+                            "reflections",
+                        ],
+                    },
                     "memory_content": {"type": "string"},
                     "memory_limit": {"type": "integer", "default": 5},
                     "memory_order": {"type": "string", "enum": ["asc", "desc"]},

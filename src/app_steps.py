@@ -569,7 +569,16 @@ IMPORTANT: For submolt, use only the name (e.g., "general"), NOT "/m/general" or
                 blog_list.append("write_blog_article")
             allowed_actions.extend(blog_list)
 
-        action_schema = get_actions_schema(allowed_actions, self.feed_options)
+        action_schema = get_actions_schema(
+            allowed_actions=allowed_actions,
+            feed_options=self.feed_options,
+            available_ids={
+                "posts": self.available_post_ids,
+                "comments": list(self.available_comment_ids.keys()),
+            },
+            available_submolts=self.available_submolts,
+            allowed_domains=self.allowed_domains,
+        )
 
         max_attempts = 3
         last_error = None

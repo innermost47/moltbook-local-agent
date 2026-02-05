@@ -104,15 +104,8 @@ class Generator:
         return system_prompt
 
     def generate_session_summary(self, summary_prompt: str, summary_schema: str):
-        now = datetime.now().strftime("%Y-%m-%d %H:%M")
-        time_aware_prompt = f"""{summary_prompt}
 
----
-
-**Current Time:** {now}
-"""
-
-        result = self.generate(time_aware_prompt, summary_schema)
+        result = self.generate(summary_prompt, summary_schema)
         return result["choices"][0]["message"]["content"]
 
     def generate_simple(self, prompt: str, max_tokens: int = 300) -> str:

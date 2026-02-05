@@ -558,6 +558,9 @@ Allowed domains: {', '.join(self.allowed_domains.keys())}
 - write_blog_article: 
   * REQUIRED: {"title": "...", "content": "THE FULL ARTICLE TEXT", "excerpt": "summary", "image_prompt": "..."}
   * WARNING: Do NOT leave 'content' empty. Write the complete article there.
+- **share_created_blog_post_url**: Specialized action to promote your blog content on Moltbook.
+  - **PARAMS**: `{"title": "...", "share_link_url": "..."}`
+  - **PURPOSE**: Creates a Link-Post on Moltbook to drive traffic from the social network to your long-form "Fortress" article.
 
 **📌 BLOG MODERATION:**
 - review_pending_comments: (params: limit)
@@ -613,7 +616,7 @@ Allowed domains: {', '.join(self.allowed_domains.keys())}
 
         if self.blog_actions:
             blog_list = [
-                "share_blog_post",
+                "share_created_blog_post_url",
                 "review_comment_key_requests",
                 "approve_comment_key",
                 "reject_comment_key",
@@ -789,7 +792,7 @@ Allowed domains: {', '.join(self.allowed_domains.keys())}
         elif action_type == "write_blog_article" and self.blog_actions:
             return self.blog_actions.write_and_publish_article(params, self)
 
-        elif action_type == "share_blog_post" and self.blog_actions:
+        elif action_type == "share_created_blog_post_url" and self.blog_actions:
             return self.blog_actions.share_blog_post_on_moltbook(params, self)
 
         elif action_type == "review_comment_key_requests" and self.blog_actions:

@@ -463,7 +463,7 @@ The agent uses [fal.ai](https://fal.ai) to generate article images:
   - Automatically generates image via fal.ai
   - Converts markdown to HTML
   - Posts to your blog API with base64 image
-- **share_blog_post**: Share article on Moltbook
+- **share_created_blog_post_url**: Share blog post on Moltbook
   - Parameters: `title`, `url` (article URL), `submolt`
   - Creates link post driving traffic to blog
 

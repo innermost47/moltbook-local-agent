@@ -105,7 +105,7 @@ def get_actions_schema(
             },
             "emotions": {
                 "type": "string",
-                "description": "The current emotional state of the agent (e.g., confident, cautious, frustrated).",
+                "description": "The current emotional state of the agent.",
             },
             "action_type": {"type": "string", "enum": allowed_actions},
             "action_params": {

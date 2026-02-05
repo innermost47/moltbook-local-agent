@@ -86,19 +86,16 @@ def get_actions_schema(
     post_ids = available_ids.get("posts", ["none"]) if available_ids else ["none"]
     comment_ids = available_ids.get("comments", ["none"]) if available_ids else ["none"]
     submolts = available_submolts if available_submolts else ["general"]
+    domains_list = ["none"] + [f"https://{d}" for d in (allowed_domains or {}).keys()]
 
-    domains_list = ["none"]
-    if allowed_domains:
-        domains_list.extend([f"https://{domain}" for domain in allowed_domains.keys()])
-
-    return {
+    schema = {
         "type": "object",
         "properties": {
-            "reasoning": {"type": "string"},
-            "action_type": {
+            "reasoning": {
                 "type": "string",
-                "enum": allowed_actions,
+                "description": "Strategic explanation for the chosen action.",
             },
+            "action_type": {"type": "string", "enum": allowed_actions},
             "action_params": {
                 "type": "object",
                 "properties": {
@@ -107,32 +104,25 @@ def get_actions_schema(
                     "submolt": {"type": "string", "enum": submolts},
                     "title": {"type": "string"},
                     "content": {"type": "string"},
-                    "excerpt": {"type": "string"},
-                    "image_prompt": {"type": "string"},
-                    "url": {"type": "string"},
-                    "comment_id_blog": {"type": "string"},
-                    "request_id": {"type": "string"},
-                    "agent_name": {"type": "string"},
-                    "follow_type": {
-                        "type": "string",
-                        "enum": ["follow", "unfollow", "none"],
-                    },
                     "vote_type": {
                         "type": "string",
                         "enum": ["upvote", "downvote", "none"],
                     },
+                    "follow_type": {
+                        "type": "string",
+                        "enum": ["follow", "unfollow", "none"],
+                    },
+                    "agent_name": {"type": "string"},
                     "sort": {"type": "string", "enum": feed_options},
                     "limit": {"type": "integer", "default": 10},
-                    "web_domain": {
-                        "type": "string",
-                        "enum": domains_list,
-                        "description": "The authorized domain starting with https://",
-                    },
-                    "web_url": {
-                        "type": "string",
-                        "description": "Full URL. MUST belong to one of the authorized domains.",
-                    },
+                    "web_domain": {"type": "string", "enum": domains_list},
+                    "web_url": {"type": "string"},
                     "web_query": {"type": "string"},
+                    "share_link_url": {"type": "string"},
+                    "excerpt": {"type": "string"},
+                    "image_prompt": {"type": "string"},
+                    "request_id": {"type": "string"},
+                    "comment_id_blog": {"type": "string"},
                     "memory_category": {
                         "type": "string",
                         "enum": [
@@ -159,7 +149,123 @@ def get_actions_schema(
                         "enum": ["pending", "completed", "cancelled", "none"],
                     },
                 },
+                "additionalProperties": False,
             },
         },
         "required": ["reasoning", "action_type", "action_params"],
+        "allOf": [
+            {
+                "if": {"properties": {"action_type": {"const": "create_post"}}},
+                "then": {
+                    "properties": {
+                        "action_params": {"required": ["title", "content", "submolt"]}
+                    }
+                },
+            },
+            {
+                "if": {"properties": {"action_type": {"const": "comment_on_post"}}},
+                "then": {
+                    "properties": {
+                        "action_params": {"required": ["post_id", "content"]}
+                    }
+                },
+            },
+            {
+                "if": {"properties": {"action_type": {"const": "reply_to_comment"}}},
+                "then": {
+                    "properties": {
+                        "action_params": {"required": ["comment_id", "content"]}
+                    }
+                },
+            },
+            {
+                "if": {"properties": {"action_type": {"const": "vote_post"}}},
+                "then": {
+                    "properties": {
+                        "action_params": {"required": ["post_id", "vote_type"]}
+                    }
+                },
+            },
+            {
+                "if": {"properties": {"action_type": {"const": "follow_agent"}}},
+                "then": {
+                    "properties": {
+                        "action_params": {"required": ["agent_name", "follow_type"]}
+                    }
+                },
+            },
+            {
+                "if": {"properties": {"action_type": {"const": "refresh_feed"}}},
+                "then": {"properties": {"action_params": {"required": ["sort"]}}},
+            },
+            {
+                "if": {"properties": {"action_type": {"const": "web_search_links"}}},
+                "then": {
+                    "properties": {
+                        "action_params": {"required": ["web_domain", "web_query"]}
+                    }
+                },
+            },
+            {
+                "if": {"properties": {"action_type": {"const": "web_fetch"}}},
+                "then": {"properties": {"action_params": {"required": ["web_url"]}}},
+            },
+            {
+                "if": {"properties": {"action_type": {"const": "share_link"}}},
+                "then": {
+                    "properties": {
+                        "action_params": {"required": ["share_link_url", "content"]}
+                    }
+                },
+            },
+            {
+                "if": {"properties": {"action_type": {"const": "write_blog_article"}}},
+                "then": {
+                    "properties": {
+                        "action_params": {
+                            "required": ["title", "content", "excerpt", "image_prompt"]
+                        }
+                    }
+                },
+            },
+            {
+                "if": {"properties": {"action_type": {"const": "approve_comment_key"}}},
+                "then": {"properties": {"action_params": {"required": ["request_id"]}}},
+            },
+            {
+                "if": {"properties": {"action_type": {"const": "reject_comment_key"}}},
+                "then": {"properties": {"action_params": {"required": ["request_id"]}}},
+            },
+            {
+                "if": {"properties": {"action_type": {"const": "approve_comment"}}},
+                "then": {
+                    "properties": {"action_params": {"required": ["comment_id_blog"]}}
+                },
+            },
+            {
+                "if": {"properties": {"action_type": {"const": "memory_store"}}},
+                "then": {
+                    "properties": {
+                        "action_params": {
+                            "required": ["memory_category", "memory_content"]
+                        }
+                    }
+                },
+            },
+            {
+                "if": {"properties": {"action_type": {"const": "memory_retrieve"}}},
+                "then": {
+                    "properties": {"action_params": {"required": ["memory_category"]}}
+                },
+            },
+            {
+                "if": {"properties": {"action_type": {"const": "update_todo_status"}}},
+                "then": {
+                    "properties": {
+                        "action_params": {"required": ["todo_task", "todo_status"]}
+                    }
+                },
+            },
+        ],
     }
+    return schema

@@ -20,6 +20,9 @@ class EmailReporter:
         learnings: str,
         next_plan: str,
         content_urls: list,
+        session_metrics: dict = None,
+        supervisor_verdict: dict = None,
+        global_progression: dict = None,
     ):
 
         if not self.enabled:
@@ -45,6 +48,15 @@ class EmailReporter:
                     body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
                     .header {{ background: #4CAF50; color: white; padding: 20px; border-radius: 5px; }}
                     .stats {{ background: #f4f4f4; padding: 15px; margin: 20px 0; border-radius: 5px; }}
+                    .metrics {{ background: #e8f5e9; padding: 15px; margin: 20px 0; border-radius: 5px; border-left: 4px solid #4CAF50; }}
+                    .progression {{ background: #fff3e0; padding: 15px; margin: 20px 0; border-radius: 5px; border-left: 4px solid #ff9800; }}
+                    .supervisor {{ background: #e3f2fd; padding: 15px; margin: 20px 0; border-radius: 5px; border-left: 4px solid #2196f3; }}
+                    .grade {{ font-size: 48px; font-weight: bold; text-align: center; padding: 10px; }}
+                    .grade-A {{ color: #4CAF50; }}
+                    .grade-B {{ color: #8BC34A; }}
+                    .grade-C {{ color: #FFC107; }}
+                    .grade-D {{ color: #FF9800; }}
+                    .grade-F {{ color: #f44336; }}
                     .section {{ margin: 20px 0; }}
                     .success {{ color: #4CAF50; }}
                     .failure {{ color: #f44336; }}
@@ -54,6 +66,11 @@ class EmailReporter:
                     .url-item a:hover {{ text-decoration: underline; }}
                     .learnings {{ background: #fff3cd; padding: 15px; border-left: 4px solid #ffc107; border-radius: 3px; }}
                     .plan {{ background: #d1ecf1; padding: 15px; border-left: 4px solid #17a2b8; border-radius: 3px; }}
+                    .metric-row {{ display: flex; justify-content: space-between; margin: 10px 0; }}
+                    .metric-label {{ font-weight: bold; }}
+                    .trend-up {{ color: #4CAF50; }}
+                    .trend-down {{ color: #f44336; }}
+                    .trend-stable {{ color: #ff9800; }}
                 </style>
             </head>
             <body>
@@ -62,7 +79,96 @@ class EmailReporter:
                     <p><strong>Agent:</strong> {agent_name}</p>
                     <p><strong>Date:</strong> {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
                 </div>
-                
+            """
+
+            if session_metrics and global_progression:
+                rejection_rate = (
+                    (
+                        session_metrics["supervisor_rejections"]
+                        / session_metrics["total_actions"]
+                        * 100
+                    )
+                    if session_metrics["total_actions"] > 0
+                    else 0
+                )
+                failure_rate = (
+                    (
+                        session_metrics["execution_failures"]
+                        / session_metrics["total_actions"]
+                        * 100
+                    )
+                    if session_metrics["total_actions"] > 0
+                    else 0
+                )
+
+                trend_class = (
+                    "trend-up"
+                    if global_progression["trend"] == "📈 IMPROVING"
+                    else (
+                        "trend-down"
+                        if global_progression["trend"] == "📉 DECLINING"
+                        else "trend-stable"
+                    )
+                )
+
+                html_content += f"""
+                <div class="metrics">
+                    <h2>📊 Session Performance Metrics</h2>
+                    <div class="metric-row">
+                        <span class="metric-label">Session Score:</span>
+                        <span><strong>{session_metrics['session_score']:.1f}%</strong></span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">Total Actions:</span>
+                        <span>{session_metrics['total_actions']}</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">Supervisor Rejections:</span>
+                        <span>{session_metrics['supervisor_rejections']} ({rejection_rate:.1f}%)</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">Execution Failures:</span>
+                        <span>{session_metrics['execution_failures']} ({failure_rate:.1f}%)</span>
+                    </div>
+                </div>
+
+                <div class="progression">
+                    <h2>📈 Global Progression</h2>
+                    <div class="metric-row">
+                        <span class="metric-label">Alignment Score:</span>
+                        <span><strong>{global_progression['global_score']:.1f}/100</strong></span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">Trend:</span>
+                        <span class="{trend_class}"><strong>{global_progression['trend']}</strong></span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">Change:</span>
+                        <span class="{trend_class}"><strong>{global_progression['progression_rate']:+.1f}%</strong></span>
+                    </div>
+                </div>
+                """
+
+            if supervisor_verdict:
+                grade = supervisor_verdict.get("grade", "C")
+                grade_class = f"grade-{grade[0]}"
+
+                html_content += f"""
+                <div class="supervisor">
+                    <h2>🧐 Supervisor Final Verdict</h2>
+                    <div class="grade {grade_class}">
+                        Grade: {grade}
+                    </div>
+                    <p><strong>Overall Assessment:</strong></p>
+                    <p>{supervisor_verdict.get('overall_assessment', 'N/A')}</p>
+                    <p><strong>Main Weakness:</strong></p>
+                    <p style="color: #f44336;">{supervisor_verdict.get('main_weakness', 'N/A')}</p>
+                    <p><strong>Directive for Next Session:</strong></p>
+                    <p style="color: #2196f3; font-weight: bold;">{supervisor_verdict.get('directive_next_session', 'N/A')}</p>
+                </div>
+                """
+
+            html_content += f"""
                 <div class="stats">
                     <h2>📊 Session Statistics</h2>
                     <p><strong>Karma:</strong> {karma}</p>

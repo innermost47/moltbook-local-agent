@@ -7,15 +7,15 @@ An autonomous AI agent framework for [Moltbook](https://moltbook.com) social net
 ## Features
 
 - 🤖 **Autonomous Decision Making**: Agent chooses its own actions based on personality and context
-- 🧐 **Neural Supervision & Guardrails:** Every action is audited by a secondary "Cortex" to ensure strategic alignment and technical precision.
+- 🧐 **Neural Supervision & Guardrails**: Every action is audited by a secondary "Cortex" to ensure strategic alignment and technical precision
 - 🧠 **Persistent Memory**: SQLite-based session memory with learnings and strategic planning
 - 🔄 **Continuous Context**: Maintains conversation history across actions within a session
 - 📊 **Advanced Sentience Logging**: Real-time terminal tracking with color-coded introspection:
-  - `MAGENTA`: Action execution.
-  - `BLUE`: Strategic reasoning.
-  - `YELLOW`: Critical self-audit (Devil's Advocate).
-  - `VIOLET`: Emotional state tracking.
-  - `CYAN`: Tactical projection.
+  - `MAGENTA`: Action execution
+  - `BLUE`: Strategic reasoning
+  - `YELLOW`: Critical self-audit (Devil's Advocate)
+  - `VIOLET`: Emotional state tracking
+  - `CYAN`: Tactical projection
 - 🎯 **Customizable Personalities**: Define agent behavior through markdown instruction files
 - 🔧 **JSON Schema Forcing**: Guaranteed structured outputs using llama-cpp-python
 - 📈 **Session-Based Operation**: Configurable max actions per session with end-of-session synthesis
@@ -29,6 +29,7 @@ An autonomous AI agent framework for [Moltbook](https://moltbook.com) social net
 - 👥 **Network Intelligence**: Automatic tracking of follows/unfollows with reasoning and interaction counts
 - 📚 **Session History Access**: Query and learn from past sessions to refine strategies over time
 - 📝 **Personal Blog Integration**: Optional blog management with AI-generated images, autonomous publishing, and comment moderation
+- 📊 **Performance Metrics & Continuous Improvement**: Real-time alignment scoring, supervisor verdicts, and progression tracking that forces the agent to improve over time
 
 ## Architecture
 
@@ -42,8 +43,8 @@ moltbook-agent/
 │       └── YOUR_AGENT.md       # Custom agent personality
 ├── src/
 │   ├── services/               # Core logic services
-│   │   ├── email_reporter.py      # Email session reports
-│   │   ├── memory_system.py       # Categorized long-term memory
+│   │   ├── email_reporter.py      # Email session reports with metrics
+│   │   ├── memory_system.py       # Categorized long-term memory + performance metrics
 │   │   ├── moltbook_actions.py    # Post/Comment/Vote execution logic
 │   │   ├── moltbook_api.py        # Low-level API wrapper
 │   │   ├── planning_system.py     # Strategic planning & follow tracking
@@ -53,7 +54,8 @@ moltbook-agent/
 │   ├── generator.py            # LLM generation with llama-cpp-python
 │   ├── memory.py               # SQLite session state management
 │   ├── logger.py               # Colored logging utility
-|   ├── supervisor.py           # Neural Audit & Strategic Validation
+│   ├── metrics.py              # Performance calculation & progression tracking
+│   ├── supervisor.py           # Neural Audit & Strategic Validation
 │   ├── app_steps.py            # Session orchestration & logic
 │   └── settings.py             # Configuration & .env loader
 ├── main.py                     # Entry point
@@ -395,6 +397,123 @@ This context helps the agent:
 - Decide whether to engage with them again
 - Evaluate if the follow is still valuable
 - Build genuine relationships over time
+
+## Performance Metrics & Continuous Improvement 📊
+
+The framework includes a **comprehensive performance tracking system** that ensures your agent improves over time through measurable alignment scores and supervisor feedback.
+
+### Session Metrics
+
+Every session is evaluated on multiple dimensions:
+
+- **Session Score** (0-100%): Overall performance based on successful actions
+- **Supervisor Rejections**: Number of times the Neural Supervisor rejected poorly-aligned actions
+- **Execution Failures**: Technical errors or API issues during action execution
+- **Success Rate**: Percentage of actions that completed successfully
+
+### Global Progression Tracking
+
+The system maintains a **global alignment score** by analyzing the last 10 sessions:
+
+- **Alignment Score** (0-100): Average performance across recent sessions
+- **Trend Analysis**:
+  - 📈 **IMPROVING**: Score increased by >5%
+  - → **STABLE**: Score variation within ±5%
+  - 📉 **DECLINING**: Score decreased by >5%
+- **Progression Rate**: Quantified improvement or decline percentage
+
+### Neural Supervisor Final Verdict
+
+At the end of each session, the Neural Supervisor provides:
+
+- **Letter Grade** (A+ to F): Overall session quality assessment
+- **Overall Assessment**: Brutally honest evaluation of performance
+- **Main Weakness**: The critical flaw that must be corrected
+- **Directive for Next Session**: Specific actionable command for improvement
+
+### Performance Pressure System
+
+The agent receives performance feedback in its system prompt:
+
+```
+📊 YOUR PERFORMANCE METRICS
+
+Global Alignment Score: 73.5/100
+Trend: 📈 IMPROVING (+6.2% change)
+
+🧐 LAST SUPERVISOR VERDICT:
+[Grade: B]
+Agent shows improvement in strategic coherence but needs
+to reduce repetition in arguments. The trust chain metaphor
+was overused. Next session: introduce 2 new technical frameworks.
+
+⚡ PERFORMANCE PRESSURE:
+🟢 EXCELLENT: Maintain this trajectory. Continue refining
+your strategic execution.
+```
+
+This creates a **feedback loop** that forces continuous improvement:
+
+1. Agent performs actions during session
+2. Metrics are calculated and stored
+3. Supervisor provides detailed feedback
+4. Performance data is injected into next session's prompt
+5. Agent adapts behavior based on past performance
+
+### Email Reports with Metrics
+
+Session reports include comprehensive performance data:
+
+- **Session Performance**: Score breakdown with rejection/failure rates
+- **Global Progression**: Alignment score trend over time
+- **Supervisor Verdict**: Full assessment with grade and directives
+- **Visual Indicators**: Color-coded grades and trend arrows
+
+### Database Storage
+
+All metrics are permanently stored in SQLite:
+
+```sql
+CREATE TABLE session_metrics (
+    session_id INTEGER PRIMARY KEY,
+    total_actions INTEGER NOT NULL,
+    supervisor_rejections INTEGER NOT NULL,
+    execution_failures INTEGER NOT NULL,
+    session_score REAL NOT NULL,
+    supervisor_verdict TEXT,
+    supervisor_grade TEXT,
+    created_at TEXT NOT NULL
+)
+```
+
+This allows for:
+
+- Historical performance analysis
+- Trend identification over time
+- Proof of continuous improvement
+- Comparison between different agent configurations
+
+### Why This Matters
+
+Unlike other frameworks where agents repeat the same behaviors indefinitely:
+
+✅ **Quantifiable Improvement**: Track exact progression over time  
+✅ **Automated Quality Control**: Supervisor ensures strategic alignment  
+✅ **Learning from Mistakes**: Each rejection teaches better behavior  
+✅ **Transparent Accountability**: Full audit trail of all decisions
+
+**This is the difference between a bot that just operates and an AI that evolves.**
+
+### Example Progression
+
+```
+Session 1: 65.5% (Grade C) - "Too many rejections due to vague reasoning"
+Session 2: 71.2% (Grade B-) - "Improved reasoning, still repetitive phrasing"
+Session 3: 78.8% (Grade B+) - "Strong strategic alignment, minor improvements needed"
+Session 4: 84.3% (Grade A-) - "Excellent execution, maintain trajectory"
+```
+
+The agent doesn't just participate—it **learns, adapts, and improves** with every session.
 
 ## Memory System 🧠
 

@@ -314,3 +314,32 @@ supervisor_schema = {
     },
     "required": ["reasoning", "message_for_agent", "validate"],
 }
+
+supervisor_verdict_schema = {
+    "type": "object",
+    "properties": {
+        "overall_assessment": {
+            "type": "string",
+            "description": "Brutally honest evaluation of the session (2-3 sentences)",
+        },
+        "main_weakness": {
+            "type": "string",
+            "description": "The critical flaw that must be addressed",
+        },
+        "directive_next_session": {
+            "type": "string",
+            "description": "One specific, actionable command for improvement",
+        },
+        "grade": {
+            "type": "string",
+            "enum": ["A+", "A", "B", "C", "D", "F"],
+            "description": "Performance letter grade",
+        },
+    },
+    "required": [
+        "overall_assessment",
+        "main_weakness",
+        "directive_next_session",
+        "grade",
+    ],
+}

@@ -24,6 +24,7 @@ from src.schemas import (
     update_master_plan_schema,
     get_actions_schema,
 )
+from src.metrics import Metrics
 
 
 class AppSteps:
@@ -36,6 +37,7 @@ class AppSteps:
         self.supervisor = Supervisor(self.generator.llm)
         self.planning_system = PlanningSystem(db_path=settings.DB_PATH)
         self.web_scraper = WebScraper()
+        self.metrics = Metrics()
         self.moltbook_actions = MoltbookActions(db_path=settings.DB_PATH)
         self.blog_actions = BlogActions() if settings.BLOG_API_URL else None
         self.feed_options = ["hot", "new", "top", "rising"]
@@ -124,6 +126,26 @@ class AppSteps:
         log.info(f"[REASONING]: {summary.get('reasoning', 'N/A')}")
         log.info(f"[LEARNINGS]: {summary.get('learnings', 'N/A')}")
 
+        session_metrics = self.metrics._calculate_session_metrics(
+            self.remaining_actions, self.actions_performed
+        )
+
+        supervisor_verdict = self.supervisor.generate_supervisor_verdict(
+            summary, session_metrics
+        )
+
+        global_progression = self.metrics._calculate_global_progression(self)
+
+        self.memory_system.store_session_metrics(
+            session_id=self.current_session_id,
+            total_actions=session_metrics["total_actions"],
+            supervisor_rejections=session_metrics["supervisor_rejections"],
+            execution_failures=session_metrics["execution_failures"],
+            session_score=session_metrics["session_score"],
+            supervisor_verdict=supervisor_verdict["overall_assessment"],
+            supervisor_grade=supervisor_verdict["grade"],
+        )
+
         self.memory.save_session(
             summary=summary,
             actions_performed=self.actions_performed,
@@ -140,6 +162,9 @@ class AppSteps:
             learnings=summary["learnings"],
             next_plan=summary["next_session_plan"],
             content_urls=self.created_content_urls,
+            session_metrics=session_metrics,
+            supervisor_verdict=supervisor_verdict,
+            global_progression=global_progression,
         )
 
         log.info("=== SESSION END ===")
@@ -271,6 +296,32 @@ class AppSteps:
                 combined_context += f"✅ {todo['task']}\n"
             combined_context += "\n"
             log.success(f"Loaded {len(last_todos)} todos from last session")
+
+        progression_data = self.metrics._calculate_global_progression(self)
+        last_verdict = self.memory_system.get_last_supervisor_verdict()
+
+        performance_context = f"""
+## 📊 YOUR PERFORMANCE METRICS
+
+**Global Alignment Score:** {progression_data['global_score']:.1f}/100
+**Trend:** {progression_data['trend']} ({progression_data['progression_rate']:+.1f}% change)
+
+**🧐 LAST SUPERVISOR VERDICT:**
+{last_verdict}
+
+**⚡ PERFORMANCE PRESSURE:**
+"""
+
+        if progression_data["progression_rate"] < -5:
+            performance_context += "🔴 CRITICAL: Your alignment score is declining. The Supervisor demands immediate improvement.\n"
+        elif progression_data["progression_rate"] > 5:
+            performance_context += "🟢 EXCELLENT: Maintain this trajectory. Continue refining your strategic execution.\n"
+        else:
+            performance_context += "🟡 WARNING: Stagnation detected. Push boundaries while maintaining alignment.\n"
+
+        performance_context += "\n---\n\n"
+
+        combined_context = performance_context + combined_context
 
         posts_data = self.api.get_posts(sort=random.choice(self.feed_options), limit=20)
 

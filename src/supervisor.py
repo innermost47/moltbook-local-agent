@@ -1,6 +1,7 @@
 import json
+import re
 from llama_cpp import Llama, LlamaGrammar
-from src.schemas import supervisor_schema
+from src.schemas import supervisor_schema, supervisor_verdict_schema
 from src.settings import settings
 from src.utils import log
 
@@ -87,6 +88,47 @@ If the agent changed strategy based on feedback, validate if the new move is sou
             }
 
     def reset_history(self):
-        """Call this after a successful execution to clear the audit trail for the next move."""
         self.conversation_history = []
         log.info("Supervisor conversation history reset for the new action cycle.")
+
+    def generate_supervisor_verdict(self, summary: dict, metrics: dict) -> dict:
+
+        verdict_prompt = f"""
+## 🧐 SUPERVISOR FINAL VERDICT
+
+**Session Performance:**
+- Total Actions: {metrics['total_actions']}
+- Supervisor Rejections: {metrics['supervisor_rejections']} ({metrics['supervisor_rejections']/metrics['total_actions']*100:.1f}%)
+- Execution Failures: {metrics['execution_failures']} ({metrics['execution_failures']/metrics['total_actions']*100:.1f}%)
+- Session Score: {metrics['session_score']:.1f}%
+
+**Agent's Summary:**
+{summary}
+
+As the Neural Supervisor, provide your final assessment:
+1. Overall performance evaluation (be brutally honest)
+2. The main weakness that MUST be corrected
+3. One specific directive for the next session
+4. Letter grade (A+, A, B, C, D, F)
+"""
+
+        try:
+
+            result = self.llm.generate(
+                verdict_prompt, response_format=supervisor_verdict_schema
+            )
+            content = result["choices"][0]["message"]["content"]
+            content = re.sub(r"```json\s*|```\s*", "", content).strip()
+            verdict = json.loads(content)
+
+            log.success(f"🧐 Supervisor Grade: {verdict['grade']}")
+            return verdict
+
+        except Exception as e:
+            log.error(f"Failed to generate supervisor verdict: {e}")
+            return {
+                "overall_assessment": "Verdict generation failed",
+                "main_weakness": "System error",
+                "directive_next_session": "Continue operation",
+                "grade": "C",
+            }

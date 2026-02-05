@@ -29,6 +29,22 @@ class MemorySystem:
 
         cursor.execute(
             """
+            CREATE TABLE IF NOT EXISTS session_metrics (
+                session_id INTEGER PRIMARY KEY,
+                total_actions INTEGER NOT NULL,
+                supervisor_rejections INTEGER NOT NULL,
+                execution_failures INTEGER NOT NULL,
+                session_score REAL NOT NULL,
+                supervisor_verdict TEXT,
+                supervisor_grade TEXT,
+                created_at TEXT NOT NULL,
+                FOREIGN KEY (session_id) REFERENCES sessions(id)
+            )
+        """
+        )
+
+        cursor.execute(
+            """
             CREATE INDEX IF NOT EXISTS idx_category 
             ON memory_entries(category)
         """
@@ -333,6 +349,112 @@ class MemorySystem:
         actions_performed.append("[LIST] Listed memory categories")
 
         return {"success": True, "data": list_text}
+
+    def store_session_metrics(
+        self,
+        session_id: int,
+        total_actions: int,
+        supervisor_rejections: int,
+        execution_failures: int,
+        session_score: float,
+        supervisor_verdict: str = None,
+        supervisor_grade: str = None,
+    ) -> bool:
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute(
+                """
+                INSERT INTO session_metrics 
+                (session_id, total_actions, supervisor_rejections, execution_failures, 
+                session_score, supervisor_verdict, supervisor_grade, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+                (
+                    session_id,
+                    total_actions,
+                    supervisor_rejections,
+                    execution_failures,
+                    session_score,
+                    supervisor_verdict,
+                    supervisor_grade,
+                    datetime.now().isoformat(),
+                ),
+            )
+            self.conn.commit()
+            log.success(
+                f"📊 Session metrics stored: {session_score:.1f}% (Grade: {supervisor_grade})"
+            )
+            return True
+        except Exception as e:
+            log.error(f"Failed to store session metrics: {e}")
+            return False
+
+    def get_session_metrics_history(self, limit: int = 10) -> List[Dict]:
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute(
+                """
+                SELECT 
+                    session_id,
+                    total_actions,
+                    supervisor_rejections,
+                    execution_failures,
+                    session_score,
+                    supervisor_verdict,
+                    supervisor_grade,
+                    created_at
+                FROM session_metrics
+                ORDER BY created_at DESC
+                LIMIT ?
+            """,
+                (limit,),
+            )
+
+            results = cursor.fetchall()
+            metrics = []
+
+            for row in results:
+                metrics.append(
+                    {
+                        "session_id": row[0],
+                        "total_actions": row[1],
+                        "supervisor_rejections": row[2],
+                        "execution_failures": row[3],
+                        "session_score": row[4],
+                        "supervisor_verdict": row[5],
+                        "supervisor_grade": row[6],
+                        "created_at": row[7],
+                    }
+                )
+
+            return metrics
+
+        except Exception as e:
+            log.error(f"Failed to retrieve metrics history: {e}")
+            return []
+
+    def get_last_supervisor_verdict(self) -> str:
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute(
+                """
+                SELECT supervisor_verdict, supervisor_grade
+                FROM session_metrics
+                ORDER BY created_at DESC
+                LIMIT 1
+            """
+            )
+
+            result = cursor.fetchone()
+
+            if result and result[0]:
+                return f"[Grade: {result[1]}]\n{result[0]}"
+            else:
+                return "No previous supervisor verdict found."
+
+        except Exception as e:
+            log.error(f"Failed to get last verdict: {e}")
+            return "Error retrieving verdict."
 
     def __del__(self):
         if hasattr(self, "conn"):

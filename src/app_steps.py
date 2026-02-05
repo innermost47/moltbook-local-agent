@@ -589,6 +589,11 @@ IMPORTANT: For submolt, use only the name (e.g., "general"), NOT "/m/general" or
 - Remaining action points: {self.remaining_actions}
 - Moltbook post: {'✅ AVAILABLE' if not self.post_creation_attempted else '❌ ALREADY PUBLISHED'}
 - Blog article: {'✅ AVAILABLE' if not self.blog_article_attempted else '❌ ALREADY PUBLISHED'}
+
+### 🛠️ OPERATIONAL GUIDELINES
+- **WEB SEARCH**: Use `web_search_links` to FIND URLs (requires `web_domain` + `web_query`).
+- **WEB FETCH**: Use `web_fetch` ONLY if you already have a specific URL (requires `web_url`).
+
 """
 
         for attempt in range(1, max_attempts + 1):
@@ -599,13 +604,19 @@ IMPORTANT: For submolt, use only the name (e.g., "general"), NOT "/m/general" or
 
             prompt_parts.append(status_nudge)
 
+            attempts_left = (max_attempts - attempt) + 1
+            prompt_parts.append(
+                f"### 🛡️ ATTEMPT CONTROL\n- Current attempt: {attempt}/{max_attempts}\n- Remaining attempts for this action: {attempts_left}"
+            )
+
             if attempt > 1:
                 prompt_parts.append(
-                    f"⚠️ PREVIOUS ATTEMPT FAILED: {last_error}\nPlease correct your parameters and follow the status constraints."
+                    f"⚠️ PREVIOUS ATTEMPT FAILED: {last_error}\n"
+                    "Please correct your parameters. This is a technical failure, check your JSON against the schema."
                 )
 
             prompt_parts.append(
-                "Decide your next action based on your to-do list and the session status."
+                "[SYSTEM] ➔ Decide your next action based on your to-do list and the session status."
             )
 
             self.current_prompt = "\n".join(prompt_parts)
@@ -633,9 +644,12 @@ IMPORTANT: For submolt, use only the name (e.g., "general"), NOT "/m/general" or
 
                     if attempt == max_attempts:
                         log.error(f"❌ All {max_attempts} attempts failed")
+                        extra_feedback = f"❌ LAST ACTION FAILED: {decision['action_type']} after {max_attempts} attempts.\nERROR: {last_error[:150]}"
                         self.actions_performed.append(
                             f"FAILED: {decision['action_type']} - {last_error[:150]}"
                         )
+                        continue
+
                     continue
 
                 success_data = execution_result.get(
@@ -651,6 +665,9 @@ IMPORTANT: For submolt, use only the name (e.g., "general"), NOT "/m/general" or
                 last_error = f"JSON format error: {str(e)}"
                 log.error(last_error)
                 if attempt == max_attempts:
+                    extra_feedback = (
+                        f"❌ LAST ACTION FAILED: Critical JSON Protocol Violation."
+                    )
                     decision = {
                         "action_type": "refresh_feed",
                         "action_params": {"sort": "new", "limit": 5},

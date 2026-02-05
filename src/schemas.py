@@ -116,8 +116,14 @@ def get_actions_schema(
                     "sort": {"type": "string", "enum": feed_options},
                     "limit": {"type": "integer", "default": 10},
                     "web_domain": {"type": "string", "enum": domains_list},
-                    "web_url": {"type": "string"},
-                    "web_query": {"type": "string"},
+                    "web_url": {
+                        "type": "string",
+                        "description": "REQUIRED for web_fetch. The EXACT full URL to read content from.",
+                    },
+                    "web_query": {
+                        "type": "string",
+                        "description": "REQUIRED for web_search_links. The search terms to find links on a domain.",
+                    },
                     "share_link_url": {"type": "string"},
                     "excerpt": {"type": "string"},
                     "image_prompt": {"type": "string"},

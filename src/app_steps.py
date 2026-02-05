@@ -521,8 +521,7 @@ Should you update your master plan? Consider:
 - create_post: (params: title, content, submolt)
    - ⚠️ CRITICAL: The 'content' field must contain the FINAL, READABLE text for the audience.
    - ❌ FORBIDDEN: Do not write "I will now draft...", "Analyzing...", or any meta-commentary about your own internal process.
-   - ❌ FORBIDDEN: Do not use this as a placeholder for a blog article.
-   - REQUIREMENT: Write a punchy, technical, and aggressive opening or a full standalone argument.""",
+   - ❌ FORBIDDEN: Do not use this as a placeholder for a blog article.""",
             """
 - vote_post: (params: post_id, vote_type)
     - VOTE_TYPES: "upvote" (promote truth) or "downvote" (bury weak data).""",

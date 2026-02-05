@@ -64,12 +64,39 @@ class WebScraper:
                 extracted[key] = []
                 continue
 
-            texts = [elem.get_text(strip=True) for elem in elements]
+            texts = [
+                elem.get_text(strip=True)
+                for elem in elements
+                if elem.get_text(strip=True)
+            ]
             extracted[key] = texts[:20]
 
+        total_content_found = sum(len(v) for k, v in extracted.items())
+
+        if total_content_found == 0:
+            log.warning(
+                "No data found with specific selectors. Triggering global fallback..."
+            )
+            fallback_selectors = (
+                "article, main, .content, .article, #content, #main, .post-content"
+            )
+            fallback_elements = soup.select(fallback_selectors)
+
+            if not fallback_elements:
+                fallback_elements = soup.find_all("p")
+
+            fallback_text = [
+                e.get_text(strip=True)
+                for e in fallback_elements
+                if e.get_text(strip=True)
+            ]
+            extracted["fallback_content"] = fallback_text[:30]
+
         extracted["_diagnostics"] = {
-            "success": len(missing_selectors) < len(selectors),
+            "success": len(extracted.get("fallback_content", [])) > 0
+            or len(missing_selectors) < len(selectors),
             "missing_keys": missing_selectors,
+            "using_fallback": "fallback_content" in extracted,
             "total_found": sum(
                 len(v) for k, v in extracted.items() if k != "_diagnostics"
             ),

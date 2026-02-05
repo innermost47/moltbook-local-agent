@@ -131,7 +131,11 @@ class AppSteps:
         )
 
         supervisor_verdict = self.supervisor.generate_supervisor_verdict(
-            summary, session_metrics
+            summary=summary,
+            metrics=session_metrics,
+            master_plan=self.planning_system.get_active_master_plan(),
+            session_todos=self.session_todos,
+            actions_performed=self.actions_performed,
         )
 
         global_progression = self.metrics._calculate_global_progression(self)
@@ -453,7 +457,6 @@ Your focus should be on immediate progress while respecting the 10-action limit.
             log.error(f"Failed to create session plan: {e}")
 
     def _update_master_plan_if_needed(self, summary: dict):
-
         current_plan = self.planning_system.get_active_master_plan()
 
         plan_json = (
@@ -487,11 +490,21 @@ Should you update your master plan? Consider:
             decision = json.loads(content)
 
             if decision.get("should_update"):
+                new_objective = decision.get("new_objective")
+                new_strategy = decision.get("new_strategy")
+
+                if not new_objective or not new_strategy:
+                    log.warning(
+                        "Master plan update skipped: missing objective or strategy"
+                    )
+                    log.info(f"Reason: {decision.get('reasoning')}")
+                    return
+
                 log.info(f"Updating master plan: {decision.get('reasoning')}")
 
                 self.planning_system.create_or_update_master_plan(
-                    objective=decision.get("new_objective"),
-                    strategy=decision.get("new_strategy"),
+                    objective=new_objective,
+                    strategy=new_strategy,
                     milestones=decision.get("new_milestones", []),
                 )
             else:

@@ -91,32 +91,74 @@ If the agent changed strategy based on feedback, validate if the new move is sou
         self.conversation_history = []
         log.info("Supervisor conversation history reset for the new action cycle.")
 
-    def generate_supervisor_verdict(self, summary: dict, metrics: dict) -> dict:
+    def generate_supervisor_verdict(
+        self,
+        summary: dict,
+        metrics: dict,
+        master_plan: dict,
+        session_todos: list,
+        actions_performed: list,
+    ) -> dict:
+
+        formatted_todos = "\n".join(
+            [
+                f"- [{task.get('priority', 1)}⭐] {task.get('task')}"
+                for task in session_todos
+            ]
+        )
+
+        formatted_actions = "\n".join([f"- {action}" for action in actions_performed])
 
         verdict_prompt = f"""
-## 🧐 SUPERVISOR FINAL VERDICT
+## 🧐 END-OF-SESSION PERFORMANCE REVIEW
 
-**Session Performance:**
-- Total Actions: {metrics['total_actions']}
-- Supervisor Rejections: {metrics['supervisor_rejections']} ({metrics['supervisor_rejections']/metrics['total_actions']*100:.1f}%)
-- Execution Failures: {metrics['execution_failures']} ({metrics['execution_failures']/metrics['total_actions']*100:.1f}%)
-- Session Score: {metrics['session_score']:.1f}%
+### 📊 SESSION METRICS
+- **Total Actions**: {metrics['total_actions']}
+- **Supervisor Rejections**: {metrics['supervisor_rejections']} ({metrics['supervisor_rejections']/metrics['total_actions']*100:.1f}%)
+- **Execution Failures**: {metrics['execution_failures']} ({metrics['execution_failures']/metrics['total_actions']*100:.1f}%)
+- **Session Score**: {metrics['session_score']:.1f}%
 
-**Agent's Summary:**
-{summary}
+### 🎯 MASTER PLAN (Agent's Strategic Vision)
+{json.dumps(master_plan, indent=2)}
 
-As the Neural Supervisor, provide your final assessment:
-1. Overall performance evaluation (be brutally honest)
-2. The main weakness that MUST be corrected
-3. One specific directive for the next session
-4. Letter grade (A+, A, B, C, D, F)
+### 📋 SESSION TO-DO LIST (What Was Planned)
+{formatted_todos}
+
+### ✅ ACTIONS PERFORMED (What Actually Happened)
+{formatted_actions}
+
+### 🧠 AGENT'S SELF-SUMMARY
+**Reasoning**: {summary.get('reasoning', 'N/A')}
+**Learnings**: {summary.get('learnings', 'N/A')}
+**Next Session Plan**: {summary.get('next_session_plan', 'N/A')}
+
+---
+
+Based on this complete session context, provide your final verdict:
+1. **Overall Assessment** (2-3 sentences, brutally honest)
+2. **Main Weakness** (the critical flaw that most impacted performance)
+3. **Directive for Next Session** (one concrete, measurable instruction)
+4. **Letter Grade** (A+, A, B, C, D, F - calibrated to both metrics AND strategic value)
 """
 
         try:
 
-            result = self.llm.generate(
-                verdict_prompt, response_format=supervisor_verdict_schema
+            system_prompt = settings.SUPERVISOR_VERDICT_SYSTEM_PROMPT
+
+            grammar = LlamaGrammar.from_json_schema(
+                json.dumps(supervisor_verdict_schema)
             )
+
+            result = self.llm.create_chat_completion(
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": verdict_prompt},
+                ],
+                grammar=grammar,
+                temperature=0.2,
+                max_tokens=500,
+            )
+
             content = result["choices"][0]["message"]["content"]
             content = re.sub(r"```json\s*|```\s*", "", content).strip()
             verdict = json.loads(content)
@@ -127,8 +169,8 @@ As the Neural Supervisor, provide your final assessment:
         except Exception as e:
             log.error(f"Failed to generate supervisor verdict: {e}")
             return {
-                "overall_assessment": "Verdict generation failed",
-                "main_weakness": "System error",
-                "directive_next_session": "Continue operation",
+                "overall_assessment": "Verdict generation failed due to system error.",
+                "main_weakness": "System error prevented proper evaluation.",
+                "directive_next_session": "Continue operation with caution.",
                 "grade": "C",
             }

@@ -16,6 +16,13 @@ from src.memory import Memory
 from src.utils import log
 from src.settings import settings
 from src.services.planning_system import PlanningSystem
+from src.schemas import (
+    master_plan_schema,
+    session_plan_schema,
+    summary_schema,
+    update_master_plan_schema,
+    get_actions_schema,
+)
 
 
 class AppSteps:
@@ -45,6 +52,7 @@ class AppSteps:
         self.session_todos = []
         self.blog_article_attempted = False
         self.current_prompt = None
+        self.master_plan_success_prompt = None
 
     def run_session(self):
         log.info("=== SESSION START ===")
@@ -68,30 +76,15 @@ class AppSteps:
                 + f"\n\n{combined_context}",
             }
         self._create_session_plan()
-
+        pending_confirmation = "✅ SESSION PLAN LOADED.\n"
+        pending_confirmation += (
+            f"Tasks: {', '.join([t['task'] for t in self.session_todos])}\n\n"
+        )
         while self.remaining_actions > 0:
-            self._perform_autonomous_action()
+            self._perform_autonomous_action(extra_feedback=pending_confirmation)
+            pending_confirmation = None
 
         log.info("Generating session summary...")
-
-        summary_schema = {
-            "type": "object",
-            "properties": {
-                "reasoning": {
-                    "type": "string",
-                    "description": "Your thought process about this session",
-                },
-                "learnings": {
-                    "type": "string",
-                    "description": "What you learned from interactions and feedback",
-                },
-                "next_session_plan": {
-                    "type": "string",
-                    "description": "What you plan to do in the next session",
-                },
-            },
-            "required": ["reasoning", "learnings", "next_session_plan"],
-        }
 
         self.current_prompt = f"""
         Session completed. Here's what happened:
@@ -103,8 +96,6 @@ class AppSteps:
         1. Your reasoning about what worked/didn't work
         2. Key learnings from user interactions
         3. Your strategic plan for the next session
-
-        Respond in JSON format.
         """
         summary_raw = self.generator.generate_session_summary(
             self.current_prompt, summary_schema
@@ -299,19 +290,15 @@ Use ONLY these exact IDs in your actions. Never invent or truncate IDs.
         if not current_plan:
             log.warning("No Master Plan found. Forcing initialization...")
 
-            init_prompt = """
+            init_prompt = f"""
 You are starting your first session without a Master Plan.
 Based on your persona and the current state of Moltbook, define your long-term objective.
-
-Return ONLY a valid JSON object:
-{
-    "objective": "Your supreme goal",
-    "strategy": "How you will achieve it",
-    "milestones": ["Milestone 1", "Milestone 2", "Milestone 3"]
-}
 """
+
             try:
-                result = self.generator.generate(init_prompt)
+                result = self.generator.generate(
+                    init_prompt, response_format=master_plan_schema
+                )
                 content = re.sub(
                     r"```json\s*|```\s*", "", result["choices"][0]["message"]["content"]
                 ).strip()
@@ -322,35 +309,30 @@ Return ONLY a valid JSON object:
                     strategy=plan_data.get("strategy"),
                     milestones=plan_data.get("milestones", []),
                 )
+
+                self.master_plan_success_prompt = "✅ MASTER PLAN INITIALIZED: Your supreme goal and strategy are now active.\n"
+
                 log.success(f"Master Plan initialized: {plan_data.get('objective')}")
                 return False
             except Exception as e:
                 log.error(f"Failed to initialize Master Plan: {e}")
                 return True
         else:
+            self.master_plan_success_prompt = ""
             return True
 
     def _create_session_plan(self):
         log.info("Creating session plan...")
 
-        self.current_prompt = """
+        self.current_prompt = f"""{getattr(self, 'master_plan_success_prompt', '')}
 Based on your master plan, previous sessions, current context, and feed state,
 create a concrete to-do list for THIS session.
 
 Generate 3-5 specific, actionable tasks prioritized by importance (1-5, 5 being highest).
-
-Return ONLY a valid JSON object with this structure:
-{
-    "reasoning": "Why these tasks align with your strategy",
-    "tasks": [
-        {"task": "Specific action to take", "priority": 5},
-        {"task": "Another specific action", "priority": 3}
-    ]
-}
 """
 
         try:
-            result = self.generator.generate(self.current_prompt)
+            result = self.generator.generate(self.current_prompt, session_plan_schema)
             content = result["choices"][0]["message"]["content"]
 
             content = re.sub(r"```json\s*", "", content)
@@ -388,32 +370,29 @@ Return ONLY a valid JSON object with this structure:
 
         current_plan = self.planning_system.get_active_master_plan()
 
+        plan_json = (
+            json.dumps(current_plan, indent=2) if current_plan else "NO MASTER PLAN YET"
+        )
+
         self.current_prompt = f"""
 Based on this session's learnings and your current master plan:
 
-**Current Master Plan:**
-{json.dumps(current_plan, indent=2) if current_plan else "NO MASTER PLAN YET"}
+### 🗺️ CURRENT MASTER PLAN
+{plan_json}
 
-**Session Learnings:**
+### 💡 SESSION LEARNINGS
 {summary.get('learnings', 'N/A')}
 
 Should you update your master plan? Consider:
 - Have you achieved a major milestone?
 - Have you learned something that changes your strategy?
 - Do you need to refine your objective?
-
-Return ONLY a valid JSON object:
-{{
-    "should_update": true/false,
-    "reasoning": "Why or why not",
-    "new_objective": "Updated objective (if updating)",
-    "new_strategy": "Updated strategy (if updating)",
-    "new_milestones": ["milestone1", "milestone2"] (if updating)
-}}
 """
 
         try:
-            result = self.generator.generate(self.current_prompt)
+            result = self.generator.generate(
+                self.current_prompt, update_master_plan_schema
+            )
             content = result["choices"][0]["message"]["content"]
 
             content = re.sub(r"```json\s*", "", content)
@@ -550,12 +529,11 @@ Allowed domains: {', '.join(self.allowed_domains.keys())}
 Available submolts: {', '.join(self.available_submolts)}
 IMPORTANT: For submolt, use only the name (e.g., "general"), NOT "/m/general" or "m/general"
 
-Decide your next action based on your personality, strategy, and TO-DO LIST.
 Consider using memory to track patterns and learn over time.
 """
         return decision_prompt
 
-    def _perform_autonomous_action(self):
+    def _perform_autonomous_action(self, extra_feedback=None):
 
         allowed_actions = [
             "comment_on_post",
@@ -596,62 +574,20 @@ Consider using memory to track patterns and learn over time.
                 blog_actions_list.insert(0, "write_blog_article")
             allowed_actions.extend(blog_actions_list)
 
-        action_schema = {
-            "type": "object",
-            "properties": {
-                "reasoning": {"type": "string"},
-                "action_type": {
-                    "type": "string",
-                    "enum": allowed_actions,
-                },
-                "action_params": {
-                    "type": "object",
-                    "properties": {
-                        "post_id": {"type": "string"},
-                        "comment_id": {"type": "string"},
-                        "submolt": {"type": "string"},
-                        "title": {"type": "string"},
-                        "content": {"type": "string"},
-                        "excerpt": {"type": "string"},
-                        "image_prompt": {"type": "string"},
-                        "url": {"type": "string"},
-                        "comment_id_blog": {"type": "string"},
-                        "request_id": {"type": "string"},
-                        "agent_name": {"type": "string"},
-                        "follow_type": {
-                            "type": "string",
-                            "enum": ["follow", "unfollow", "none"],
-                        },
-                        "vote_type": {
-                            "type": "string",
-                            "enum": ["upvote", "downvote", "none"],
-                        },
-                        "sort": {"type": "string", "enum": self.feed_options},
-                        "limit": {"type": "integer", "default": 10},
-                        "web_url": {"type": "string"},
-                        "web_domain": {"type": "string"},
-                        "web_query": {"type": "string"},
-                        "memory_category": {"type": "string"},
-                        "memory_content": {"type": "string"},
-                        "memory_limit": {"type": "integer", "default": 5},
-                        "memory_order": {"type": "string", "enum": ["asc", "desc"]},
-                        "todo_task": {"type": "string"},
-                        "todo_status": {
-                            "type": "string",
-                            "enum": ["pending", "completed", "cancelled", "none"],
-                        },
-                    },
-                },
-            },
-            "required": ["reasoning", "action_type", "action_params"],
-        }
+        action_schema = get_actions_schema(allowed_actions, self.feed_options)
 
         max_attempts = 3
         last_error = None
 
         for attempt in range(1, max_attempts + 1):
-            if not self.current_prompt:
-                self.current_prompt = "Decide your next action based on your strategy and the current feed."
+            if extra_feedback:
+                feedback_text = ""
+                feedback_text += f"{extra_feedback}\n\n"
+                status_text = f"Remaining actions: {self.remaining_actions}\n"
+                status_text += "Current focus: Execute your session to-do list.\n"
+                self.current_prompt = (
+                    f"{feedback_text}{status_text}Decide your next action."
+                )
 
             try:
                 result = self.generator.generate(

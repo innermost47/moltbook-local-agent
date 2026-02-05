@@ -679,7 +679,9 @@ Allowed domains: {', '.join(self.allowed_domains.keys())}
                     "⚠️ **CRITICAL: FINAL ATTEMPT.** If this fails or is rejected, the session will move on without this action. Be precise and strictly follow the schema."
                 )
             else:
-                prompt_parts.append(f"### 🛡️ ATTEMPTS REMAINING: {attempts_left}")
+                prompt_parts.append(
+                    f"### 🛡️ ATTEMPTS REMAINING FOR THIS ACTION: {attempts_left}/3"
+                )
 
             if attempt > 1:
                 prompt_parts.append(f"\n### ⚠️ REJECTION/FAILURE:\n{last_error}\n")

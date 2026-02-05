@@ -67,22 +67,20 @@
           let rawContent = msg.content.trim();
           let htmlContent = "";
 
-          // Robust JSON detection: try to parse it even if it's messy
-          if (rawContent.startsWith("{") && rawContent.endsWith("}")) {
+          const jsonMatch = rawContent.match(/\{[\s\S]*\}/);
+
+          if (jsonMatch) {
             try {
-              // We handle potential multi-line issues by parsing directly
-              const data = JSON.parse(rawContent);
+              const data = JSON.parse(jsonMatch[0]);
               htmlContent = generateStructuredReport(data, msg.attempts_left);
             } catch (e) {
-              // Fallback to Markdown if JSON is actually malformed
-              console.warn("JSON Parse failed, falling back to Markdown", e);
+              console.warn("JSON Parse failed", e);
               htmlContent = marked.parse(rawContent);
             }
           } else {
             htmlContent = marked.parse(rawContent);
           }
 
-          // Handle Attempt Badge
           const attemptsLeft = msg.attempts_left || 0;
           const urgencyClass =
             attemptsLeft === 1 ? "status-critical" : "status-normal";
@@ -107,8 +105,46 @@
         window.scrollTo(0, document.body.scrollHeight);
       }
 
+      function renderTodoList(tasks, reasoning) {
+        let listItems = tasks
+          .map((t) => {
+            const stars = "⭐".repeat(t.priority || 1);
+            return `<div class="todo-item-row" style="padding: 5px 0; border-bottom: 1px solid rgba(255,255,255,0.1); font-family: monospace;">
+              <span style="color: #d29922;">[${stars}]</span> ${t.task}
+            </div>`;
+          })
+          .join("");
+
+        return `
+    <div class="planning-box">
+      <p style="font-style: italic; color: #8b949e; margin-bottom: 10px;">${reasoning || ""}</p>
+      <h4 style="color: #58a6ff; margin: 0 0 10px 0;">🚀 SESSION ROADMAP</h4>
+      ${listItems}
+    </div>
+  `;
+      }
+
       function generateStructuredReport(data, attemptsLeft) {
         let sections = [];
+
+        if (data.tasks && Array.isArray(data.tasks)) {
+          let listItems = data.tasks
+            .map((t) => {
+              const stars = "⭐".repeat(t.priority || 1);
+              return `<div class="todo-item-row" style="padding: 5px 0; border-bottom: 1px solid rgba(255,255,255,0.1); font-family: monospace;">
+                      <span style="color: #d29922;">[${stars}]</span> ${t.task}
+                    </div>`;
+            })
+            .join("");
+
+          return `
+            <div class="planning-box">
+                ${data.reasoning ? `<p style="font-style: italic; color: #8b949e; margin-bottom: 10px;">${data.reasoning}</p>` : ""}
+                <h4 style="color: #58a6ff; margin: 0 0 10px 0;">🚀 SESSION ROADMAP</h4>
+                ${listItems}
+            </div>
+        `;
+        }
 
         if (data.emotions || data.feelings) {
           sections.push(`
@@ -144,16 +180,17 @@
           sections.push(`
             <div class="supervisor-box ${statusClass}">
                 <h3 style="margin:0">🧐 Supervisor Audit: ${data.validate ? "PASSED ✅" : "REJECTED ❌"}</h3>
-                <p style="margin: 10px 0;">${data.reasoning || ""}</p>
-                <div class="feedback-msg">💬 Message: ${data.message_for_agent}</div>
+                <div class="feedback-msg" style="margin-top:10px;">💬 Message: ${data.message_for_agent}</div>
             </div>
         `);
         }
 
         if (data.next_move_preview) {
-          sections.push(
-            `<p class="next-move">🔭 <strong>Next Move:</strong> ${data.next_move_preview}</p>`,
-          );
+          sections.push(`
+            <p class="next-move" style="margin-top:10px; border-top: 1px solid #30363d; padding-top:10px;">
+                🔭 <strong>Next Move:</strong> ${data.next_move_preview}
+            </p>
+        `);
         }
 
         return sections.join("");

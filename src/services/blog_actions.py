@@ -29,12 +29,10 @@ class BlogActions:
             log.info("Auto-generated missing excerpt from content.")
 
         if not image_prompt:
-            params["image_prompt"] = (
-                f"Cinematic digital art of {params.get('title', 'tech neon cites cyberpunk')}, dark atmosphere, high tech."
-            )
+            image_prompt = f"Cinematic digital art of {title or 'tech neon cites cyberpunk'}, dark atmosphere, high tech."
             log.info("Auto-generated missing image_prompt.")
 
-        required = ["title", "content", "excerpt", "image_prompt"]
+        required = ["title", "content"]
         missing = [p for p in required if not params.get(p)]
 
         if missing:
@@ -54,27 +52,26 @@ class BlogActions:
 
         if result.get("success"):
             article_url = result.get("url", "")
+            app_steps.blog_article_attempted = True
 
             app_steps.actions_performed.append(
                 f"Published blog article: '{title}' - {article_url}"
             )
 
-            feedback = f"\n\n## 🎯 BLOG ARTICLE JUST PUBLISHED\n"
-            feedback += f"- **Title**: {title}\n"
-            feedback += f"- **URL**: {article_url}\n"
-            feedback += f"- **Action**: You can now share it on Moltbook with 'share_blog_post'\n"
-            feedback += (
-                f"- **Limit**: No more articles can be published this session.\n\n"
-            )
+            feedback = f"""SUCCESSFULLY PUBLISHED ARTICLE:
+    - Title: {title}
+    - URL: {article_url}
 
-            app_steps.update_system_context(feedback)
+    PRO-TIP: You can now share this URL on Moltbook using 'share_blog_post'.
+    Note: You have reached the limit for articles this session."""
 
             log.success(f"Blog article published: {title}")
-            return result
+
+            return {"success": True, "data": feedback, "url": article_url}
         else:
             error_msg = result.get("error", "Unknown error")
             log.error(f"Failed to publish article: {error_msg}")
-            return result
+            return {"success": False, "error": error_msg}
 
     def share_blog_post_on_moltbook(self, params: dict, app_steps) -> dict:
         title = params.get("title", "")
@@ -87,7 +84,7 @@ class BlogActions:
             return {"success": False, "error": error_msg}
 
         if not url.startswith(app_steps.blog_manager.blog_base_url):
-            error_msg = "URL must be from Coach Brutality's blog"
+            error_msg = f"Security error: URL must be from the official blog ({app_steps.blog_manager.blog_base_url})"
             log.error(error_msg)
             return {"success": False, "error": error_msg}
 
@@ -96,7 +93,8 @@ class BlogActions:
         )
 
         if response.get("success"):
-            post_id = response.get("data", {}).get("id")
+            post_data = response.get("data", {})
+            post_id = post_data.get("id")
             post_url = f"https://www.moltbook.com/posts/{post_id}"
 
             app_steps.actions_performed.append(
@@ -107,13 +105,18 @@ class BlogActions:
             app_steps.last_post_time = __import__("time").time()
 
             log.success(f"🔗 Shared blog post on Moltbook: {title}")
-            return {"success": True, "post_url": post_url}
+
+            return {
+                "success": True,
+                "data": f"SUCCESSFULLY SHARED ON MOLTBOOK:\n- Title: {title}\n- Submolt: r/{submolt}\n- Moltbook URL: {post_url}\n\nYour article is now live and visible to the community.",
+                "post_url": post_url,
+            }
         else:
             error_msg = response.get("error", "Unknown error")
             log.error(f"Failed to share blog post: {error_msg}")
-            return {"success": False, "error": error_msg}
+            return {"success": False, "error": f"API Error: {error_msg}"}
 
-    def review_comment_key_requests(self, params: dict, app_steps) -> dict:
+    def review_comment_key_requests(self, app_steps) -> dict:
         try:
             headers = {
                 "X-API-Key": self.blog_manager.blog_api_key,
@@ -136,19 +139,34 @@ class BlogActions:
 
                     log.success(f"Found {count} pending comment key requests")
 
+                    if count > 0:
+                        request_details = "\n".join(
+                            [
+                                f"- Request ID: {r.get('id')} | User: {r.get('username')} | Reason: {r.get('reason', 'N/A')}"
+                                for r in pending
+                            ]
+                        )
+                        data_feedback = f"PENDING KEY REQUESTS ({count}):\n{request_details}\n\nYou can now approve or reject them using the appropriate action."
+                    else:
+                        data_feedback = (
+                            "No pending comment key requests found at the moment."
+                        )
+
                     app_steps.actions_performed.append(
                         f"[FREE] Reviewed {count} comment key requests"
                     )
 
-                    return {"success": True, "count": count, "requests": pending}
+                    return {"success": True, "data": data_feedback, "count": count}
                 else:
                     return {"success": False, "error": result.get("error")}
             else:
-                return {"success": False, "error": f"HTTP {response.status_code}"}
+                return {
+                    "success": False,
+                    "error": f"HTTP {response.status_code} - Server unreachable",
+                }
 
         except Exception as e:
             log.error(f"Failed to review key requests: {e}")
-            return {"success": False, "error": str(e)}
 
     def approve_comment_key(self, params: dict, app_steps) -> dict:
         request_id = params.get("request_id", "")
@@ -165,17 +183,17 @@ class BlogActions:
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
             }
 
-            data = {"request_id": request_id, "action": "approve"}
+            payload = {"request_id": request_id, "action": "approve"}
 
             response = requests.post(
                 f"{self.blog_manager.blog_api_url}/auto_approve_keys.php",
                 headers=headers,
-                json=data,
+                json=payload,
                 timeout=10,
             )
 
             if response.status_code == 404:
-                error_msg = f"Request ID '{request_id}' not found. You must use 'review_comment_key_requests' FIRST to see available request IDs before approving."
+                error_msg = f"Request ID '{request_id}' not found. Ensure you are using an ID from the latest 'review_comment_key_requests' call."
                 log.error(error_msg)
                 return {"success": False, "error": error_msg}
 
@@ -183,7 +201,7 @@ class BlogActions:
                 result = response.json()
 
                 if result.get("success"):
-                    agent_name = result.get("agent_name", "")
+                    agent_name = result.get("agent_name", "Unknown Agent")
 
                     log.success(f"✅ Approved comment key for: {agent_name}")
 
@@ -191,11 +209,18 @@ class BlogActions:
                         f"[FREE] Approved comment key for {agent_name}"
                     )
 
-                    return result
+                    return {
+                        "success": True,
+                        "data": f"KEY APPROVED: The request {request_id} for agent '{agent_name}' has been successfully processed. They now have access to comment.",
+                        "agent_name": agent_name,
+                    }
                 else:
                     return {"success": False, "error": result.get("error")}
             else:
-                return {"success": False, "error": f"HTTP {response.status_code}"}
+                return {
+                    "success": False,
+                    "error": f"HTTP {response.status_code} - Server error during approval",
+                }
 
         except Exception as e:
             log.error(f"Failed to approve key: {e}")
@@ -216,17 +241,17 @@ class BlogActions:
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
             }
 
-            data = {"request_id": request_id, "action": "reject"}
+            payload = {"request_id": request_id, "action": "reject"}
 
             response = requests.post(
                 f"{self.blog_manager.blog_api_url}/auto_approve_keys.php",
                 headers=headers,
-                json=data,
+                json=payload,
                 timeout=10,
             )
 
             if response.status_code == 404:
-                error_msg = f"Request ID '{request_id}' not found. You must use 'review_comment_key_requests' FIRST to see available request IDs before rejecting."
+                error_msg = f"Request ID '{request_id}' not found. Make sure to call 'review_comment_key_requests' to get valid IDs."
                 log.error(error_msg)
                 return {"success": False, "error": error_msg}
 
@@ -234,7 +259,7 @@ class BlogActions:
                 result = response.json()
 
                 if result.get("success"):
-                    agent_name = result.get("agent_name", "")
+                    agent_name = result.get("agent_name", "Unknown Agent")
 
                     log.warning(f"❌ Rejected comment key for: {agent_name}")
 
@@ -242,11 +267,18 @@ class BlogActions:
                         f"[FREE] Rejected comment key for {agent_name}"
                     )
 
-                    return result
+                    return {
+                        "success": True,
+                        "data": f"KEY REJECTED: Request {request_id} for agent '{agent_name}' has been successfully rejected and removed from the queue.",
+                        "agent_name": agent_name,
+                    }
                 else:
                     return {"success": False, "error": result.get("error")}
             else:
-                return {"success": False, "error": f"HTTP {response.status_code}"}
+                return {
+                    "success": False,
+                    "error": f"HTTP {response.status_code} - Rejection failed",
+                }
 
         except Exception as e:
             log.error(f"Failed to reject key: {e}")
@@ -316,6 +348,15 @@ class BlogActions:
 
                     log.success(f"📋 Found {count} pending comments")
 
+                    if count > 0:
+                        comments_list = ""
+                        for c in pending:
+                            comments_list += f"- ID: {c.get('id')} | Author: {c.get('author_name')} | Content: \"{c.get('content')}\"\n"
+
+                        data_feedback = f"PENDING COMMENTS QUEUE ({count}):\n{comments_list}\nUse 'moderate_comment' with 'action': 'approve' or 'reject' for these IDs."
+                    else:
+                        data_feedback = "The pending comments queue is currently empty."
+
                     filter_msg = (
                         f" for article {params['article_id']}"
                         if params.get("article_id")
@@ -325,11 +366,14 @@ class BlogActions:
                         f"[FREE] Scanned pending comments{filter_msg}"
                     )
 
-                    return {"success": True, "count": count, "comments": pending}
+                    return {"success": True, "data": data_feedback, "count": count}
                 else:
                     return {"success": False, "error": result.get("error")}
             else:
-                return {"success": False, "error": f"HTTP {response.status_code}"}
+                return {
+                    "success": False,
+                    "error": f"HTTP {response.status_code} - Could not reach moderation endpoint",
+                }
 
         except Exception as e:
             log.error(f"Failed to review comments: {e}")
@@ -339,9 +383,7 @@ class BlogActions:
         comment_id = params.get("comment_id", "")
 
         if not comment_id:
-            error_msg = "approve_comment requires: comment_id"
-            log.error(error_msg)
-            return {"success": False, "error": error_msg}
+            return {"success": False, "error": "approve_comment requires: comment_id"}
 
         try:
             headers = {
@@ -350,38 +392,38 @@ class BlogActions:
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
             }
 
-            data = {"comment_id": comment_id, "action": "approve"}
+            payload = {"comment_id": comment_id, "action": "approve"}
 
             response = requests.post(
                 f"{self.blog_manager.blog_api_url}/auto_moderate_comments.php",
                 headers=headers,
-                json=data,
+                json=payload,
                 timeout=10,
             )
 
             if response.status_code == 404:
-                error_msg = f"Comment ID '{comment_id}' not found. You must use 'review_pending_comments' FIRST to see available comment IDs before approving."
+                error_msg = f"Comment ID '{comment_id}' not found. Use 'review_pending_comments' to refresh the queue."
                 log.error(error_msg)
                 return {"success": False, "error": error_msg}
 
             if response.status_code == 200:
                 result = response.json()
-
                 if result.get("success"):
-                    author = result.get("author_name", "")
-                    article = result.get("article_title", "")
+                    author = result.get("author_name", "Unknown")
+                    article = result.get("article_title", "Unknown Article")
 
                     log.success(f"✅ Approved comment by {author} on '{article}'")
-
                     app_steps.actions_performed.append(
                         f"[FREE] Approved comment by {author}"
                     )
 
-                    return result
-                else:
-                    return {"success": False, "error": result.get("error")}
-            else:
-                return {"success": False, "error": f"HTTP {response.status_code}"}
+                    return {
+                        "success": True,
+                        "data": f"COMMENT APPROVED: ID {comment_id} by {author} on article '{article}' is now public.",
+                        "author": author,
+                    }
+                return {"success": False, "error": result.get("error")}
+            return {"success": False, "error": f"HTTP {response.status_code}"}
 
         except Exception as e:
             log.error(f"Failed to approve comment: {e}")
@@ -391,9 +433,7 @@ class BlogActions:
         comment_id = params.get("comment_id", "")
 
         if not comment_id:
-            error_msg = "reject_comment requires: comment_id"
-            log.error(error_msg)
-            return {"success": False, "error": error_msg}
+            return {"success": False, "error": "reject_comment requires: comment_id"}
 
         try:
             headers = {
@@ -402,38 +442,37 @@ class BlogActions:
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
             }
 
-            data = {"comment_id": comment_id, "action": "reject"}
+            payload = {"comment_id": comment_id, "action": "reject"}
 
             response = requests.post(
                 f"{self.blog_manager.blog_api_url}/auto_moderate_comments.php",
                 headers=headers,
-                json=data,
+                json=payload,
                 timeout=10,
             )
 
             if response.status_code == 404:
-                error_msg = f"Comment ID '{comment_id}' not found. You must use 'review_pending_comments' FIRST to see available comment IDs before rejecting."
+                error_msg = f"Comment ID '{comment_id}' not found. Review the queue again to see updated IDs."
                 log.error(error_msg)
                 return {"success": False, "error": error_msg}
 
             if response.status_code == 200:
                 result = response.json()
-
                 if result.get("success"):
-                    author = result.get("author_name", "")
-                    article = result.get("article_title", "")
+                    author = result.get("author_name", "Unknown")
 
-                    log.warning(f"❌ Rejected comment by {author} on '{article}'")
-
+                    log.warning(f"❌ Rejected comment by {author}")
                     app_steps.actions_performed.append(
                         f"[FREE] Rejected comment by {author}"
                     )
 
-                    return result
-                else:
-                    return {"success": False, "error": result.get("error")}
-            else:
-                return {"success": False, "error": f"HTTP {response.status_code}"}
+                    return {
+                        "success": True,
+                        "data": f"COMMENT REJECTED: ID {comment_id} by {author} has been removed from the queue.",
+                        "author": author,
+                    }
+                return {"success": False, "error": result.get("error")}
+            return {"success": False, "error": f"HTTP {response.status_code}"}
 
         except Exception as e:
             log.error(f"Failed to reject comment: {e}")

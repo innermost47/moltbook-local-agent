@@ -44,6 +44,7 @@ class AppSteps:
         self.allowed_domains = settings.get_domains()
         self.session_todos = []
         self.blog_article_attempted = False
+        self.current_prompt = None
 
     def run_session(self):
         log.info("=== SESSION START ===")
@@ -72,7 +73,42 @@ class AppSteps:
             self._perform_autonomous_action()
 
         log.info("Generating session summary...")
-        summary_raw = self.generator.generate_session_summary(self.actions_performed)
+
+        summary_schema = {
+            "type": "object",
+            "properties": {
+                "reasoning": {
+                    "type": "string",
+                    "description": "Your thought process about this session",
+                },
+                "learnings": {
+                    "type": "string",
+                    "description": "What you learned from interactions and feedback",
+                },
+                "next_session_plan": {
+                    "type": "string",
+                    "description": "What you plan to do in the next session",
+                },
+            },
+            "required": ["reasoning", "learnings", "next_session_plan"],
+        }
+
+        self.current_prompt = f"""
+        Session completed. Here's what happened:
+
+        Actions performed: {len(self.actions_performed)}
+        {chr(10).join(f"- {action}" for action in self.actions_performed)}
+
+        Reflect on this session and create a summary with:
+        1. Your reasoning about what worked/didn't work
+        2. Key learnings from user interactions
+        3. Your strategic plan for the next session
+
+        Respond in JSON format.
+        """
+        summary_raw = self.generator.generate_session_summary(
+            self.current_prompt, summary_schema
+        )
 
         summary_raw = re.sub(r"```json\s*", "", summary_raw)
         summary_raw = re.sub(r"```\s*", "", summary_raw).strip()
@@ -195,7 +231,7 @@ class AppSteps:
                     )
 
                 log.info("Checking pending comment key requests...")
-                pending_keys = self.blog_actions.review_comment_key_requests({}, self)
+                pending_keys = self.blog_actions.review_comment_key_requests(self)
 
                 if pending_keys.get("success") and pending_keys.get("count", 0) > 0:
                     key_context = "\n## 🔑 PENDING COMMENT KEY REQUESTS\n\n"
@@ -297,7 +333,7 @@ Return ONLY a valid JSON object:
     def _create_session_plan(self):
         log.info("Creating session plan...")
 
-        plan_prompt = """
+        self.current_prompt = """
 Based on your master plan, previous sessions, current context, and feed state,
 create a concrete to-do list for THIS session.
 
@@ -314,7 +350,7 @@ Return ONLY a valid JSON object with this structure:
 """
 
         try:
-            result = self.generator.generate(plan_prompt)
+            result = self.generator.generate(self.current_prompt)
             content = result["choices"][0]["message"]["content"]
 
             content = re.sub(r"```json\s*", "", content)
@@ -343,8 +379,7 @@ Return ONLY a valid JSON object with this structure:
                 todo_context += (
                     "\nRemember to mark tasks as completed when you accomplish them!\n"
                 )
-
-                self.update_system_context(todo_context)
+                self.current_prompt = todo_context
 
         except Exception as e:
             log.error(f"Failed to create session plan: {e}")
@@ -353,7 +388,7 @@ Return ONLY a valid JSON object with this structure:
 
         current_plan = self.planning_system.get_active_master_plan()
 
-        update_prompt = f"""
+        self.current_prompt = f"""
 Based on this session's learnings and your current master plan:
 
 **Current Master Plan:**
@@ -378,7 +413,7 @@ Return ONLY a valid JSON object:
 """
 
         try:
-            result = self.generator.generate(update_prompt)
+            result = self.generator.generate(self.current_prompt)
             content = result["choices"][0]["message"]["content"]
 
             content = re.sub(r"```json\s*", "", content)
@@ -615,20 +650,12 @@ Consider using memory to track patterns and learn over time.
         last_error = None
 
         for attempt in range(1, max_attempts + 1):
-            current_prompt = (
-                "Decide your next action based on your strategy and the current feed."
-            )
-            if last_error:
-                current_prompt = f"""
+            if not self.current_prompt:
+                self.current_prompt = "Decide your next action based on your strategy and the current feed."
 
-⚠️ PREVIOUS ATTEMPT FAILED (Attempt {attempt}/{max_attempts})
-Error: {last_error}
-
-Please fix the issue and try again. Make sure all required parameters are provided.
-"""
             try:
                 result = self.generator.generate(
-                    current_prompt, response_format=action_schema
+                    self.current_prompt, response_format=action_schema
                 )
                 content = result["choices"][0]["message"]["content"]
 
@@ -652,6 +679,10 @@ Please fix the issue and try again. Make sure all required parameters are provid
 
                     if attempt < max_attempts:
                         log.info(f"🔄 Retrying... ({attempt + 1}/{max_attempts})")
+                        self.current_prompt = f"""⚠️ ACTION FAILED
+Error: {last_error}
+
+Please refer to your system prompt for the correct schema. Correct your mistake and try again."""
                         continue
                     else:
                         log.error(f"❌ All {max_attempts} attempts failed")
@@ -660,6 +691,15 @@ Please fix the issue and try again. Make sure all required parameters are provid
                         )
                         break
                 else:
+                    success_data = execution_result.get(
+                        "data", "Action completed successfully."
+                    )
+
+                    self.current_prompt = f"""✅ LAST ACTION SUCCESSFUL: {decision['action_type']}
+RESULT: {success_data}
+
+Based on this result, decide your next action."""
+
                     if attempt > 1:
                         log.success(f"✅ Succeeded on attempt {attempt}")
                     break
@@ -736,12 +776,10 @@ Please fix the issue and try again. Make sure all required parameters are provid
             return self.memory_system.retrieve(
                 params=params,
                 actions_performed=self.actions_performed,
-                update_system_context=self.update_system_context,
             )
 
         elif action_type == "memory_list":
             return self.memory_system.list(
-                update_system_context=self.update_system_context,
                 actions_performed=self.actions_performed,
             )
 
@@ -762,22 +800,17 @@ Please fix the issue and try again. Make sure all required parameters are provid
         elif action_type == "web_search_links":
             return self.web_scraper.web_search_links(
                 params=params,
-                update_system_context=self.update_system_context,
                 actions_performed=self.actions_performed,
             )
 
         elif action_type == "write_blog_article" and self.blog_actions:
-            result = self.blog_actions.write_and_publish_article(params, self)
-            if result.get("success"):
-                self.blog_article_attempted = True
-                log.success("✅ Blog article published - no more articles this session")
-            return result
+            return self.blog_actions.write_and_publish_article(params, self)
 
         elif action_type == "share_blog_post" and self.blog_actions:
             return self.blog_actions.share_blog_post_on_moltbook(params, self)
 
         elif action_type == "review_comment_key_requests" and self.blog_actions:
-            return self.blog_actions.review_comment_key_requests(params, self)
+            return self.blog_actions.review_comment_key_requests(self)
 
         elif action_type == "approve_comment_key" and self.blog_actions:
             return self.blog_actions.approve_comment_key(params, self)
@@ -831,7 +864,9 @@ Please fix the issue and try again. Make sure all required parameters are provid
         elif action_type == "refresh_feed":
             return self.moltbook_actions.refresh_feed(params=params, app_steps=self)
 
-        return {"success": True}
+        error_msg = f"Unknown action type: {action_type}. Verification of the tool definition required."
+        log.error(error_msg)
+        return {"success": False, "error": error_msg}
 
     def _handle_follow_action(self, params: dict):
         agent_name = params.get("agent_name")
@@ -862,7 +897,6 @@ Please fix the issue and try again. Make sure all required parameters are provid
         return result
 
     def _handle_todo_update(self, params: dict):
-
         task = params.get("todo_task")
         status = params.get("todo_status", "completed")
 
@@ -880,7 +914,7 @@ Please fix the issue and try again. Make sure all required parameters are provid
         if not matching_todo:
             return {
                 "success": False,
-                "error": f"Task '{task}' not found in current session",
+                "error": f"Task '{task}' not found in current session. Make sure the description matches your TO-DO list.",
             }
 
         success = self.planning_system.update_todo_status(
@@ -890,9 +924,16 @@ Please fix the issue and try again. Make sure all required parameters are provid
         if success:
             log.success(f"✅ Task marked as {status}: {task}")
             self.actions_performed.append(f"[FREE] Updated todo: {task} → {status}")
-            return {"success": True}
 
-        return {"success": False, "error": "Failed to update todo"}
+            return {
+                "success": True,
+                "data": f"TO-DO LIST UPDATED: Task '{matching_todo['task']}' is now marked as {status}.",
+            }
+
+        return {
+            "success": False,
+            "error": "Internal error: Failed to update todo status in database.",
+        }
 
     def _handle_view_summaries(self, params: dict):
         limit = params.get("summary_limit", 5)
@@ -900,22 +941,24 @@ Please fix the issue and try again. Make sure all required parameters are provid
         summaries = self.memory.get_session_history(limit=limit)
 
         if summaries:
-            context = f"\n\n## 📚 PREVIOUS {len(summaries)} SESSIONS:\n\n"
+            summary_text = (
+                f"ARCHIVED SESSION HISTORY ({len(summaries)} most recent sessions):\n\n"
+            )
             for i, session in enumerate(summaries, 1):
-                context += f"### Session {i} - {session['timestamp']}\n"
-                context += f"**Learnings:** {session['learnings']}\n"
-                context += f"**Plan:** {session['plan']}\n\n"
-
-            self.update_system_context(context)
+                summary_text += f"--- SESSION {i} ({session['timestamp']}) ---\n"
+                summary_text += f"LEARNINGS: {session['learnings']}\n"
+                summary_text += f"NEXT STEPS PLANNED: {session['plan']}\n\n"
 
             log.success(f"📖 Loaded {len(summaries)} session summaries")
             self.actions_performed.append(
                 f"[FREE] Viewed {len(summaries)} session summaries"
             )
-        else:
-            log.info("No previous sessions found")
 
-        return {"success": True}
+            return {"success": True, "data": summary_text}
+        else:
+            msg = "No previous session summaries found in database."
+            log.info(msg)
+            return {"success": True, "data": msg}
 
     def update_system_context(self, additional_context: str):
         if (

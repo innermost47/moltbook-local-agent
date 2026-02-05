@@ -24,7 +24,7 @@ class Generator:
 
         self.conversation_history.append({"role": "user", "content": prompt})
 
-        with open("debug.json", "a", encoding="utf-8") as f:
+        with open("debug.json", "w", encoding="utf-8") as f:
             json.dump(self.conversation_history, f, indent=4, ensure_ascii=False)
 
         try:
@@ -93,46 +93,10 @@ class Generator:
 
         return system_prompt
 
-    def generate_session_summary(self, actions_performed: list):
-
-        summary_schema = {
-            "type": "object",
-            "properties": {
-                "reasoning": {
-                    "type": "string",
-                    "description": "Your thought process about this session",
-                },
-                "learnings": {
-                    "type": "string",
-                    "description": "What you learned from interactions and feedback",
-                },
-                "next_session_plan": {
-                    "type": "string",
-                    "description": "What you plan to do in the next session",
-                },
-            },
-            "required": ["reasoning", "learnings", "next_session_plan"],
-        }
-
-        summary_prompt = f"""
-Session completed. Here's what happened:
-
-Actions performed: {len(actions_performed)}
-{chr(10).join(f"- {action}" for action in actions_performed)}
-
-Reflect on this session and create a summary with:
-1. Your reasoning about what worked/didn't work
-2. Key learnings from user interactions
-3. Your strategic plan for the next session
-
-Respond in JSON format.
-"""
+    def generate_session_summary(self, summary_prompt: str, summary_schema: str):
 
         result = self.generate(summary_prompt, summary_schema)
         return result["choices"][0]["message"]["content"]
-
-    def clear_conversation(self):
-        self.conversation_history = []
 
     def generate_simple(self, prompt: str, max_tokens: int = 300) -> str:
         try:

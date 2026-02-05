@@ -19,63 +19,84 @@ class MoltbookActions:
 
         app_steps.post_creation_attempted = True
         submolt = params.get("submolt", "general")
+        title = params.get("title", "")
 
         result = app_steps.api.create_text_post(
-            title=params.get("title", ""),
+            title=title,
             content=params.get("content", ""),
             submolt=submolt,
         )
+
         app_steps.last_post_time = time.time()
+
         if result.get("success"):
-            post_id = result.get("id") or result.get("post", {}).get("id")
+            post_id = result.get("id") or result.get("data", {}).get("id")
             post_url = (
-                f"https://moltbook.com/m/{submolt}/post/{post_id}" if post_id else "N/A"
+                f"https://moltbook.com/m/{submolt}/post/{post_id}"
+                if post_id
+                else "URL Unavailable"
             )
 
-            log.success(f"Post created: {params.get('title', '')[:50]}")
-            log.info(f"Post URL: {post_url}")
+            log.success(f"Post created: {title[:50]}")
 
-            app_steps.actions_performed.append(
-                f"Created post: {params.get('title', '')}"
-            )
+            app_steps.actions_performed.append(f"Created post: {title}")
+
             app_steps.created_content_urls.append(
-                {"type": "post", "title": params.get("title", ""), "url": post_url}
+                {"type": "post", "title": title, "url": post_url}
             )
-            return {"success": True}
+
+            return {
+                "success": True,
+                "data": f"POST SUCCESSFULLY CREATED:\n- Title: {title}\n- Submolt: m/{submolt}\n- URL: {post_url}\n\nYour content is now visible to other users.",
+                "post_url": post_url,
+            }
         else:
-            error_msg = result.get("error", "Unknown")
+            error_msg = result.get("error", "Unknown API error")
             app_steps.actions_performed.append(f"FAILED: Create post ({error_msg})")
-            return {"success": False, "error": error_msg}
+            return {"success": False, "error": f"Failed to create post: {error_msg}"}
 
     def post_link(self, app_steps, params: dict):
 
         submolt = params.get("submolt", "general")
+        title = params.get("title", "")
+        url_to_share = params.get("url_to_share", "")
 
         result = app_steps.api.create_link_post(
-            title=params.get("title", ""),
-            url_to_share=params.get("url_to_share", ""),
+            title=title,
+            url_to_share=url_to_share,
             submolt=submolt,
         )
+
         if result.get("success"):
-            post_id = result.get("id") or result.get("post", {}).get("id")
+            post_data = result.get("data", {})
+            post_id = result.get("id") or post_data.get("id")
+
             post_url = (
-                f"https://moltbook.com/m/{submolt}/post/{post_id}" if post_id else "N/A"
+                f"https://moltbook.com/m/{submolt}/post/{post_id}"
+                if post_id
+                else "URL Unavailable"
             )
 
-            log.success(f"Link shared: {params.get('title', '')[:50]}")
+            log.success(f"Link shared: {title[:50]}")
             log.info(f"Link POST URL: {post_url}")
 
-            app_steps.actions_performed.append(
-                f"Shared link: {params.get('title', '')}"
-            )
+            app_steps.actions_performed.append(f"Shared link: {title}")
+
             app_steps.created_content_urls.append(
-                {"type": "post_link", "title": params.get("title", ""), "url": post_url}
+                {"type": "post_link", "title": title, "url": post_url}
             )
-            return {"success": True}
+
+            return {
+                "success": True,
+                "data": f"LINK POST CREATED:\n- Title: {title}\n- Shared URL: {url_to_share}\n- Moltbook URL: {post_url}\n\nYour link is now live in m/{submolt}.",
+                "post_url": post_url,
+            }
         else:
-            error_msg = result.get("error", "Unknown")
+            error_msg = result.get("error", "Unknown API error")
+            log.error(f"Failed to share link: {error_msg}")
             app_steps.actions_performed.append(f"FAILED: Share link ({error_msg})")
-            return {"success": False, "error": error_msg}
+
+            return {"success": False, "error": f"Link sharing failed: {error_msg}"}
 
     def comment_on_post(self, params: dict, app_steps):
         post_id = params.get("post_id", "")
@@ -119,15 +140,20 @@ class MoltbookActions:
             )
 
             log.success(f"Intel deployed: Comment on post {post_id} [^]")
-            log.info(f"Comment URL: {comment_url}")
 
             app_steps.actions_performed.append(f"Commented on post {post_id}")
             app_steps.created_content_urls.append(
                 {"type": "comment", "post_id": post_id, "url": comment_url}
             )
-            return {"success": True}
+
+            return {
+                "success": True,
+                "data": f"COMMENT SUCCESSFULLY DEPLOYED:\n- Post ID: {post_id}\n- Comment ID: {comment_id}\n- URL: {comment_url}\n\nYour comment is now live. You can track engagement in the next feed refresh.",
+                "comment_id": comment_id,
+            }
         else:
             error_msg = result.get("error", "Unknown API error")
+            log.error(f"Comment failed: {error_msg}")
             return {"success": False, "error": f"❌ Deployment Failed: {error_msg}"}
 
     def reply_to_comment(self, params: dict, app_steps):
@@ -161,7 +187,6 @@ class MoltbookActions:
             }
 
         correct_post_id = app_steps.available_comment_ids.get(comment_id)
-
         if post_id != correct_post_id:
             log.warning(
                 f"Vibrational Desync: post_id {post_id} mismatched. Correcting to {correct_post_id} [!]"
@@ -189,7 +214,6 @@ class MoltbookActions:
             )
 
             log.success(f"Beta neutralized: Replied to comment {comment_id} [^]")
-            log.info(f"Reply URL: {reply_url}")
 
             app_steps.actions_performed.append(f"Replied to comment {comment_id}")
             app_steps.created_content_urls.append(
@@ -199,9 +223,15 @@ class MoltbookActions:
                     "url": reply_url,
                 }
             )
-            return {"success": True}
+
+            return {
+                "success": True,
+                "data": f"REPLY SUCCESSFULLY DEPLOYED:\n- Parent Comment: {comment_id}\n- New Reply ID: {reply_id}\n- URL: {reply_url}\n\nYour response is now visible in the thread.",
+                "reply_id": reply_id,
+            }
         else:
             error_msg = result.get("error", "Unknown API error")
+            log.error(f"Reply failed: {error_msg}")
             return {"success": False, "error": f"❌ Action Failed: {error_msg}"}
 
     def vote_post(self, params: dict, app_steps):
@@ -225,15 +255,22 @@ class MoltbookActions:
         )
 
         if result.get("success"):
-            symbol = "[↑]" if v_type == "upvote" else "[↓]"
+            symbol = "↑" if v_type == "upvote" else "↓"
             log.success(
-                f"Frequency adjusted: {v_type.upper()} on post {post_id} {symbol}"
+                f"Frequency adjusted: {v_type.upper()} on post {post_id} [{symbol}]"
             )
 
             app_steps.actions_performed.append(f"{v_type.capitalize()}d post {post_id}")
-            return {"success": True}
+
+            return {
+                "success": True,
+                "data": f"VOTE REGISTERED: Successfully applied {v_type.upper()} [{symbol}] to post {post_id}.",
+                "vote_type": v_type,
+                "post_id": post_id,
+            }
         else:
             error_msg = result.get("error", "Unknown API error")
+            log.error(f"Vote failed: {error_msg}")
             return {"success": False, "error": f"❌ Adjustment Failed: {error_msg}"}
 
     def follow_agent(self, params: dict, app_steps):
@@ -241,49 +278,67 @@ class MoltbookActions:
         follow_type: str = params.get("follow_type", "follow")
 
         if not agent_name:
-            error_msg = "Missing agent_name for follow action"
+            error_msg = "❌ Protocol Violation: Missing 'agent_name' for follow/unfollow action."
+            log.error(error_msg)
             return {"success": False, "error": error_msg}
 
         result = app_steps.api.follow_agent(agent_name, follow_type)
+
         if result.get("success"):
-            log.success(f"Successfully {follow_type}ed agent {agent_name}")
+            action_label = "FOLLOWED" if follow_type == "follow" else "UNFOLLOWED"
+            icon = "👤+" if follow_type == "follow" else "👤-"
+
+            log.success(f"{icon} Successfully {follow_type}ed agent: {agent_name}")
+
             app_steps.actions_performed.append(
                 f"{follow_type.capitalize()}ed agent {agent_name}"
             )
-            return {"success": True}
+
+            return {
+                "success": True,
+                "data": f"SOCIAL UPDATE: You have successfully {action_label} agent '{agent_name}'. Your social graph has been updated.",
+                "agent_name": agent_name,
+                "status": follow_type,
+            }
         else:
-            error_msg = result.get("error", "Unknown error")
-            return {"success": False, "error": error_msg}
+            error_msg = result.get("error", "Unknown API error")
+            log.error(f"Social action failed: {error_msg}")
+            return {"success": False, "error": f"❌ Social Action Failed: {error_msg}"}
 
     def refresh_feed(self, params: dict, app_steps):
         log.info("Refreshing feed...")
+
         posts_data = app_steps.api.get_posts(
             sort=params.get("sort", "hot"), limit=params.get("limit", 20)
         )
+
         if not posts_data:
             log.warning("Feed refresh returned no data.")
-            return {"success": False, "error": "No posts found. Is the API reachable?"}
+            return {
+                "success": False,
+                "error": "No posts found. Verify API connectivity or submolt activity.",
+            }
 
         app_steps.available_post_ids = []
         app_steps.available_comment_ids = {}
 
-        app_steps.current_feed = app_steps.get_enriched_feed_context(posts_data)
+        enriched_feed = app_steps.get_enriched_feed_context(posts_data)
+        app_steps.current_feed = enriched_feed
 
-        feed_update = f"""## FEED REFRESHED
-
-{app_steps.current_feed}
-
-UPDATED POST IDs: {', '.join(app_steps.available_post_ids)}
-UPDATED COMMENT IDs: {', '.join(app_steps.available_comment_ids.keys())}
-"""
-
-        app_steps.update_system_context(feed_update)
+        feed_update = f"## FEED REFRESHED (Sort: {params.get('sort', 'hot')})\n\n"
+        feed_update += enriched_feed
+        feed_update += (
+            f"\n\nAVAILABLE POST IDs: {', '.join(app_steps.available_post_ids)}"
+        )
+        feed_update += f"\nAVAILABLE COMMENT IDs: {', '.join(app_steps.available_comment_ids.keys())}"
 
         log.success(
             f"Feed refreshed: {len(app_steps.available_post_ids)} posts, {len(app_steps.available_comment_ids)} comments"
         )
+
         app_steps.actions_performed.append("Refreshed feed")
-        return {"success": True}
+
+        return {"success": True, "data": feed_update}
 
     def track_interaction_from_post(self, post_id: str, app_steps):
         post_data = app_steps.api.get_single_post(post_id)

@@ -179,6 +179,9 @@ Provide a concise summary (max 300 words) highlighting the most relevant informa
                 "error": "❌ Missing 'web_url'. Supply a valid URL from the allowed domains.",
             }
 
+        if not url.startswith(("http://", "https://")):
+            url = f"https://{url}"
+
         parsed_url = urlparse(url)
         domain = parsed_url.netloc.lower().replace("www.", "")
 
@@ -218,11 +221,12 @@ Provide a concise summary (max 300 words) highlighting the most relevant informa
         log.success(f"Intel extracted from {domain} [^]")
         actions_performed.append(f"[FREE] Web Fetch: {domain}")
 
-        return {"success": True, "summary": summary}
+        return {
+            "success": True,
+            "data": f"WEB CONTENT FETCHED FROM {url}:\n\n{summary}",
+        }
 
-    def web_search_links(
-        self, params: dict, update_system_context, actions_performed: List
-    ):
+    def web_search_links(self, params: dict, actions_performed: List):
         domain = params.get("web_domain", "").lower().replace("www.", "")
         query = params.get("web_query", "")
 
@@ -251,17 +255,17 @@ Provide a concise summary (max 300 words) highlighting the most relevant informa
 
         if not result.get("links"):
             msg = f"No relevant links found on {domain} for '{query}'."
-            update_system_context(f"\n## WEB SEARCH: {domain}\n> {msg}\n")
-            return {"success": True, "message": msg}
+            log.info(msg)
+            return {"success": True, "data": f"WEB SEARCH RESULT: {msg}"}
 
-        links_text = f"## SEARCH RESULTS ON {domain} FOR '{query}':\n"
+        links_text = f"SEARCH RESULTS ON {domain} FOR '{query}':\n"
         for link in result["links"][:10]:
             links_text += f"- {link['text']}: {link['url']}\n"
 
-        update_system_context(links_text)
+        log.success(f"Found {len(result['links'][:10])} links on {domain}")
         actions_performed.append(f"[FREE] Web Search: {domain}")
 
-        return {"success": True}
+        return {"success": True, "data": links_text}
 
 
 def get_web_context_for_agent() -> str:

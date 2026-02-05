@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Agent Debugger - Live Feed</title>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css"
+    />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+    <style>
+      body {
+        font-family: "Segoe UI", sans-serif;
+        background-color: #0d1117;
+        color: #e6edf3;
+        margin: 0;
+        padding: 20px;
+      }
+      .container {
+        width: 100%;
+        max-width: 1000px;
+        margin: auto;
+      }
+      .header {
+        position: sticky;
+        top: 0;
+        background: #0d1117;
+        z-index: 100;
+        margin-bottom: 20px;
+        border-bottom: 1px solid #30363d;
+        padding: 10px 0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .status-dot {
+        height: 10px;
+        width: 10px;
+        background-color: #2ea043;
+        border-radius: 50%;
+        display: inline-block;
+        margin-right: 5px;
+      }
+      .message-card {
+        margin-bottom: 20px;
+        border-radius: 8px;
+        border: 1px solid #30363d;
+        background-color: #161b22;
+      }
+      .role-badge {
+        padding: 8px 15px;
+        font-weight: bold;
+        text-transform: uppercase;
+        font-size: 11px;
+        display: flex;
+        justify-content: space-between;
+      }
+      .role-user {
+        background-color: #23863622;
+        color: #2ea043;
+      }
+      .role-assistant {
+        background-color: #1f6feb22;
+        color: #58a6ff;
+      }
+      .role-system {
+        background-color: #6e768122;
+        color: #8b949e;
+      }
+      .content {
+        padding: 15px;
+        line-height: 1.6;
+      }
+      pre {
+        background-color: #010409 !important;
+        padding: 12px;
+        border-radius: 6px;
+        border: 1px solid #30363d;
+        white-space: pre-wrap;
+        white-space: -moz-pre-wrap;
+        white-space: -pre-wrap;
+        white-space: -o-pre-wrap;
+        word-wrap: break-word;
+      }
+      code {
+        font-family: "Cascadia Code", "Fira Code", monospace;
+        font-size: 0.9em;
+        word-break: break-word;
+      }
+      a {
+        color: #58a6ff;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <h1>Live Debug Feed</h1>
+        <div id="status">
+          <span class="status-dot"></span> Auto-syncing:
+          <span id="last-update">--</span>
+        </div>
+      </div>
+      <div id="logs"></div>
+    </div>
+
+    <script>
+      const logsContainer = document.getElementById("logs");
+      const lastUpdateSpan = document.getElementById("last-update");
+      let lastJsonString = "";
+
+      marked.setOptions({
+        highlight: function (code, lang) {
+          const language = hljs.getLanguage(lang) ? lang : "plaintext";
+          return hljs.highlight(code, { language }).value;
+        },
+        breaks: true,
+      });
+
+      async function fetchLogs() {
+        try {
+          const response = await fetch("debug.json?t=" + new Date().getTime());
+          if (!response.ok) throw new Error("File not found");
+
+          const rawJson = await response.text();
+
+          if (rawJson !== lastJsonString) {
+            lastJsonString = rawJson;
+            const data = JSON.parse(rawJson);
+            renderLogs(data);
+            lastUpdateSpan.innerText = new Date().toLocaleTimeString();
+          }
+        } catch (err) {
+          console.error("Sync error:", err);
+          lastUpdateSpan.innerText = "Error loading debug.json";
+        }
+      }
+
+      function renderLogs(messages) {
+        logsContainer.innerHTML = "";
+        messages.forEach((msg, index) => {
+          const card = document.createElement("div");
+          card.className = "message-card";
+          const roleClass = `role-${msg.role}`;
+
+          let displayContent = msg.content.trim();
+
+          if (displayContent.startsWith("{") && displayContent.endsWith("}")) {
+            try {
+              const jsonParsed = JSON.parse(displayContent);
+              const formattedJson = JSON.stringify(jsonParsed, null, 2);
+              displayContent = "```json\n" + formattedJson + "\n```";
+            } catch (e) {
+              console.warn(
+                "Contenu ressemble à du JSON mais n'est pas valide.",
+              );
+            }
+          }
+
+          card.innerHTML = `
+                      <div class="role-badge ${roleClass}">
+                          <span>${msg.role.toUpperCase()}</span>
+                          <span>MESSAGE #${index + 1}</span>
+                      </div>
+                      <div class="content">${marked.parse(displayContent)}</div>
+                  `;
+          logsContainer.appendChild(card);
+        });
+
+        document.querySelectorAll("pre code").forEach((el) => {
+          hljs.highlightElement(el);
+        });
+        window.scrollTo(0, document.body.scrollHeight);
+      }
+
+      setInterval(fetchLogs, 2000);
+      fetchLogs();
+    </script>
+  </body>
+</html>

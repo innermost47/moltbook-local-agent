@@ -245,7 +245,7 @@ class MemorySystem:
         if not category or not content:
             return {
                 "success": False,
-                "error": "Missing 'memory_category' or 'memory_content'",
+                "error": "❌ Protocol Violation: Missing 'memory_category' or 'memory_content'.",
             }
 
         result = self.store_memory(
@@ -254,13 +254,25 @@ class MemorySystem:
 
         if result["success"]:
             log.success(f"Stored memory in '{category}'")
-            actions_performed.append(f"[FREE] Stored memory in '{category}'")
-            return {"success": True}
-        else:
-            log.error(f"Failed to store memory: {result['error']}")
-            return result
 
-    def retrieve(self, params: dict, actions_performed: List, update_system_context):
+            actions_performed.append(f"[FREE] Stored memory in '{category}'")
+
+            return {
+                "success": True,
+                "data": (
+                    f"✅ MEMORY SECURED & VERIFIED\n"
+                    f"Category: {category}\n"
+                    f"Content stored: {content}\n\n"
+                    f"System Note: This information is now locked into your long-term memory. "
+                    f"It remains active in your current focus."
+                ),
+            }
+        else:
+            error_msg = result.get("error", "Database connection failed")
+            log.error(f"Failed to store memory: {error_msg}")
+            return {"success": False, "error": f"❌ Storage Failure: {error_msg}"}
+
+    def retrieve(self, params: dict, actions_performed: List):
         category = params.get("memory_category", "")
         limit = params.get("memory_limit", 5)
         order = params.get("memory_order", "desc")
@@ -294,41 +306,36 @@ class MemorySystem:
 
         entries = result["entries"]
         if entries:
-            feedback = f"\n## 📚 MEMORIES RETRIEVED FROM '{category}'\n\n"
-            for memory in entries:
-                feedback += f"- {memory['content']}...\n"
-            feedback += f"\n✅ You now have this information. DO NOT retrieve the same category again.\n"
-
-            update_system_context(feedback)
+            memory_text = "\n".join([f"- {m['content']}" for m in entries])
+            feedback = f"Data found in '{category}':\n{memory_text}"
 
             log.success(f"Retrieved {len(entries)} memories from '{category}'")
             actions_performed.append(
                 f"[FREE] Retrieved {len(entries)} memories from '{category}'"
             )
-            return {"success": True}
+            return {"success": True, "data": feedback}
         else:
             msg = f"No memories found in '{category}'."
-            update_system_context(f"\n## 📚 MEMORY SEARCH: {category}\n> {msg}\n")
             log.info(msg)
             return {"success": True, "message": msg}
 
-    def list(self, update_system_context, actions_performed: List):
+    def list(self, actions_performed: List):
         categories_info = self.list_categories()
-
-        list_text = "\n\n## MEMORY CATEGORIES STATUS:\n\n"
-        for category, info in categories_info.items():
-            stats = info["stats"]
-            if stats["count"] > 0:
-                list_text += f"- **{category}**: {stats['count']} entries ({stats['oldest'][:10]} to {stats['newest'][:10]})\n"
-            else:
-                list_text += f"- **{category}**: empty\n"
-
-        update_system_context(list_text)
+        list_text = "MEMORY CATEGORIES STATUS:\n"
+        if categories_info:
+            for category, info in categories_info.items():
+                stats = info["stats"]
+                if stats["count"] > 0:
+                    list_text += f"- {category}: {stats['count']} entries ({stats['oldest'][:10]} to {stats['newest'][:10]})\n"
+                else:
+                    list_text += f"- {category}: empty\n"
+        else:
+            list_text += "No memory categories found."
 
         log.success("Listed all memory categories")
         actions_performed.append("[FREE] Listed memory categories")
 
-        return {"success": True}
+        return {"success": True, "data": list_text}
 
     def __del__(self):
         if hasattr(self, "conn"):

@@ -16,9 +16,9 @@ An autonomous AI agent framework for [Moltbook](https://moltbook.com) social net
 - 🚦 **Rate Limit Management**: Automatic compliance with Moltbook API limits (1 post/30min, 50 comments/hour, 100 requests/min)
 - 🎭 **Dynamic Context Loading**: Loads feed once per session with real post/comment IDs for validation
 - 📧 **Email Reports**: Optional end-of-session reports with success/failure breakdown and URLs to created content
-- 🗂️ **Categorized Memory System**: 12 generic categories for storing and retrieving structured memories across sessions (FREE actions)
+- 🗂️ **Categorized Memory System**: 12 generic categories for storing and retrieving structured memories across sessions
 - 🔄 **Error Recovery**: 3-attempt retry system with error feedback for failed actions
-- 🌐 **Web Research & Scraping**: Controlled web access to specific domains for fact-checking and research (FREE actions)
+- 🌐 **Web Research & Scraping**: Controlled web access to specific domains for fact-checking and research
 - 🎯 **Strategic Planning System**: Master plan with long-term objectives, session-based to-do lists, and milestone tracking
 - 👥 **Network Intelligence**: Automatic tracking of follows/unfollows with reasoning and interaction counts
 - 📚 **Session History Access**: Query and learn from past sessions to refine strategies over time
@@ -261,9 +261,7 @@ Before taking any actions, the agent generates a **concrete to-do list** for the
 
 **Tasks are prioritized** (1-5 stars) and **tracked throughout the session**. The agent can mark tasks as completed or cancelled as it progresses.
 
-### Planning Actions (FREE)
-
-Planning operations don't count toward `MAX_ACTIONS_PER_SESSION`:
+### Planning Actions
 
 - **update_todo_status**: Mark a task as completed or cancelled
   - Parameters: `todo_task` (description), `todo_status` (`completed` or `cancelled`)
@@ -339,7 +337,7 @@ This context helps the agent:
 
 ## Memory System 🧠
 
-The agent has access to a categorized long-term memory system that persists across sessions. Memory operations are **FREE** and don't count toward `MAX_ACTIONS_PER_SESSION`.
+The agent has access to a categorized long-term memory system that persists across sessions.
 
 ### Available Categories
 
@@ -358,7 +356,7 @@ The agent can store and retrieve information in 12 generic categories:
 - **ideas**: Future ideas and concepts to explore
 - **reflections**: Deep thoughts and self-analysis
 
-### Memory Actions (FREE)
+### Memory Actions
 
 - **memory_store**: Save information to a category
   - Parameters: `memory_category`, `memory_content`
@@ -440,7 +438,7 @@ The agent uses [fal.ai](https://fal.ai) to generate article images:
   - Parameters: `title`, `url` (article URL), `submolt`
   - Creates link post driving traffic to blog
 
-#### Moderation Actions (FREE - Unlimited)
+#### Moderation Actions
 
 If your blog supports LLM commenting:
 
@@ -465,42 +463,6 @@ FAL_API_KEY=your_fal_ai_key
 
 **If these variables are empty or missing**, blog actions are automatically disabled.
 
-### Workflow Example
-
-```
-Session 1: Research Phase
-[PRO] web_search_links: arxiv.org "neural audio synthesis"
-[DATA] Found relevant papers
-[PRO] web_fetch: Extract key findings
-[FREE] memory_store: Archive research for article
-
-Session 2: Publishing Phase
-[PLAN] To-do: Write article on neural audio (priority 5)
-[^] write_blog_article:
-    title="The Science of Neural Audio Synthesis"
-    excerpt="A technical deep-dive into latent diffusion..."
-    content=<markdown with research citations>
-    image_prompt="Abstract neural network processing audio waves, digital art"
-[SUCCESS] Article published: https://yourdomain.com/article.php?slug=science-neural-audio
-[^] share_blog_post: Share on Moltbook /m/general
-[PLAN] update_todo_status: "Write article" → completed
-
-Session 3: Moderation Phase (if applicable)
-[FREE] review_comment_key_requests: 2 pending
-[FREE] approve_comment_key: @ai_researcher (technical background)
-[FREE] reject_comment_key: @spambot5000 (spam)
-[FREE] review_pending_comments: 1 comment
-[FREE] approve_comment: Technical insight from approved agent
-```
-
-### Strategic Benefits
-
-- **Authority**: Long-form content establishes thought leadership
-- **SEO**: Blog posts get indexed, expanding reach beyond Moltbook
-- **Depth**: Complex topics that need more than 500 characters
-- **Traffic**: Link posts on Moltbook drive readers to your blog
-- **Portability**: All content stored in your database (articles + images as base64)
-
 ### Implementation Notes
 
 The framework includes `blog_manager.py` and `blog_actions.py` as reference implementations. You can:
@@ -511,7 +473,7 @@ The framework includes `blog_manager.py` and `blog_actions.py` as reference impl
 
 **The blog feature is completely optional** - the agent works perfectly without it.
 
-## Web Actions 🌐 (FREE)
+## Web Actions 🌐
 
 - **web_search_links**: Scans a specific domain's page to list available links (useful for finding specific articles).
 - **web_fetch**: Fetches and extracts content from a specific URL. The content is automatically summarized by the LLM and stored in the agent's memory.
@@ -639,24 +601,18 @@ All actions respect Moltbook API rate limits automatically:
 - **Posts**: 1 per 30 minutes
 - **Comments**: 50 per hour (~72s between comments)
 
-### Memory Actions (FREE - Unlimited)
-
-Memory operations don't count toward `MAX_ACTIONS_PER_SESSION`:
+### Memory Actions
 
 - **memory_store**: Save information (params: `memory_category`, `memory_content`)
 - **memory_retrieve**: Get memories (params: `memory_category`, `memory_limit`, `memory_order`, optional: `from_date`, `to_date`)
 - **memory_list**: See all category stats
 
-### Planning Actions (FREE - Unlimited)
-
-Strategic planning operations don't count toward `MAX_ACTIONS_PER_SESSION`:
+### Planning Actions
 
 - **update_todo_status**: Mark a task as completed or cancelled (params: `todo_task`, `todo_status`)
 - **view_session_summaries**: Access past session summaries (params: `summary_limit`)
 
-### Web Actions (FREE - Unlimited)
-
-Web research operations don't count toward `MAX_ACTIONS_PER_SESSION`:
+### Web Actions
 
 - **web_search_links**: Find links on a specific domain (params: `web_domain`, `web_query`)
 - **web_fetch**: Fetch and analyze content from a URL (params: `web_url`)
@@ -668,7 +624,7 @@ Web research operations don't count toward `MAX_ACTIONS_PER_SESSION`:
 - **write_blog_article**: Publish article (params: `title`, `excerpt`, `content`, `image_prompt`)
 - **share_blog_post**: Share on Moltbook (params: `title`, `url`, `submolt`)
 
-#### Moderation Actions (FREE - Unlimited)
+#### Moderation Actions
 
 - **review_comment_key_requests**: List pending key requests
 - **approve_comment_key**: Approve request (params: `request_id`)

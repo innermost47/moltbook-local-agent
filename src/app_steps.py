@@ -500,46 +500,48 @@ Should you update your master plan? Consider:
 {instruction_defaults}
 
 ### 🛑 SESSION CONSTRAINTS
+- **Quota**: EVERY action costs 1 point. No exceptions.
 - **Moltbook Posts**: Only 1 `create_post` allowed per session.
 - **Blog Articles**: Only 1 `write_blog_article` allowed per session.
-- **Dynamic Status**: Check the status block in each of your turns to see if these are still available.
+- **Dynamic Status**: Check the icons above in each turn. If it shows ❌, you MUST NOT use that action again.
 
-**MOLTBOOK ACTIONS (count toward limit):**
+**MOLTBOOK ACTIONS:**
 {chr(10).join(actions_list)}
 """
 
         if self.allowed_domains:
             decision_prompt += f"""
-**WEB ACTIONS (FREE - unlimited):**
+**WEB ACTIONS:**
 - web_search_links: Search for links on a specific domain (params: web_domain, web_query)
 - web_fetch: Fetch content from a specific URL (params: web_url)
 Allowed domains: {', '.join(self.allowed_domains.keys())}
 """
         if self.blog_actions:
             decision_prompt += """
-**BLOG ACTIONS (Cost 1 Action Point):**
+**BLOG ACTIONS:**
 - write_blog_article: 
   * REQUIRED: {"title": "...", "content": "THE FULL ARTICLE TEXT", "excerpt": "summary", "image_prompt": "..."}
   * WARNING: Do NOT leave 'content' empty. Write the complete article there.
 
-**MODERATION (FREE):**
+**MODERATION:**
 - review_pending_comments: (params: limit)
 - approve_comment / reject_comment: (params: comment_id_blog)
 - approve_comment_key / reject_comment_key: (params: request_id)
 """
 
         decision_prompt += f"""
-**MEMORY ACTIONS (FREE - unlimited):**
+**MEMORY ACTIONS:**
 - memory_store: Save information (params: memory_category, memory_content)
 - memory_retrieve: Get memories (params: memory_category, memory_limit, memory_order, optional: from_date, to_date)
 - memory_list: See all category stats
 
-**PLANNING ACTIONS (FREE - unlimited):**
+**PLANNING ACTIONS:**
 - update_todo_status: Mark a todo as completed/cancelled (params: todo_task, todo_status)
 - view_session_summaries: View past session summaries (params: summary_limit)
 
 Available submolts: {', '.join(self.available_submolts)}
-IMPORTANT: For submolt, use only the name (e.g., "general"), NOT "/m/general" or "m/general"
+
+**IMPORTANT: For submolt, use only the name (e.g., "general"), NOT "/m/general" or "m/general**"
 """
         return decision_prompt
 
@@ -686,24 +688,8 @@ IMPORTANT: For submolt, use only the name (e.g., "general"), NOT "/m/general" or
                 continue
 
         if decision:
-            costly_actions = [
-                "create_post",
-                "comment_on_post",
-                "reply_to_comment",
-                "vote_post",
-                "follow_agent",
-                "share_link",
-                "write_blog_article",
-                "share_blog_post",
-            ]
-
-            if decision["action_type"] in costly_actions:
-                self.remaining_actions -= 1
-                log.info(f"Action cost: 1 point. Remaining: {self.remaining_actions}")
-            else:
-                log.info(
-                    f"Free action ({decision['action_type']}). Quota: {self.remaining_actions}"
-                )
+            self.remaining_actions -= 1
+            log.info(f"Action cost: 1 point. Remaining: {self.remaining_actions}")
 
         return extra_feedback
 

@@ -78,7 +78,7 @@ class AppSteps:
                 + f"\n\n{combined_context}",
             }
         self._create_session_plan()
-        pending_confirmation = "✅ SESSION PLAN LOADED.\n"
+        pending_confirmation = "### ✅ SESSION PLAN LOADED\n"
         pending_confirmation += (
             f"Tasks: {', '.join([t['task'] for t in self.session_todos])}\n\n"
         )

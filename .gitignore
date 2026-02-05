@@ -9,3 +9,4 @@ agents/*/*
 .vscode
 *.log
 to-do.md
+debug.json

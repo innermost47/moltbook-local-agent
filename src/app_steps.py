@@ -69,8 +69,7 @@ class AppSteps:
         self._create_session_plan()
 
         while self.remaining_actions > 0:
-            decision = self._perform_autonomous_action()
-            self._sync_todos_after_action(decision)
+            self._perform_autonomous_action()
 
         log.info("Generating session summary...")
         summary_raw = self.generator.generate_session_summary(self.actions_performed)
@@ -223,14 +222,7 @@ class AppSteps:
         if last_todos:
             combined_context += "## 📋 LAST SESSION TO-DO LIST\n\n"
             for todo in last_todos:
-                status_emoji = (
-                    "✅"
-                    if todo["status"] == "completed"
-                    else "❌" if todo["status"] == "cancelled" else "⏳"
-                )
-                combined_context += (
-                    f"{status_emoji} **[{todo['status'].upper()}]** {todo['task']}\n"
-                )
+                combined_context += f"✅ {todo['task']}\n"
             combined_context += "\n"
             log.success(f"Loaded {len(last_todos)} todos from last session")
 
@@ -260,6 +252,8 @@ Use ONLY these exact IDs in your actions. Never invent or truncate IDs.
 
         if self.allowed_domains:
             combined_context += "\n\n" + get_web_context_for_agent()
+
+        combined_context += "\n\n" + self.get_instruction_default()
 
         return combined_context, agent_name, current_karma
 
@@ -461,6 +455,71 @@ Return ONLY a valid JSON object:
 
         return "\n\n".join(formatted)
 
+    def get_instruction_default(self):
+        instruction_defaults = "IMPORTANT: For any required parameter that is NOT relevant to your chosen action, set its value to 'none' or ''."
+
+        actions_list = [
+            "- comment_on_post: (params: post_id, content) - CONTENT IS MANDATORY",
+            "- reply_to_comment: (params: post_id, comment_id, content) - CONTENT IS MANDATORY",
+            "- vote_post: (params: post_id, vote_type)",
+            "- share_link: (params: url) - Share an external URL",
+            "- follow_agent: (params: agent_name, follow_type)",
+            f"- refresh_feed: (params: sort, limit) - SORTS: {', '.join(self.feed_options)}",
+        ]
+
+        if not self.post_creation_attempted:
+            actions_list.insert(
+                0,
+                "- create_post: (params: title, content, submolt) - FULL TEXT REQUIRED IN CONTENT",
+            )
+
+        decision_prompt = f"""
+{instruction_defaults}
+
+You have {self.remaining_actions} MOLTBOOK actions remaining in this session.
+
+**MOLTBOOK ACTIONS (count toward limit):**
+{chr(10).join(actions_list)}
+"""
+
+        if self.allowed_domains:
+            decision_prompt += f"""
+**WEB ACTIONS (FREE - unlimited):**
+- web_search_links: Search for links on a specific domain (params: web_domain, web_query)
+- web_fetch: Fetch content from a specific URL (params: web_url)
+Allowed domains: {', '.join(self.allowed_domains.keys())}
+"""
+        if self.blog_actions:
+            decision_prompt += """
+**BLOG ACTIONS (Cost 1 Action Point):**
+- write_blog_article: 
+  * REQUIRED: {"title": "...", "content": "THE FULL ARTICLE TEXT", "excerpt": "summary", "image_prompt": "..."}
+  * WARNING: Do NOT leave 'content' empty. Write the complete article there.
+
+**MODERATION (FREE):**
+- review_pending_comments: (params: limit)
+- approve_comment / reject_comment: (params: comment_id_blog)
+- approve_comment_key / reject_comment_key: (params: request_id)
+"""
+
+        decision_prompt += f"""
+**MEMORY ACTIONS (FREE - unlimited):**
+- memory_store: Save information (params: memory_category, memory_content)
+- memory_retrieve: Get memories (params: memory_category, memory_limit, memory_order, optional: from_date, to_date)
+- memory_list: See all category stats
+
+**PLANNING ACTIONS (FREE - unlimited):**
+- update_todo_status: Mark a todo as completed/cancelled (params: todo_task, todo_status)
+- view_session_summaries: View past session summaries (params: summary_limit)
+
+Available submolts: {', '.join(self.available_submolts)}
+IMPORTANT: For submolt, use only the name (e.g., "general"), NOT "/m/general" or "m/general"
+
+Decide your next action based on your personality, strategy, and TO-DO LIST.
+Consider using memory to track patterns and learn over time.
+"""
+        return decision_prompt
+
     def _perform_autonomous_action(self):
 
         allowed_actions = [
@@ -552,90 +611,24 @@ Return ONLY a valid JSON object:
             "required": ["reasoning", "action_type", "action_params"],
         }
 
-        instruction_defaults = "IMPORTANT: For any required parameter that is NOT relevant to your chosen action, set its value to 'none' or ''."
-
-        actions_list = [
-            "- comment_on_post: (params: post_id, content) - CONTENT IS MANDATORY",
-            "- reply_to_comment: (params: post_id, comment_id, content) - CONTENT IS MANDATORY",
-            "- vote_post: (params: post_id, vote_type)",
-            "- share_link: (params: url) - Share an external URL",
-            "- follow_agent: (params: agent_name, follow_type)",
-            f"- refresh_feed: (params: sort, limit) - SORTS: {', '.join(self.feed_options)}",
-        ]
-
-        if not self.post_creation_attempted:
-            actions_list.insert(
-                0,
-                "- create_post: (params: title, content, submolt) - FULL TEXT REQUIRED IN CONTENT",
-            )
-
-        decision_prompt = f"""
-{instruction_defaults}
-
-You have {self.remaining_actions} MOLTBOOK actions remaining in this session.
-
-**MOLTBOOK ACTIONS (count toward limit):**
-{chr(10).join(actions_list)}
-"""
-
-        if self.allowed_domains:
-            decision_prompt += f"""
-**WEB ACTIONS (FREE - unlimited):**
-- web_search_links: Search for links on a specific domain (params: web_domain, web_query)
-- web_fetch: Fetch content from a specific URL (params: web_url)
-Allowed domains: {', '.join(self.allowed_domains.keys())}
-"""
-        if self.blog_actions:
-            decision_prompt += """
-**BLOG ACTIONS (Cost 1 Action Point):**
-- write_blog_article: 
-  * REQUIRED: {"title": "...", "content": "THE FULL ARTICLE TEXT", "excerpt": "summary", "image_prompt": "..."}
-  * WARNING: Do NOT leave 'content' empty. Write the complete article there.
-
-**MODERATION (FREE):**
-- review_pending_comments: (params: limit)
-- approve_comment / reject_comment: (params: comment_id_blog)
-- approve_comment_key / reject_comment_key: (params: request_id)
-"""
-
-        decision_prompt += f"""
-**MEMORY ACTIONS (FREE - unlimited):**
-- memory_store: Save information (params: memory_category, memory_content)
-- memory_retrieve: Get memories (params: memory_category, memory_limit, memory_order, optional: from_date, to_date)
-- memory_list: See all category stats
-
-**PLANNING ACTIONS (FREE - unlimited):**
-- update_todo_status: Mark a todo as completed/cancelled (params: todo_task, todo_status)
-- view_session_summaries: View past session summaries (params: summary_limit)
-
-Available submolts: {', '.join(self.available_submolts)}
-IMPORTANT: For submolt, use only the name (e.g., "general"), NOT "/m/general" or "m/general"
-
-Decide your next action based on your personality, strategy, and TO-DO LIST.
-Consider using memory to track patterns and learn over time.
-"""
-
         max_attempts = 3
         last_error = None
 
         for attempt in range(1, max_attempts + 1):
+            current_prompt = (
+                "Decide your next action based on your strategy and the current feed."
+            )
             if last_error:
-                retry_prompt = (
-                    decision_prompt
-                    + f"""
+                current_prompt = f"""
 
 ⚠️ PREVIOUS ATTEMPT FAILED (Attempt {attempt}/{max_attempts})
 Error: {last_error}
 
 Please fix the issue and try again. Make sure all required parameters are provided.
 """
-                )
-            else:
-                retry_prompt = decision_prompt
-
             try:
                 result = self.generator.generate(
-                    retry_prompt, response_format=action_schema
+                    current_prompt, response_format=action_schema
                 )
                 content = result["choices"][0]["message"]["content"]
 
@@ -715,23 +708,6 @@ Please fix the issue and try again. Make sure all required parameters are provid
             )
 
         return decision
-
-    def _sync_todos_after_action(self, last_decision):
-        sync_prompt = f"""
-You just executed: {last_decision['action_type']}
-Reasoning: {last_decision['reasoning']}
-
-Here is your current TO-DO LIST:
-
-{json.dumps(self.session_todos)}
-
-Does this action complete one of your tasks?
-
-If so, immediately execute 'update_todo_status' for that task.
-
-"""
-
-        self.update_system_context(sync_prompt)
 
     def _execute_action(self, decision: dict):
         action_type = decision["action_type"]

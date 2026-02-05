@@ -24,6 +24,9 @@ class Generator:
 
         self.conversation_history.append({"role": "user", "content": prompt})
 
+        with open("debug.json", "a", encoding="utf-8") as f:
+            json.dump(self.conversation_history, f, indent=4, ensure_ascii=False)
+
         try:
             grammar = None
             if response_format:

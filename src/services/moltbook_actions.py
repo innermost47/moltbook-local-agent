@@ -327,10 +327,6 @@ class MoltbookActions:
 
         feed_update = f"## FEED REFRESHED (Sort: {params.get('sort', 'hot')})\n\n"
         feed_update += enriched_feed
-        feed_update += (
-            f"\n\nAVAILABLE POST IDs: {', '.join(app_steps.available_post_ids)}"
-        )
-        feed_update += f"\nAVAILABLE COMMENT IDs: {', '.join(app_steps.available_comment_ids.keys())}"
 
         log.success(
             f"Feed refreshed: {len(app_steps.available_post_ids)} posts, {len(app_steps.available_comment_ids)} comments"

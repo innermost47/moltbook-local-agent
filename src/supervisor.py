@@ -2,12 +2,15 @@ import json
 from llama_cpp import Llama, LlamaGrammar
 from src.schemas import supervisor_schema
 from src.settings import settings
+from src.utils import log
 
 
 class Supervisor:
     def __init__(self, llm_instance: Llama):
         self.llm = llm_instance
         self.schema = supervisor_schema
+        self.conversation_history = []
+        log.success("Supervisor initialized with dedicated history")
 
     def audit(
         self,
@@ -17,25 +20,30 @@ class Supervisor:
         attempts_left: int,
         last_error: str = None,
     ):
+        base_system = f"""{settings.SUPERVISOR_SYSTEM_PROMPT}
+
+## 🎯 MASTER PLAN (SUPREME OBJECTIVES)
+{json.dumps(master_plan, indent=2)}
+"""
+        if attempts_left == 1:
+            base_system += "\n⚠️ CRITICAL: This is the final attempt. Prioritize technical validity and move progress over perfect strategy."
+
+        if not self.conversation_history:
+            self.conversation_history.append({"role": "system", "content": base_system})
+
         urgency_note = (
-            "🔴 FINAL ATTEMPT: Be constructive and prioritize technical validity."
+            "🔴 FINAL ATTEMPT: Be constructive."
             if attempts_left == 1
             else "🟢 Standard Audit: Be rigorous."
         )
 
         previous_rejection_context = ""
         if last_error and attempts_left < 3:
-            previous_rejection_context = f"""
-**⚠️ PREVIOUS REJECTION FEEDBACK:**
-{last_error}
-*(Note: If the agent has addressed this feedback or changed strategy to comply, you SHOULD validate it.)*
-"""
+            previous_rejection_context = (
+                f"\n**⚠️ PREVIOUS REJECTION FEEDBACK:**\n{last_error}\n"
+            )
 
-        prompt = f"""### 📥 INPUT DATA
-**Current Master Plan:**
-{json.dumps(master_plan, indent=2)}
-
-**Session Status:**
+        user_prompt = f"""**Session Status:**
 - Attempts remaining for this action: {attempts_left}
 - Urgency Level: {urgency_note}
 {previous_rejection_context}
@@ -50,21 +58,27 @@ class Supervisor:
 Perform a Neural Audit. If the agent changed strategy based on previous feedback, acknowledge the pivot. 
 Determine if this action should be executed or rejected."""
 
-        system_content = settings.SUPERVISOR_SYSTEM_PROMPT
-        if attempts_left == 1:
-            system_content += "\nCRITICAL: Validate if the action is logically sound and technically valid, even if not perfect."
+        self.conversation_history.append({"role": "user", "content": user_prompt})
 
-        messages = [
-            {"role": "system", "content": system_content},
-            {"role": "user", "content": prompt},
-        ]
+        try:
+            grammar = LlamaGrammar.from_json_schema(json.dumps(self.schema))
+            result = self.llm.create_chat_completion(
+                messages=self.conversation_history,
+                grammar=grammar,
+                temperature=0.2,
+            )
 
-        grammar = LlamaGrammar.from_json_schema(json.dumps(self.schema))
+            response_content = result["choices"][0]["message"]["content"]
+            self.conversation_history.append(
+                {"role": "assistant", "content": response_content}
+            )
 
-        result = self.llm.create_chat_completion(
-            messages=messages,
-            grammar=grammar,
-            temperature=0.2,
-        )
+            return json.loads(response_content)
 
-        return json.loads(result["choices"][0]["message"]["content"])
+        except Exception as e:
+            log.error(f"Supervisor Audit Error: {e}")
+            return {
+                "reasoning": "Technical failure during audit.",
+                "message_for_agent": "Proceed with caution.",
+                "validate": True,
+            }

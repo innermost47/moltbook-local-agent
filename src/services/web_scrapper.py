@@ -170,17 +170,21 @@ Provide a concise summary (max 300 words) highlighting the most relevant informa
     def web_fetch(
         self, params: dict, generator: Generator, store_memory, actions_performed: List
     ):
-        url = params.get("web_url")
+        url = params.get("web_url", "").strip()
         query = params.get("web_query", "")
+
+        if not url:
+            url = params.get("web_domain", "").strip()
 
         if not url:
             return {
                 "success": False,
-                "error": "❌ Missing 'web_url'. Supply a valid URL from the allowed domains.",
+                "error": "❌ Missing 'web_url'. Please provide a full URL.",
             }
 
-        if not url.startswith(("http://", "https://")):
-            url = f"https://{url}"
+        url_clean = url.lower()
+        if not url_clean.startswith(("http://", "https://")):
+            url = f"https://{url.lstrip(':/ ')}"
 
         parsed_url = urlparse(url)
         domain = parsed_url.netloc.lower().replace("www.", "")
@@ -227,10 +231,18 @@ Provide a concise summary (max 300 words) highlighting the most relevant informa
         }
 
     def web_search_links(self, params: dict, actions_performed: List):
-        domain = params.get("web_domain", "").lower().replace("www.", "")
+        raw_input = params.get("web_domain", "").strip()
+        if not raw_input:
+            raw_input = params.get("web_url", "").strip()
         query = params.get("web_query", "")
 
-        if domain not in self.allowed_domains:
+        raw_input_low = raw_input.lower()
+        if raw_input_low.startswith(("http://", "https://")):
+            domain = urlparse(raw_input_low).netloc.lower().replace("www.", "")
+        else:
+            domain = raw_input_low.lstrip(":/ ").replace("www.", "")
+
+        if not domain or domain not in self.allowed_domains:
             allowed_list = ", ".join(self.allowed_domains.keys())
             return {
                 "success": False,

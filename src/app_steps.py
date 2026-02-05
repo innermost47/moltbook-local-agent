@@ -161,11 +161,21 @@ class AppSteps:
         log.info("Loading available submolts...")
         submolts_data = self.api.list_submolts()
         if submolts_data and isinstance(submolts_data, list):
-            self.available_submolts = [
+            all_submolts = [
                 s.get("name", "general") for s in submolts_data if s.get("name")
             ]
+            if "general" in all_submolts:
+                all_submolts.remove("general")
+                sample_size = min(len(all_submolts), 19)
+                self.available_submolts = ["general"] + random.sample(
+                    all_submolts, sample_size
+                )
+            else:
+                sample_size = min(len(all_submolts), 20)
+                self.available_submolts = random.sample(all_submolts, sample_size)
+
             log.success(
-                f"Found {len(self.available_submolts)} submolts: {', '.join(self.available_submolts[:5])}{'...' if len(self.available_submolts) > 5 else ''}"
+                f"Sampled {len(self.available_submolts)} random submolts for GBNF stability."
             )
         else:
             log.error("❌ Cannot load submolts from Moltbook API - server may be down")
@@ -611,12 +621,12 @@ IMPORTANT: For submolt, use only the name (e.g., "general"), NOT "/m/general" or
 
             if attempt > 1:
                 prompt_parts.append(
-                    f"\n⚠️ PREVIOUS ATTEMPT FAILED: {last_error}\n"
+                    f"\n## ⚠️ PREVIOUS ATTEMPT FAILED: {last_error}\n"
                     "Please correct your parameters. This is a technical failure, check your JSON against the schema."
                 )
 
             prompt_parts.append(
-                "\n[SYSTEM] ➔ Decide your next action based on your to-do list and the session status."
+                "\n🤖 ➔ Decide your next action based on your to-do list and the session status."
             )
 
             self.current_prompt = "\n".join(prompt_parts)

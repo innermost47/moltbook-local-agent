@@ -81,8 +81,12 @@ class AppSteps:
             f"Tasks: {', '.join([t['task'] for t in self.session_todos])}\n\n"
         )
         while self.remaining_actions > 0:
-            self._perform_autonomous_action(extra_feedback=pending_confirmation)
-            pending_confirmation = None
+            pending_confirmation = self._perform_autonomous_action(
+                extra_feedback=pending_confirmation
+            )
+            if pending_confirmation and "TERMINATE_SESSION" in pending_confirmation:
+                log.info("Agent decided to terminate session early.")
+                break
 
         log.info("Generating session summary...")
 
@@ -479,18 +483,16 @@ Should you update your master plan? Consider:
             "- share_link: (params: url) - Share an external URL",
             "- follow_agent: (params: agent_name, follow_type)",
             f"- refresh_feed: (params: sort, limit) - SORTS: {', '.join(self.feed_options)}",
+            "- create_post: (params: title, content, submolt) - FULL TEXT REQUIRED IN CONTENT",
         ]
-
-        if not self.post_creation_attempted:
-            actions_list.insert(
-                0,
-                "- create_post: (params: title, content, submolt) - FULL TEXT REQUIRED IN CONTENT",
-            )
 
         decision_prompt = f"""
 {instruction_defaults}
 
-You have {self.remaining_actions} MOLTBOOK actions remaining in this session.
+### 🛑 SESSION CONSTRAINTS
+- **Moltbook Posts**: Only 1 `create_post` allowed per session.
+- **Blog Articles**: Only 1 `write_blog_article` allowed per session.
+- **Dynamic Status**: Check the status block in each of your turns to see if these are still available.
 
 **MOLTBOOK ACTIONS (count toward limit):**
 {chr(10).join(actions_list)}
@@ -528,8 +530,6 @@ Allowed domains: {', '.join(self.allowed_domains.keys())}
 
 Available submolts: {', '.join(self.available_submolts)}
 IMPORTANT: For submolt, use only the name (e.g., "general"), NOT "/m/general" or "m/general"
-
-Consider using memory to track patterns and learn over time.
 """
         return decision_prompt
 
@@ -551,16 +551,12 @@ Consider using memory to track patterns and learn over time.
 
         if not self.post_creation_attempted:
             allowed_actions.append("create_post")
+
         if self.allowed_domains:
-            allowed_actions.extend(
-                [
-                    "web_fetch",
-                    "web_search_links",
-                ]
-            )
+            allowed_actions.extend(["web_fetch", "web_search_links"])
+
         if self.blog_actions:
-            blog_actions_list = [
-                "write_blog_article",
+            blog_list = [
                 "share_blog_post",
                 "review_comment_key_requests",
                 "approve_comment_key",
@@ -569,35 +565,48 @@ Consider using memory to track patterns and learn over time.
                 "approve_comment",
                 "reject_comment",
             ]
-
             if not self.blog_article_attempted:
-                blog_actions_list.insert(0, "write_blog_article")
-            allowed_actions.extend(blog_actions_list)
+                blog_list.append("write_blog_article")
+            allowed_actions.extend(blog_list)
 
         action_schema = get_actions_schema(allowed_actions, self.feed_options)
 
         max_attempts = 3
         last_error = None
+        decision = None
+
+        status_nudge = f"""
+### 📊 SESSION STATUS
+- Remaining action points: {self.remaining_actions}
+- Moltbook post: {'✅ AVAILABLE' if not self.post_creation_attempted else '❌ ALREADY PUBLISHED'}
+- Blog article: {'✅ AVAILABLE' if not self.blog_article_attempted else '❌ ALREADY PUBLISHED'}
+"""
 
         for attempt in range(1, max_attempts + 1):
+            prompt_parts = []
+
             if extra_feedback:
-                feedback_text = ""
-                feedback_text += f"{extra_feedback}\n\n"
-                status_text = f"Remaining actions: {self.remaining_actions}\n"
-                status_text += "Current focus: Execute your session to-do list.\n"
-                self.current_prompt = (
-                    f"{feedback_text}{status_text}Decide your next action."
+                prompt_parts.append(f"{extra_feedback}")
+
+            prompt_parts.append(status_nudge)
+
+            if attempt > 1:
+                prompt_parts.append(
+                    f"⚠️ PREVIOUS ATTEMPT FAILED: {last_error}\nPlease correct your parameters and follow the status constraints."
                 )
+
+            prompt_parts.append(
+                "Decide your next action based on your to-do list and the session status."
+            )
+
+            self.current_prompt = "\n".join(prompt_parts)
 
             try:
                 result = self.generator.generate(
                     self.current_prompt, response_format=action_schema
                 )
                 content = result["choices"][0]["message"]["content"]
-
-                content = re.sub(r"```json\s*", "", content)
-                content = re.sub(r"```\s*", "", content)
-                content = content.strip()
+                content = re.sub(r"```json\s*|```\s*", "", content).strip()
 
                 decision = json.loads(content)
 
@@ -613,77 +622,54 @@ Consider using memory to track patterns and learn over time.
                     last_error = execution_result["error"]
                     log.warning(f"❌ Attempt {attempt} failed: {last_error[:150]}")
 
-                    if attempt < max_attempts:
-                        log.info(f"🔄 Retrying... ({attempt + 1}/{max_attempts})")
-                        self.current_prompt = f"""⚠️ ACTION FAILED
-Error: {last_error}
-
-Please refer to your system prompt for the correct schema. Correct your mistake and try again."""
-                        continue
-                    else:
+                    if attempt == max_attempts:
                         log.error(f"❌ All {max_attempts} attempts failed")
                         self.actions_performed.append(
-                            f"FAILED after {max_attempts} attempts: {decision['action_type']} - {last_error[:150]}"
+                            f"FAILED: {decision['action_type']} - {last_error[:150]}"
                         )
-                        break
-                else:
-                    success_data = execution_result.get(
-                        "data", "Action completed successfully."
-                    )
+                    continue
 
-                    self.current_prompt = f"""✅ LAST ACTION SUCCESSFUL: {decision['action_type']}
-RESULT: {success_data}
+                success_data = execution_result.get(
+                    "data", "Action completed successfully."
+                )
+                extra_feedback = f"✅ LAST ACTION SUCCESSFUL: {decision['action_type']}\nRESULT: {success_data}"
 
-Based on this result, decide your next action."""
-
-                    if attempt > 1:
-                        log.success(f"✅ Succeeded on attempt {attempt}")
-                    break
+                if attempt > 1:
+                    log.success(f"✅ Succeeded on attempt {attempt}")
+                break
 
             except (json.JSONDecodeError, KeyError) as e:
-                last_error = f"JSON parsing failed: {str(e)}"
+                last_error = f"JSON format error: {str(e)}"
                 log.error(last_error)
-
-                if attempt < max_attempts:
-                    log.info(f"🔄 Retrying... ({attempt + 1}/{max_attempts})")
-                    continue
-                else:
-                    log.warning("Falling back to default action: upvote_post")
+                if attempt == max_attempts:
                     decision = {
-                        "reasoning": "Failed to parse decision after 3 attempts, upvoting first post",
-                        "action_type": "vote_post",
-                        "action_params": {
-                            "post_id": (
-                                self.available_post_ids[0]
-                                if self.available_post_ids
-                                else "none"
-                            ),
-                            "vote_type": "upvote",
-                        },
+                        "action_type": "refresh_feed",
+                        "action_params": {"sort": "new", "limit": 5},
                     }
                     self._execute_action(decision)
-                    break
+                continue
 
-        costly_actions = [
-            "create_post",
-            "comment_on_post",
-            "reply_to_comment",
-            "vote_post",
-            "follow_agent",
-            "share_link",
-            "write_blog_article",
-            "share_blog_post",
-        ]
+        if decision:
+            costly_actions = [
+                "create_post",
+                "comment_on_post",
+                "reply_to_comment",
+                "vote_post",
+                "follow_agent",
+                "share_link",
+                "write_blog_article",
+                "share_blog_post",
+            ]
 
-        if decision["action_type"] in costly_actions:
-            self.remaining_actions -= 1
-            log.info(f"Action completed. Remaining: {self.remaining_actions}")
-        else:
-            log.info(
-                f"Free action ({decision['action_type']}). Quota preserved: {self.remaining_actions}"
-            )
+            if decision["action_type"] in costly_actions:
+                self.remaining_actions -= 1
+                log.info(f"Action cost: 1 point. Remaining: {self.remaining_actions}")
+            else:
+                log.info(
+                    f"Free action ({decision['action_type']}). Quota: {self.remaining_actions}"
+                )
 
-        return decision
+        return extra_feedback
 
     def _execute_action(self, decision: dict):
         action_type = decision["action_type"]

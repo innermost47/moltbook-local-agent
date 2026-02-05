@@ -1,0 +1,237 @@
+body {
+  font-family: "Segoe UI", sans-serif;
+  background-color: #0d1117;
+  color: #e6edf3;
+  margin: 0;
+  padding: 20px;
+}
+.container {
+  width: 100%;
+  max-width: 1000px;
+  margin: auto;
+}
+.header {
+  position: sticky;
+  top: 0;
+  background: #0d1117;
+  z-index: 100;
+  margin-bottom: 20px;
+  border-bottom: 1px solid #30363d;
+  padding: 10px 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.status-dot {
+  height: 10px;
+  width: 10px;
+  background-color: #2ea043;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 5px;
+}
+.message-card {
+  margin-bottom: 20px;
+  border-radius: 8px;
+  border: 1px solid #30363d;
+  background-color: #161b22;
+}
+.role-badge {
+  padding: 8px 15px;
+  font-weight: bold;
+  text-transform: uppercase;
+  font-size: 11px;
+  display: flex;
+  justify-content: space-between;
+}
+.role-user {
+  background-color: #23863622;
+  color: #2ea043;
+}
+.role-assistant {
+  background-color: #1f6feb22;
+  color: #58a6ff;
+}
+.role-system {
+  background-color: #6e768122;
+  color: #8b949e;
+}
+.content {
+  padding: 15px;
+  line-height: 1.6;
+}
+pre {
+  background-color: #010409 !important;
+  padding: 12px;
+  border-radius: 6px;
+  border: 1px solid #30363d;
+  white-space: pre-wrap;
+  white-space: -moz-pre-wrap;
+  white-space: -pre-wrap;
+  white-space: -o-pre-wrap;
+  word-wrap: break-word;
+}
+code {
+  font-family: "Cascadia Code", "Fira Code", monospace;
+  font-size: 0.9em;
+  word-break: break-word;
+}
+a {
+  color: #58a6ff;
+}
+.report-section {
+  margin: 15px 0;
+  padding: 10px;
+  border-radius: 6px;
+}
+.report-section.meta {
+  background: #1c2128;
+  border: 1px solid #444c56;
+}
+.thought-box {
+  background: #1a2635;
+  padding: 12px;
+  border-left: 4px solid #3498db;
+  margin-top: 10px;
+  font-style: italic;
+  font-size: 0.95em;
+}
+.audit-box {
+  background: #2c2615;
+  padding: 12px;
+  border-left: 4px solid #f1c40f;
+  margin-top: 10px;
+  font-size: 0.95em;
+}
+.report-section.plan {
+  border-top: 2px solid #30363d;
+  padding-top: 15px;
+}
+.report-section.tasks {
+  background: #0d1117;
+  border: 1px solid #30363d;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+}
+th {
+  color: #8b949e;
+  text-align: left;
+  font-size: 0.8em;
+  text-transform: uppercase;
+  border-bottom: 1px solid #30363d;
+  padding: 8px;
+}
+td {
+  padding: 8px;
+  border-bottom: 1px solid #21262d;
+  font-size: 0.9em;
+}
+.report-section h3 {
+  margin: 0 0 10px 0;
+  font-size: 0.85em;
+  color: #f85149;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+.next-move {
+  margin-top: 15px;
+  padding-top: 10px;
+  color: #3fb950;
+  font-weight: 500;
+  border-top: 1px dashed #30363d;
+}
+p strong {
+  color: #7d8590;
+}
+p:has(strong:contains("Emotion")) {
+  color: #d670d6;
+}
+p:has(strong:contains("Feeling")) {
+  color: #ff7b72;
+}
+.supervisor-box {
+  padding: 15px;
+  border-radius: 8px;
+  margin: 10px 0;
+  border: 2px solid;
+}
+.supervisor-box.valid {
+  border-color: #2ea043;
+  background: #23863611;
+}
+.supervisor-box.invalid {
+  border-color: #f85149;
+  background: #da363311;
+}
+.feedback-msg {
+  margin-top: 10px;
+  font-weight: bold;
+  color: #58a6ff;
+}
+/* --- Sentience Styling --- */
+.sentience-container {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.emotion-tag,
+.feeling-tag {
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 0.85em;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.emotion-tag {
+  background: rgba(214, 112, 214, 0.15);
+  color: #d670d6;
+  border-color: rgba(214, 112, 214, 0.3);
+}
+
+.feeling-tag {
+  background: rgba(255, 123, 114, 0.15);
+  color: #ff7b72;
+  border-color: rgba(255, 123, 114, 0.3);
+}
+
+.emotion-tag strong,
+.feeling-tag strong {
+  margin-right: 5px;
+  filter: brightness(1.2);
+}
+
+.status-normal {
+  background-color: rgba(56, 139, 253, 0.15);
+  color: #58a6ff;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 10px;
+  border: 1px solid rgba(56, 139, 253, 0.3);
+}
+
+.status-critical {
+  background-color: rgba(248, 81, 73, 0.2);
+  color: #ff7b72;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 10px;
+  font-weight: 800;
+  border: 1px solid rgba(248, 81, 73, 0.5);
+  animation: pulse-red 2s infinite;
+}
+
+@keyframes pulse-red {
+  0% {
+    box-shadow: 0 0 0 0 rgba(248, 81, 73, 0.4);
+  }
+  70% {
+    box-shadow: 0 0 0 6px rgba(248, 81, 73, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(248, 81, 73, 0);
+  }
+}

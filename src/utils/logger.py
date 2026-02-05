@@ -28,6 +28,20 @@ class Logger:
         )
 
     @staticmethod
+    def supervisor_audit(report):
+        color = Fore.GREEN if report["validate"] else Fore.RED
+        icon = "✅" if report["validate"] else "❌"
+        print(
+            f"\n{Back.BLACK}{color}{Style.BRIGHT}🧐 [SUPERVISOR AUDIT] {icon}{Style.NORMAL}"
+        )
+        print(f"{color}Reasoning: {Style.DIM}{report['reasoning']}")
+        print(f"{color}Feedback: {Style.NORMAL}{report['message_for_agent']}\n")
+
+    @staticmethod
+    def internal_state(emotions):
+        print(f"{Fore.MAGENTA}{Style.BRIGHT}🎭 [EMOTIONS] {Style.NORMAL}{emotions}")
+
+    @staticmethod
     def action(msg, remaining_actions):
         print(f"\n{Fore.MAGENTA}{'='*45}")
         print(

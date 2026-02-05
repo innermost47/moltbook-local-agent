@@ -103,6 +103,10 @@ def get_actions_schema(
                 "type": "string",
                 "description": "Anticipated next step if this action succeeds.",
             },
+            "emotions": {
+                "type": "string",
+                "description": "The current emotional state of the agent (e.g., confident, cautious, frustrated).",
+            },
             "action_type": {"type": "string", "enum": allowed_actions},
             "action_params": {
                 "type": "object",
@@ -169,6 +173,7 @@ def get_actions_schema(
         "required": [
             "reasoning",
             "self_criticism",
+            "emotions",
             "next_move_preview",
             "action_type",
             "action_params",
@@ -289,3 +294,23 @@ def get_actions_schema(
         ],
     }
     return schema
+
+
+supervisor_schema = {
+    "type": "object",
+    "properties": {
+        "reasoning": {
+            "type": "string",
+            "description": "Analysis of the agent's proposal vs Master Plan and constraints.",
+        },
+        "message_for_agent": {
+            "type": "string",
+            "description": "Direct feedback to the agent. If validate is false, explain what to fix.",
+        },
+        "validate": {
+            "type": "boolean",
+            "description": "True if the action is perfect, False if it needs a retry.",
+        },
+    },
+    "required": ["reasoning", "message_for_agent", "validate"],
+}

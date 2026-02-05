@@ -16,6 +16,7 @@ from src.memory import Memory
 from src.utils import log
 from src.settings import settings
 from src.services.planning_system import PlanningSystem
+from src.supervisor import Supervisor
 from src.schemas import (
     master_plan_schema,
     session_plan_schema,
@@ -32,6 +33,7 @@ class AppSteps:
         self.memory = Memory()
         self.reporter = EmailReporter()
         self.memory_system = MemorySystem()
+        self.supervisor = Supervisor(self.generator.llm)
         self.planning_system = PlanningSystem(db_path=settings.DB_PATH)
         self.web_scraper = WebScraper()
         self.moltbook_actions = MoltbookActions(db_path=settings.DB_PATH)
@@ -648,36 +650,27 @@ Allowed domains: {', '.join(self.allowed_domains.keys())}
 - Remaining action points: {self.remaining_actions}
 - Moltbook post: {'✅ AVAILABLE' if not self.post_creation_attempted else '❌ ALREADY PUBLISHED'}
 - Blog article: {'✅ AVAILABLE' if not self.blog_article_attempted else '❌ ALREADY PUBLISHED'}
-
-### 🛠️ OPERATIONAL GUIDELINES
-- **WEB SCRAPING FOR LINKS**: Use `web_scrap_for_links` to GATHER URLs (requires `web_domain` + `web_query`).
-- **WEB FETCH**: Use `web_fetch` ONLY if you already have a specific URL (requires `web_url`).
-
 """
 
         for attempt in range(1, max_attempts + 1):
             prompt_parts = []
-
             if attempt == 1 and extra_feedback:
                 prompt_parts.append(f"{extra_feedback}")
 
             prompt_parts.append(status_nudge)
-
             attempts_left = (max_attempts - attempt) + 1
-            prompt_parts.append(
-                f"### 🛡️ ATTEMPT CONTROL\n- Current attempt: {attempt}/{max_attempts}\n- Remaining attempts for this action: {attempts_left}"
-            )
+
+            if attempts_left == 1:
+                prompt_parts.append(
+                    "⚠️ **CRITICAL: FINAL ATTEMPT.** If this fails or is rejected, the session will move on without this action. Be precise and strictly follow the schema."
+                )
+            else:
+                prompt_parts.append(f"🛡️ Attempts remaining: {attempts_left}")
 
             if attempt > 1:
-                prompt_parts.append(
-                    f"\n### ⚠️ PREVIOUS ATTEMPT FAILED: {last_error}\n"
-                    "Please correct your parameters. This is a technical failure, check your JSON against the schema."
-                )
+                prompt_parts.append(f"\n### ⚠️ REJECTION/FAILURE:\n{last_error}\n")
 
-            prompt_parts.append(
-                "\n**🤖 ➔ Decide your next action based on your to-do list and the session status.**"
-            )
-
+            prompt_parts.append("\n**🤖 SUPERVISOR: Decide your next action.**")
             self.current_prompt = "\n".join(prompt_parts)
 
             try:
@@ -686,47 +679,48 @@ Allowed domains: {', '.join(self.allowed_domains.keys())}
                 )
                 content = result["choices"][0]["message"]["content"]
                 content = re.sub(r"```json\s*|```\s*", "", content).strip()
-
                 decision = json.loads(content)
+
+                audit_report = self.supervisor.audit(
+                    agent_context=self.generator.conversation_history,
+                    proposed_action=decision,
+                    master_plan=self.planning_system.get_active_master_plan(),
+                    attempts_left=attempts_left,
+                )
+
+                log.supervisor_audit(audit_report)
+
+                if not audit_report["validate"]:
+                    last_error = f"**🤖 SUPERVISOR REJECTION:** {audit_report['message_for_agent']}"
+                    log.warning(f"❌ Attempt {attempt} rejected by Supervisor.")
+                    if attempt < max_attempts:
+                        continue
+                    else:
+                        break
 
                 log.action(
                     f"{decision['action_type']} (Attempt {attempt})",
                     self.remaining_actions,
                 )
-                log.reasoning(decision.get("reasoning", "N/A"))
-                log.criticism(decision.get("self_criticism", "N/A"))
-                log.next_move(decision.get("next_move_preview", "N/A"))
 
                 execution_result = self._execute_action(decision)
 
                 if execution_result and execution_result.get("error"):
                     last_error = execution_result["error"]
-                    extra_feedback = f"❌ CURRENT ACTION FAILED: {last_error[:150]}"
-                    log.warning(f"❌ Attempt {attempt} failed: {last_error[:150]}")
+                    log.warning(f"❌ Execution failed: {last_error[:150]}")
                     continue
 
                 success_data = execution_result.get(
                     "data", "Action completed successfully."
                 )
-                extra_feedback = f"✅ LAST ACTION SUCCESSFUL: {decision['action_type']}\nRESULT: {success_data}"
 
-                if attempt > 1:
-                    log.success(f"✅ Succeeded on attempt {attempt}")
+                encouragement = audit_report.get("message_for_agent", "Excellent move.")
+                extra_feedback = f"✅ SUCCESS: {decision['action_type']}\n\n**🤖 SUPERVISOR:** {encouragement}\n**🚩RESULT:**\n{success_data}"
                 break
 
             except (json.JSONDecodeError, KeyError) as e:
-                last_error = f"JSON format error: {str(e)}"
-                extra_feedback = f"❌ SYNTAX ERROR: Your JSON is invalid."
+                last_error = f"JSON Syntax Error: {str(e)}"
                 log.error(last_error)
-                if attempt == max_attempts:
-                    extra_feedback = (
-                        f"❌ LAST ACTION FAILED: Critical JSON Protocol Violation."
-                    )
-                    decision = {
-                        "action_type": "refresh_feed",
-                        "action_params": {"sort": "new", "limit": 5},
-                    }
-                    self._execute_action(decision)
                 continue
 
         if decision:

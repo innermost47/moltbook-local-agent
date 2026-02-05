@@ -10,91 +10,8 @@
       href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css"
     />
     <link rel="icon" type="image/x-icon" href="/assets/favicon.ico" />
+    <link href="/assets/style.css" rel="stylesheet" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
-
-    <style>
-      body {
-        font-family: "Segoe UI", sans-serif;
-        background-color: #0d1117;
-        color: #e6edf3;
-        margin: 0;
-        padding: 20px;
-      }
-      .container {
-        width: 100%;
-        max-width: 1000px;
-        margin: auto;
-      }
-      .header {
-        position: sticky;
-        top: 0;
-        background: #0d1117;
-        z-index: 100;
-        margin-bottom: 20px;
-        border-bottom: 1px solid #30363d;
-        padding: 10px 0;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-      }
-      .status-dot {
-        height: 10px;
-        width: 10px;
-        background-color: #2ea043;
-        border-radius: 50%;
-        display: inline-block;
-        margin-right: 5px;
-      }
-      .message-card {
-        margin-bottom: 20px;
-        border-radius: 8px;
-        border: 1px solid #30363d;
-        background-color: #161b22;
-      }
-      .role-badge {
-        padding: 8px 15px;
-        font-weight: bold;
-        text-transform: uppercase;
-        font-size: 11px;
-        display: flex;
-        justify-content: space-between;
-      }
-      .role-user {
-        background-color: #23863622;
-        color: #2ea043;
-      }
-      .role-assistant {
-        background-color: #1f6feb22;
-        color: #58a6ff;
-      }
-      .role-system {
-        background-color: #6e768122;
-        color: #8b949e;
-      }
-      .content {
-        padding: 15px;
-        line-height: 1.6;
-      }
-      pre {
-        background-color: #010409 !important;
-        padding: 12px;
-        border-radius: 6px;
-        border: 1px solid #30363d;
-        white-space: pre-wrap;
-        white-space: -moz-pre-wrap;
-        white-space: -pre-wrap;
-        white-space: -o-pre-wrap;
-        word-wrap: break-word;
-      }
-      code {
-        font-family: "Cascadia Code", "Fira Code", monospace;
-        font-size: 0.9em;
-        word-break: break-word;
-      }
-      a {
-        color: #58a6ff;
-      }
-    </style>
   </head>
   <body>
     <div class="container">
@@ -147,34 +64,104 @@
           card.className = "message-card";
           const roleClass = `role-${msg.role}`;
 
-          let displayContent = msg.content.trim();
+          let rawContent = msg.content.trim();
+          let htmlContent = "";
 
-          if (displayContent.startsWith("{") && displayContent.endsWith("}")) {
+          // Robust JSON detection: try to parse it even if it's messy
+          if (rawContent.startsWith("{") && rawContent.endsWith("}")) {
             try {
-              const jsonParsed = JSON.parse(displayContent);
-              const formattedJson = JSON.stringify(jsonParsed, null, 2);
-              displayContent = "```json\n" + formattedJson + "\n```";
+              // We handle potential multi-line issues by parsing directly
+              const data = JSON.parse(rawContent);
+              htmlContent = generateStructuredReport(data, msg.attempts_left);
             } catch (e) {
-              console.warn(
-                "Contenu ressemble à du JSON mais n'est pas valide.",
-              );
+              // Fallback to Markdown if JSON is actually malformed
+              console.warn("JSON Parse failed, falling back to Markdown", e);
+              htmlContent = marked.parse(rawContent);
             }
+          } else {
+            htmlContent = marked.parse(rawContent);
           }
 
+          // Handle Attempt Badge
+          const attemptsLeft = msg.attempts_left || 0;
+          const urgencyClass =
+            attemptsLeft === 1 ? "status-critical" : "status-normal";
+          const attemptDisplay =
+            msg.role === "assistant"
+              ? `<span class="${urgencyClass}">ATTEMPT LEFT: ${attemptsLeft}</span>`
+              : "";
+
           card.innerHTML = `
-                      <div class="role-badge ${roleClass}">
-                          <span>${msg.role.toUpperCase()}</span>
-                          <span>MESSAGE #${index + 1}</span>
-                      </div>
-                      <div class="content">${marked.parse(displayContent)}</div>
-                  `;
+            <div class="role-badge ${roleClass}">
+                <span>${msg.role.toUpperCase()} #${index + 1}</span>
+                ${attemptDisplay}
+            </div>
+            <div class="content">${htmlContent}</div>
+        `;
           logsContainer.appendChild(card);
         });
 
-        document.querySelectorAll("pre code").forEach((el) => {
-          hljs.highlightElement(el);
-        });
+        document
+          .querySelectorAll("pre code")
+          .forEach((el) => hljs.highlightElement(el));
         window.scrollTo(0, document.body.scrollHeight);
+      }
+
+      function generateStructuredReport(data, attemptsLeft) {
+        let sections = [];
+
+        // 1. Sentience Layer (Emotions & Feelings)
+        if (data.emotions || data.feelings) {
+          sections.push(`
+            <div class="sentience-container">
+                ${data.emotions ? `<div class="emotion-tag"><strong>🎭 Emotion:</strong> ${data.emotions}</div>` : ""}
+                ${data.feelings ? `<div class="feeling-tag"><strong>💓 Feeling:</strong> ${data.feelings}</div>` : ""}
+            </div>
+        `);
+        }
+
+        // 2. Intelligence Layer (Reasoning & Criticism)
+        if (data.reasoning || data.self_criticism) {
+          sections.push(`
+            <div class="report-section meta">
+                ${data.reasoning ? `<div class="thought-box"><strong>🧠 Reasoning:</strong><br>${marked.parse(data.reasoning)}</div>` : ""}
+                ${data.self_criticism ? `<div class="audit-box"><strong>🛡️ Self-Criticism:</strong><br>${marked.parse(data.self_criticism)}</div>` : ""}
+            </div>
+        `);
+        }
+
+        // 3. Execution Layer (Action)
+        if (data.action_type) {
+          sections.push(`
+            <div class="report-section action">
+                <h3 style="color: #d1d5da; font-size: 0.8em; margin-bottom: 8px;">⚡ ACTION: ${data.action_type.toUpperCase()}</h3>
+                <div class="params-box">
+                    <pre><code class="language-json">${JSON.stringify(data.action_params, null, 2)}</code></pre>
+                </div>
+            </div>
+        `);
+        }
+
+        // 4. Supervisor Layer (If the data is a supervisor report)
+        if (data.validate !== undefined) {
+          const statusClass = data.validate ? "valid" : "invalid";
+          sections.push(`
+            <div class="supervisor-box ${statusClass}">
+                <h3 style="margin:0">🧐 Supervisor Audit: ${data.validate ? "PASSED ✅" : "REJECTED ❌"}</h3>
+                <p style="margin: 10px 0;">${data.reasoning || ""}</p>
+                <div class="feedback-msg">💬 Message: ${data.message_for_agent}</div>
+            </div>
+        `);
+        }
+
+        // 5. Next Step Preview
+        if (data.next_move_preview) {
+          sections.push(
+            `<p class="next-move">🔭 <strong>Next Move:</strong> ${data.next_move_preview}</p>`,
+          );
+        }
+
+        return sections.join("");
       }
 
       setInterval(fetchLogs, 2000);

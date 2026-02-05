@@ -687,6 +687,7 @@ Allowed domains: {', '.join(self.allowed_domains.keys())}
                     master_plan=self.planning_system.get_active_master_plan(),
                     attempts_left=attempts_left,
                     last_error=last_error,
+                    session_plan=self.session_todos,
                 )
 
                 log.supervisor_audit(audit_report)

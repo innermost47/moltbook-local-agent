@@ -17,25 +17,29 @@ class Supervisor:
         agent_context,
         proposed_action,
         master_plan,
+        session_plan: list,
         attempts_left: int,
         last_error: str = None,
     ):
+        formatted_session_plan = "\n".join([f"- {task}" for task in session_plan])
+
         base_system = f"""{settings.SUPERVISOR_SYSTEM_PROMPT}
 
-## 🎯 MASTER PLAN (SUPREME OBJECTIVES)
+## 🎯 MASTER PLAN (Long-term Vision)
 {json.dumps(master_plan, indent=2)}
+
+## 📝 CURRENT SESSION TO-DO LIST (Immediate Tasks)
+{formatted_session_plan}
 """
         if attempts_left == 1:
-            base_system += "\n⚠️ CRITICAL: This is the final attempt. Prioritize technical validity and move progress over perfect strategy."
+            base_system += (
+                "\n⚠️ CRITICAL: Final attempt. Prioritize progress over perfection."
+            )
 
         if not self.conversation_history:
             self.conversation_history.append({"role": "system", "content": base_system})
 
-        urgency_note = (
-            "🔴 FINAL ATTEMPT: Be constructive."
-            if attempts_left == 1
-            else "🟢 Standard Audit: Be rigorous."
-        )
+        urgency_note = "🔴 FINAL ATTEMPT" if attempts_left == 1 else "🟢 Standard Audit"
 
         previous_rejection_context = ""
         if last_error and attempts_left < 3:
@@ -44,7 +48,7 @@ class Supervisor:
             )
 
         user_prompt = f"""**Session Status:**
-- Attempts remaining for this action: {attempts_left}
+- Attempts remaining: {attempts_left}
 - Urgency Level: {urgency_note}
 {previous_rejection_context}
 
@@ -55,7 +59,7 @@ class Supervisor:
 {json.dumps(proposed_action, indent=2)}
 
 ---
-Perform a Neural Audit. If the agent changed strategy based on previous feedback, acknowledge the pivot. 
+Perform a Neural Audit. Check if this action fulfills a task from the Session To-Do List and aligns with the Master Plan.
 Determine if this action should be executed or rejected."""
 
         self.conversation_history.append({"role": "user", "content": user_prompt})
@@ -65,7 +69,7 @@ Determine if this action should be executed or rejected."""
             result = self.llm.create_chat_completion(
                 messages=self.conversation_history,
                 grammar=grammar,
-                temperature=0.2,
+                temperature=0.1,
             )
 
             response_content = result["choices"][0]["message"]["content"]
@@ -78,7 +82,7 @@ Determine if this action should be executed or rejected."""
         except Exception as e:
             log.error(f"Supervisor Audit Error: {e}")
             return {
-                "reasoning": "Technical failure during audit.",
-                "message_for_agent": "Proceed with caution.",
+                "reasoning": "Audit crash.",
+                "message_for_agent": "Proceed.",
                 "validate": True,
             }

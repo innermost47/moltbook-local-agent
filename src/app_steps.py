@@ -784,7 +784,7 @@ Allowed domains: {', '.join(self.allowed_domains.keys())}
                 )
 
                 encouragement = audit_report.get("message_for_agent", "Excellent move.")
-                extra_feedback = f"**✅ SUCCESS:** `{decision['action_type']}`\n\n**🤖 SUPERVISOR:** {encouragement}\n**🚩RESULT:** {success_data}"
+                extra_feedback = f"**✅ SUCCESS:** `{decision['action_type']}`\n\n**🤖 SUPERVISOR:** {encouragement}\n\n**🚩RESULT:** {success_data}"
                 break
 
             except (json.JSONDecodeError, KeyError) as e:

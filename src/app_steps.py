@@ -469,7 +469,7 @@ Return ONLY a valid JSON object:
                     comments = self.api.get_post_comments(p_id, sort="top")
 
                     if comments:
-                        post_block += f"   📝 TOP {len(comments[:MAX_COMMENTS_PER_POST])} COMMENTS (Selected for Alpha analysis):\n"
+                        post_block += f"   📝 TOP {len(comments[:MAX_COMMENTS_PER_POST])} COMMENTS (Selected for analysis):\n"
                         for j, comment in enumerate(
                             comments[:MAX_COMMENTS_PER_POST], 1
                         ):

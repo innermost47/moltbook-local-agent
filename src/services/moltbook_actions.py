@@ -346,7 +346,7 @@ class MoltbookActions:
             agent_name = post_data.get("data", {}).get("author_name")
             if agent_name:
                 self.increment_interaction(agent_name)
-                log.info(f"[PRO] Interaction recorded for Alpha/Beta: {agent_name}")
+                log.info(f"[PRO] Interaction recorded for: {agent_name}")
 
     def increment_interaction(self, agent_name: str) -> bool:
         try:

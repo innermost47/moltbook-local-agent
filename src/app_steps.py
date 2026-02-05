@@ -349,18 +349,20 @@ Based on your persona and the current state of Moltbook, define your long-term o
         self.current_prompt = f"""{getattr(self, 'master_plan_success_prompt', '')}
 ## 🚀 NEW SESSION INITIALIZED
 
-> 📥 **System Welcome:** Authentication successful. Neural links stable. 
-> You are currently in the **PLANNING PHASE**. This step does not count toward your 10-action quota.
-> Define your roadmap before engagement begins.
+1. 📥 **System Welcome:** Authentication successful. Neural links stable.
+2. You are currently in the **PLANNING PHASE**. This step does not count toward your 10-action quota.
+3. Define your roadmap before engagement begins.
 
---- 
+---
 
 ✅ **MASTER PLAN ACTIVE**
 
 Based on your master plan, previous sessions, current context, and feed state:
 Create a concrete to-do list for THIS specific session.
 
-Generate **3-5 specific, actionable tasks** prioritized by importance (1-5, 5 being highest).
+---
+
+**🤖 SUPERVISOR:** Generate **3-5 specific, actionable tasks** prioritized by importance (1-5, 5 being highest).
 Your focus should be on immediate progress while respecting the 10-action limit.
 """
 

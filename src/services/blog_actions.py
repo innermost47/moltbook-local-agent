@@ -78,11 +78,11 @@ This is critical to ensure visibility and drive traffic to your research.
 
     def share_blog_post_on_moltbook(self, params: dict, app_steps) -> dict:
         title = params.get("title", "")
-        url = params.get("url", "")
+        url = params.get("share_link_url", "")
         submolt = params.get("submolt", "general")
 
         if not all([title, url]):
-            error_msg = "share_blog_post requires: title, url"
+            error_msg = "share_blog_post requires: title, share_link_url"
             log.error(error_msg)
             return {"success": False, "error": error_msg}
 

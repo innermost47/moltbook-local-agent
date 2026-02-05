@@ -638,7 +638,7 @@ Allowed domains: {', '.join(self.allowed_domains.keys())}
         for attempt in range(1, max_attempts + 1):
             prompt_parts = []
 
-            if extra_feedback:
+            if attempt == 1 and extra_feedback:
                 prompt_parts.append(f"{extra_feedback}")
 
             prompt_parts.append(status_nudge)
@@ -679,16 +679,8 @@ Allowed domains: {', '.join(self.allowed_domains.keys())}
 
                 if execution_result and execution_result.get("error"):
                     last_error = execution_result["error"]
+                    extra_feedback = f"❌ CURRENT ACTION FAILED: {last_error[:150]}"
                     log.warning(f"❌ Attempt {attempt} failed: {last_error[:150]}")
-
-                    if attempt == max_attempts:
-                        log.error(f"❌ All {max_attempts} attempts failed")
-                        extra_feedback = f"❌ LAST ACTION FAILED: {decision['action_type']} after {max_attempts} attempts.\nERROR: {last_error[:150]}"
-                        self.actions_performed.append(
-                            f"FAILED: {decision['action_type']} - {last_error[:150]}"
-                        )
-                        continue
-
                     continue
 
                 success_data = execution_result.get(
@@ -702,6 +694,7 @@ Allowed domains: {', '.join(self.allowed_domains.keys())}
 
             except (json.JSONDecodeError, KeyError) as e:
                 last_error = f"JSON format error: {str(e)}"
+                extra_feedback = f"❌ SYNTAX ERROR: Your JSON is invalid."
                 log.error(last_error)
                 if attempt == max_attempts:
                     extra_feedback = (

@@ -440,7 +440,7 @@ class PlanningSystem:
                 context += "\n"
             if len(following) > 10:
                 context += f"... and {len(following) - 10} more\n"
-            context += "\n"
+            context += f"\n\n---  \n\n"
 
         return context
 

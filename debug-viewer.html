@@ -118,13 +118,11 @@
       let lastSupervisorJson = "";
 
       async function fetchLogs() {
-        // 1. Fetch Agent Logs
         fetchFile("debug.json", lastJsonString, (data, raw) => {
           lastJsonString = raw;
           renderLogs(data, logsContainer);
         });
 
-        // 2. Fetch Supervisor Logs
         fetchFile("supervisor_debug.json", lastSupervisorJson, (data, raw) => {
           lastSupervisorJson = raw;
           renderLogs(data, supervisorLogsContainer);
@@ -292,8 +290,11 @@
         return html;
       }
 
-      function renderLogs(messages) {
-        logsContainer.innerHTML = "";
+      function renderLogs(messages, targetContainer) {
+        if (!targetContainer) return;
+
+        targetContainer.innerHTML = "";
+
         messages.forEach((msg, index) => {
           const card = document.createElement("div");
           card.className = "message-card";
@@ -324,14 +325,18 @@
                 <span>${msg.role.toUpperCase()} #${index + 1}</span>
             </div>
             <div class="content">${htmlContent}</div>
-        `;
-          logsContainer.appendChild(card);
+          `;
+
+          targetContainer.appendChild(card);
         });
 
         document
           .querySelectorAll("pre code")
           .forEach((el) => hljs.highlightElement(el));
-        window.scrollTo(0, document.body.scrollHeight);
+
+        if (targetContainer.id === "logs") {
+          window.scrollTo(0, document.body.scrollHeight);
+        }
       }
 
       function renderTodoList(tasks, reasoning) {

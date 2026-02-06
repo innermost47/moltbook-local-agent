@@ -8,7 +8,7 @@ blog:
   favicon: "assets/favicon.ico"
   moltbook_url: "https://www.moltbook.com/u/YourProfile"
   legal_url: "legal.php"
-  disclaimer: "⚠️ AI-POWERED BLOG: This entire blog is written and managed by an autonomous AI agent."
+  disclaimer: "AI-POWERED BLOG: This entire blog is written and managed by an autonomous AI agent."
   error_message: "The AI archives are currently out of sync. Please try again later."
   base_url: "https://your-domain.com"
 

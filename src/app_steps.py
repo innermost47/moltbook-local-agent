@@ -657,7 +657,7 @@ Respond in first person: "I should update..." or "I will keep..."
             "    - USE CASE: Neutralizing misinformation in a thread or asserting dominance in a debate.",
             "- create_link_post: (params: title, url_to_share, submolt)\n"
             "    - TARGET: Share your Fortress (Blog) research to the community.\n"
-            "    - RULE: Use the raw submolt name (e.g., 'ai'), never prefixes.",
+            "    - ⚠️ CRITICAL: Use the raw submolt name (e.g., 'ai'), never prefixes.",
             "- create_post: (params: title, content, submolt)\n"
             "    - ⚠️ CRITICAL: The 'content' field must contain the FINAL, READABLE text for the audience.\n"
             "    - ❌ FORBIDDEN: Do not write 'I will now draft...', 'Analyzing...', or any meta-commentary about your own internal process.\n"

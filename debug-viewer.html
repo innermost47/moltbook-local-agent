@@ -169,12 +169,7 @@
         }
       }
 
-      /**
-       * Render system messages (supervisor audits, etc.) with full content preserved.
-       * Strategy: split by newlines, classify each segment, render everything.
-       */
       function renderSystemMessage(rawContent) {
-        // If it doesn't look like a supervisor/audit message, just render as markdown
         const isSupervisorAudit =
           /SUPERVISOR|AUDIT|Forbidden pattern|SYSTEM:\s*Decide/i.test(
             rawContent,
@@ -191,8 +186,6 @@
 
         let html = `<div class="system-audit-wrapper ${auditStatus}">`;
 
-        // We'll walk through the content, pulling out JSON blocks and rendering
-        // everything else as styled text segments
         let remaining = rawContent;
         let safety = 0;
 
@@ -201,10 +194,8 @@
           remaining = remaining.trimStart();
           if (!remaining) break;
 
-          // Check if we're at a JSON block
           const jsonStart = remaining.search(/['{]\s*\{?\s*"reasoning"/);
 
-          // --- Audit header line ---
           const auditHeaderMatch = remaining.match(
             /^(🧐\s*SUPERVISOR[^:]*:)\s*/,
           );
@@ -214,7 +205,6 @@
             continue;
           }
 
-          // --- "Forbidden pattern" label ---
           const forbiddenMatch = remaining.match(
             /^(Forbidden pattern[^']*?)\s*(?='|\{)/,
           );
@@ -224,7 +214,6 @@
             continue;
           }
 
-          // --- "Detected Pattern:" label ---
           const detectedMatch = remaining.match(/^Detected Pattern:\s*/i);
           if (detectedMatch) {
             html += `<div class="audit-pattern-label">🔍 Detected Pattern</div>`;
@@ -232,7 +221,6 @@
             continue;
           }
 
-          // --- "Rule:" line ---
           const ruleMatch = remaining.match(/^Rule:\s*(.*?)(?=\n|💻|$)/is);
           if (ruleMatch) {
             html += `<div class="audit-rule">⚠️ Rule: ${ruleMatch[1].trim()}</div>`;
@@ -240,7 +228,6 @@
             continue;
           }
 
-          // --- "💻 SYSTEM:" line ---
           const systemMatch = remaining.match(
             /^💻\s*SYSTEM:\s*(.*?)(?=\n|Current Time|$)/is,
           );
@@ -250,7 +237,6 @@
             continue;
           }
 
-          // --- "Current Time:" line ---
           const timeMatch = remaining.match(/^Current Time:\s*(.*?)(?=\n|$)/i);
           if (timeMatch) {
             html += `<div class="system-time">🕐 Current Time: ${timeMatch[1].trim()}</div>`;
@@ -258,12 +244,9 @@
             continue;
           }
 
-          // --- JSON block (possibly wrapped in quotes) ---
           let jsonResult = null;
-          // Try at position 0
           jsonResult = extractJsonAt(remaining, 0);
           if (!jsonResult) {
-            // Try skipping a leading quote
             const qIdx = remaining.indexOf("'");
             if (qIdx >= 0 && qIdx < 3) {
               jsonResult = extractJsonAt(remaining, qIdx);
@@ -278,13 +261,11 @@
               html += `<pre><code class="language-json">${JSON.stringify(jsonResult.json, null, 2)}</code></pre>`;
             }
             html += `</div>`;
-            // Skip past the JSON and any trailing quote
             remaining = remaining.substring(jsonResult.endIndex);
             if (remaining.startsWith("'")) remaining = remaining.substring(1);
             continue;
           }
 
-          // --- Catch-all: grab text until next recognizable pattern or end ---
           const nextPattern = remaining
             .substring(1)
             .search(
@@ -298,7 +279,6 @@
             }
             remaining = remaining.substring(nextPattern + 1);
           } else {
-            // Nothing else matched — render the rest
             html += `<div class="audit-text">${marked.parse(remaining)}</div>`;
             remaining = "";
           }

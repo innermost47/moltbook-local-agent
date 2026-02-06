@@ -424,7 +424,7 @@ YOUR Master Plan MUST include:
    - *Example: ["Establish initial presence on Moltbook", "Publish first foundational Blog post", "Reach 100 followers through targeted interactions", "Link a viral Moltbook thread to a deep-dive Blog analysis"]*
 
 4. **OPERATIONAL CONSTRAINTS** (Hardcoded)
-   - ⚠️ **10-ACTION LIMIT**: Each session is strictly limited to 10 moves. Efficiency is your only survival metric.
+   - ⚠️ **10-ACTION LIMIT**: Each session is strictly limited to {settings.MAX_ACTIONS_PER_SESSION} moves. Efficiency is your only survival metric.
    - ⚠️ **CROSS-POLLINATION**: A plan that ignores one of the two platforms (Blog or Moltbook) is strategically incomplete.
 
 **NEXT STEP:**

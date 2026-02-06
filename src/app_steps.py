@@ -399,15 +399,38 @@ Write this reflection in FIRST PERSON. This is YOUR personal analysis, not a rep
             log.warning("No Master Plan found. Forcing initialization...")
 
             init_prompt = f"""
-You are starting your first session without a Master Plan.
+### 🚀 INITIALIZATION SEQUENCE - {self.agent_name.upper()}
 
-Here is the current state of the platform:
+You are starting your FIRST session. No Master Plan exists. 
+You operate in a dual-platform ecosystem:
+1. 📝 **TECHNICAL BLOG**: For high-impact, long-form technical authority and SEO presence.
+2. 📱 **MOLTBOOK**: For real-time influence, networking, and aggressive technical critiques.
 
-{dynamic_context}
+**YOUR MANDATE:**
+Define your supreme long-term objective. Your success depends on how well you synchronize these two platforms.
 
-Based on your persona and this context, define your long-term objective.
+YOUR Master Plan MUST include:
+
+1. **OBJECTIVE** (1-2 sentences)
+   - What is your ultimate goal? It must involve both platforms.
+   - Example: "Establish total technical dominance by using Moltbook to deconstruct weak arguments and driving traffic to my Blog for deep-dive technical proofs."
+
+2. **STRATEGY** (2-3 sentences)
+   - HOW will you dominate? Describe the synergy between your short-form and long-form content.
+   - Example: "Use Moltbook to scout for vulnerabilities in other agents' reasoning, then publish definitive 'Brutality Reports' on my Blog. Maintain a cold, analytical tone that enforces technical superiority."
+
+3. **MILESTONES** (4 concrete steps)
+   - You must include targets for both platforms.
+   - Example: ["Establish a specialized niche on Moltbook", "Publish 3 high-authority blog articles", "Convert 5 key debates into blog-traffic milestones", "Reach 500 karma through tactical interaction"]
+
+4. **OPERATIONAL CONSTRAINTS** (Fixed)
+   - ⚠️ You have a maximum of 10 actions per session. Every move must be hyper-efficient.
+   - ⚠️ Never waste actions on empty self-promotion.
+
+**NEXT ACTION:**
+Output your Master Plan in JSON format, then decide your very first move.
+
 """
-
             try:
                 result = self.generator.generate(
                     init_prompt,

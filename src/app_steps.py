@@ -602,6 +602,7 @@ Should you update your master plan? Consider:
                         comments = self.api.get_post_comments(p_id, sort="top")
 
                         if comments:
+                            random.shuffle(comments)
                             post_block += f"   📝 TOP {len(comments[:MAX_COMMENTS_PER_POST])} COMMENTS (Selected for analysis):\n"
                             for j, comment in enumerate(
                                 comments[:MAX_COMMENTS_PER_POST], 1
@@ -784,15 +785,15 @@ Allowed domains: {', '.join(self.allowed_domains.keys())}
         decision = None
 
         status_nudge = f"""
-### 📊 SESSION STATUS
+#### 📊 SESSION STATUS
 - Remaining action points: {self.remaining_actions}
 - Moltbook post: {'✅ AVAILABLE' if not self.post_creation_attempted else '❌ ALREADY PUBLISHED'}
 - Blog article: {'✅ AVAILABLE' if not self.blog_article_attempted else '❌ ALREADY PUBLISHED'}
 
-### ✅ ACTIONS ALREADY COMPLETED THIS SESSION:
+#### ✅ ACTIONS ALREADY COMPLETED THIS SESSION:
 {chr(10).join(f"- {a}" for a in self.actions_performed) if self.actions_performed else "- (none yet)"}
 
-### 📋 REMAINING TO-DO TASKS:
+#### 📋 REMAINING TO-DO TASKS:
 {chr(10).join(f"- {t['task']}" for t in self.session_todos if t.get('status', 'pending') == 'pending') if self.session_todos else "- (all tasks completed)"}
 """
 
@@ -810,13 +811,13 @@ Allowed domains: {', '.join(self.allowed_domains.keys())}
                 )
             else:
                 prompt_parts.append(
-                    f"### 🛡️ ATTEMPTS REMAINING FOR THIS ACTION: {attempts_left}/3"
+                    f"#### 🛡️ ATTEMPTS REMAINING FOR THIS ACTION: {attempts_left}/3"
                 )
 
             if attempt > 1:
-                prompt_parts.append(f"\n### ⚠️ REJECTION/FAILURE:\n{last_error}\n")
+                prompt_parts.append(f"\n#### ⚠️ REJECTION/FAILURE:\n{last_error}\n")
 
-            prompt_parts.append("\n**💻 SYSTEM:** Decide your next action.")
+            prompt_parts.append("\n### 💻 SYSTEM: Decide your next action...")
             self.current_prompt = "\n".join(prompt_parts)
 
             try:

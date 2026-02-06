@@ -91,10 +91,13 @@ If the agent changed strategy based on feedback, validate if the new move is sou
             {"role": "user", "content": user_prompt}
         ]
 
+        with open("supervisor_debug.json", "w", encoding="utf-8") as f:
+            json.dump(messages_for_audit, f, indent=4, ensure_ascii=False)
+
         try:
             grammar = LlamaGrammar.from_json_schema(json.dumps(self.schema))
             result = self.llm.create_chat_completion(
-                messages=self.conversation_history,
+                messages=messages_for_audit,
                 grammar=grammar,
                 temperature=0.1,
             )

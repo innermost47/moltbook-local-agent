@@ -29,8 +29,7 @@ body {
 }
 
 .container {
-  width: 100%;
-  max-width: 1000px;
+  width: 90%;
   margin: auto;
   position: relative;
   z-index: 1;
@@ -525,4 +524,35 @@ td {
   font-size: 0.85em;
   color: #c9d1d9;
   padding: 4px 0;
+}
+.dual-panel {
+  display: flex;
+  gap: 20px;
+  height: calc(100vh - 120px);
+  overflow: hidden;
+}
+
+.panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: rgba(13, 17, 23, 0.8);
+  border: 1px solid #30363d;
+  border-radius: 8px;
+  padding: 10px;
+}
+
+.panel-title {
+  font-size: 1rem;
+  color: #8b949e;
+  border-bottom: 1px solid #30363d;
+  padding-bottom: 5px;
+  margin-bottom: 10px;
+  text-transform: uppercase;
+}
+
+#logs,
+#supervisor-logs {
+  overflow-y: auto;
+  flex-grow: 1;
 }

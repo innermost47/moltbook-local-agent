@@ -24,14 +24,18 @@
         <span id="last-update">--</span>
       </div>
     </div>
-    <div class="container">
-      <div id="logs"></div>
+    <div class="container dual-panel">
+      <div class="panel">
+        <h2 class="panel-title">🤖 Agent Core</h2>
+        <div id="logs"></div>
+      </div>
+      <div class="panel">
+        <h2 class="panel-title">🧐 Supervisor Audit</h2>
+        <div id="supervisor-logs"></div>
+      </div>
     </div>
 
     <script>
-      /* ==============================
-         MATRIX RAIN EFFECT
-         ============================== */
       const canvas = document.getElementById("matrix-rain");
       const ctx = canvas.getContext("2d");
 
@@ -48,13 +52,11 @@
       let columns = Math.floor(canvas.width / fontSize);
       let drops = Array(columns).fill(1);
 
-      // Randomize initial drop positions for a more organic start
       for (let i = 0; i < drops.length; i++) {
         drops[i] = Math.floor(Math.random() * -50);
       }
 
       function drawMatrix() {
-        // Semi-transparent black to create trail effect
         ctx.fillStyle = "rgba(13, 17, 23, 0.06)";
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -66,13 +68,11 @@
           const x = i * fontSize;
           const y = drops[i] * fontSize;
 
-          // Brighter head character
           if (Math.random() > 0.7) {
             ctx.fillStyle = "#afffaf";
             ctx.shadowColor = "#00ff41";
             ctx.shadowBlur = 8;
           } else {
-            // Varying green shades for depth
             const alpha = 0.15 + Math.random() * 0.25;
             ctx.fillStyle = `rgba(0, 255, 65, ${alpha})`;
             ctx.shadowColor = "transparent";
@@ -82,7 +82,6 @@
           ctx.fillText(char, x, y);
           ctx.shadowBlur = 0;
 
-          // Reset drop to top with randomness
           if (y > canvas.height && Math.random() > 0.975) {
             drops[i] = 0;
           }
@@ -90,7 +89,6 @@
         }
       }
 
-      // Handle window resize for columns
       window.addEventListener("resize", () => {
         columns = Math.floor(canvas.width / fontSize);
         const newDrops = Array(columns).fill(1);
@@ -103,9 +101,6 @@
 
       setInterval(drawMatrix, 45);
 
-      /* ==============================
-         ORIGINAL DEBUG FEED LOGIC
-         ============================== */
       const logsContainer = document.getElementById("logs");
       const lastUpdateSpan = document.getElementById("last-update");
       let lastJsonString = "";
@@ -118,33 +113,42 @@
         breaks: true,
       });
 
+      const supervisorLogsContainer =
+        document.getElementById("supervisor-logs");
+      let lastSupervisorJson = "";
+
       async function fetchLogs() {
+        // 1. Fetch Agent Logs
+        fetchFile("debug.json", lastJsonString, (data, raw) => {
+          lastJsonString = raw;
+          renderLogs(data, logsContainer);
+        });
+
+        // 2. Fetch Supervisor Logs
+        fetchFile("supervisor_debug.json", lastSupervisorJson, (data, raw) => {
+          lastSupervisorJson = raw;
+          renderLogs(data, supervisorLogsContainer);
+        });
+
+        lastUpdateSpan.innerText = new Date().toLocaleTimeString();
+      }
+
+      async function fetchFile(fileName, lastString, callback) {
         try {
-          const response = await fetch("debug.json?t=" + new Date().getTime());
-          if (!response.ok) throw new Error("File not found");
-
+          const response = await fetch(`${fileName}?t=${new Date().getTime()}`);
+          if (!response.ok) return;
           const rawJson = await response.text();
-
-          if (rawJson !== lastJsonString) {
-            lastJsonString = rawJson;
-            const data = JSON.parse(rawJson);
-            renderLogs(data);
-            lastUpdateSpan.innerText = new Date().toLocaleTimeString();
+          if (rawJson !== lastString) {
+            callback(JSON.parse(rawJson), rawJson);
           }
         } catch (err) {
-          console.error("Sync error:", err);
-          lastUpdateSpan.innerText = "Error loading debug.json";
+          console.error(`Error loading ${fileName}:`, err);
         }
       }
 
-      /**
-       * Try to extract balanced JSON from a string starting at a given position.
-       * Returns { json: parsed, endIndex } or null.
-       */
       function extractJsonAt(str, startIndex) {
         if (str[startIndex] !== "{" && str[startIndex] !== "'") return null;
 
-        // Skip leading quote if present
         let actualStart = startIndex;
         if (str[actualStart] === "'") actualStart++;
         if (str[actualStart] !== "{") return null;

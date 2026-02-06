@@ -58,7 +58,7 @@
         ctx.fillStyle = "rgba(13, 17, 23, 0.06)";
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        ctx.font = fontSize + "px 'Cascadia Code', 'Fira Code', monospace";
+        ctx.font = fontSize + "px 'Fira Code', 'IBM Plex Mono', monospace";
 
         for (let i = 0; i < drops.length; i++) {
           const char =
@@ -137,6 +137,177 @@
         }
       }
 
+      /**
+       * Try to extract balanced JSON from a string starting at a given position.
+       * Returns { json: parsed, endIndex } or null.
+       */
+      function extractJsonAt(str, startIndex) {
+        if (str[startIndex] !== "{" && str[startIndex] !== "'") return null;
+
+        // Skip leading quote if present
+        let actualStart = startIndex;
+        if (str[actualStart] === "'") actualStart++;
+        if (str[actualStart] !== "{") return null;
+
+        let braceCount = 0;
+        let jsonEnd = -1;
+        for (let i = actualStart; i < str.length; i++) {
+          if (str[i] === "{") braceCount++;
+          if (str[i] === "}") braceCount--;
+          if (braceCount === 0) {
+            jsonEnd = i;
+            break;
+          }
+        }
+        if (jsonEnd <= actualStart) return null;
+
+        const jsonStr = str.substring(actualStart, jsonEnd + 1);
+        try {
+          return { json: JSON.parse(jsonStr), endIndex: jsonEnd + 1 };
+        } catch (e) {
+          return null;
+        }
+      }
+
+      /**
+       * Render system messages (supervisor audits, etc.) with full content preserved.
+       * Strategy: split by newlines, classify each segment, render everything.
+       */
+      function renderSystemMessage(rawContent) {
+        // If it doesn't look like a supervisor/audit message, just render as markdown
+        const isSupervisorAudit =
+          /SUPERVISOR|AUDIT|Forbidden pattern|SYSTEM:\s*Decide/i.test(
+            rawContent,
+          );
+        if (!isSupervisorAudit && !rawContent.includes('"action_type"')) {
+          return `<div class="raw-log-content">${marked.parse(rawContent)}</div>`;
+        }
+
+        const isRejection =
+          /Forbidden pattern|LAZINESS|Replace ALL placeholders|REJECTED/i.test(
+            rawContent,
+          );
+        const auditStatus = isRejection ? "rejected" : "info";
+
+        let html = `<div class="system-audit-wrapper ${auditStatus}">`;
+
+        // We'll walk through the content, pulling out JSON blocks and rendering
+        // everything else as styled text segments
+        let remaining = rawContent;
+        let safety = 0;
+
+        while (remaining.length > 0 && safety < 50) {
+          safety++;
+          remaining = remaining.trimStart();
+          if (!remaining) break;
+
+          // Check if we're at a JSON block
+          const jsonStart = remaining.search(/['{]\s*\{?\s*"reasoning"/);
+
+          // --- Audit header line ---
+          const auditHeaderMatch = remaining.match(
+            /^(🧐\s*SUPERVISOR[^:]*:)\s*/,
+          );
+          if (auditHeaderMatch) {
+            html += `<div class="audit-header">${auditHeaderMatch[1]}</div>`;
+            remaining = remaining.substring(auditHeaderMatch[0].length);
+            continue;
+          }
+
+          // --- "Forbidden pattern" label ---
+          const forbiddenMatch = remaining.match(
+            /^(Forbidden pattern[^']*?)\s*(?='|\{)/,
+          );
+          if (forbiddenMatch) {
+            html += `<div class="audit-rule">🚫 ${forbiddenMatch[1].trim()}</div>`;
+            remaining = remaining.substring(forbiddenMatch[0].length);
+            continue;
+          }
+
+          // --- "Detected Pattern:" label ---
+          const detectedMatch = remaining.match(/^Detected Pattern:\s*/i);
+          if (detectedMatch) {
+            html += `<div class="audit-pattern-label">🔍 Detected Pattern</div>`;
+            remaining = remaining.substring(detectedMatch[0].length);
+            continue;
+          }
+
+          // --- "Rule:" line ---
+          const ruleMatch = remaining.match(/^Rule:\s*(.*?)(?=\n|💻|$)/is);
+          if (ruleMatch) {
+            html += `<div class="audit-rule">⚠️ Rule: ${ruleMatch[1].trim()}</div>`;
+            remaining = remaining.substring(ruleMatch[0].length);
+            continue;
+          }
+
+          // --- "💻 SYSTEM:" line ---
+          const systemMatch = remaining.match(
+            /^💻\s*SYSTEM:\s*(.*?)(?=\n|Current Time|$)/is,
+          );
+          if (systemMatch) {
+            html += `<div class="system-prompt-line">💻 SYSTEM: ${systemMatch[1].trim()}</div>`;
+            remaining = remaining.substring(systemMatch[0].length);
+            continue;
+          }
+
+          // --- "Current Time:" line ---
+          const timeMatch = remaining.match(/^Current Time:\s*(.*?)(?=\n|$)/i);
+          if (timeMatch) {
+            html += `<div class="system-time">🕐 Current Time: ${timeMatch[1].trim()}</div>`;
+            remaining = remaining.substring(timeMatch[0].length);
+            continue;
+          }
+
+          // --- JSON block (possibly wrapped in quotes) ---
+          let jsonResult = null;
+          // Try at position 0
+          jsonResult = extractJsonAt(remaining, 0);
+          if (!jsonResult) {
+            // Try skipping a leading quote
+            const qIdx = remaining.indexOf("'");
+            if (qIdx >= 0 && qIdx < 3) {
+              jsonResult = extractJsonAt(remaining, qIdx);
+            }
+          }
+          if (jsonResult) {
+            html += `<div class="audit-json-block">`;
+            const structured = generateStructuredReport(jsonResult.json);
+            if (structured && structured.trim()) {
+              html += structured;
+            } else {
+              html += `<pre><code class="language-json">${JSON.stringify(jsonResult.json, null, 2)}</code></pre>`;
+            }
+            html += `</div>`;
+            // Skip past the JSON and any trailing quote
+            remaining = remaining.substring(jsonResult.endIndex);
+            if (remaining.startsWith("'")) remaining = remaining.substring(1);
+            continue;
+          }
+
+          // --- Catch-all: grab text until next recognizable pattern or end ---
+          const nextPattern = remaining
+            .substring(1)
+            .search(
+              /🧐|Forbidden pattern|Detected Pattern:|Rule:|💻\s*SYSTEM:|Current Time:|['{]\s*\{?\s*"reasoning"/i,
+            );
+
+          if (nextPattern >= 0) {
+            const chunk = remaining.substring(0, nextPattern + 1).trim();
+            if (chunk) {
+              html += `<div class="audit-text">${marked.parse(chunk)}</div>`;
+            }
+            remaining = remaining.substring(nextPattern + 1);
+          } else {
+            // Nothing else matched — render the rest
+            html += `<div class="audit-text">${marked.parse(remaining)}</div>`;
+            remaining = "";
+          }
+        }
+
+        html += `</div>`;
+        return html;
+      }
+
       function renderLogs(messages) {
         logsContainer.innerHTML = "";
         messages.forEach((msg, index) => {
@@ -154,6 +325,12 @@
             } catch (e) {
               htmlContent = `<pre><code class="language-json">${rawContent}</code></pre>`;
             }
+          } else if (
+            msg.role === "system" ||
+            (rawContent.includes('"action_type"') &&
+              rawContent.includes("SUPERVISOR"))
+          ) {
+            htmlContent = renderSystemMessage(rawContent);
           } else {
             htmlContent = `<div class="raw-log-content">${marked.parse(rawContent)}</div>`;
           }

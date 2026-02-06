@@ -38,6 +38,7 @@ class AppSteps:
         self.planning_system = PlanningSystem(db_path=settings.DB_PATH)
         self.web_scraper = WebScraper()
         self.metrics = Metrics()
+        self.agent_name = None
         self.moltbook_actions = MoltbookActions(db_path=settings.DB_PATH)
         self.blog_actions = BlogActions() if settings.BLOG_API_URL else None
         self.feed_options = ["hot", "new", "top", "rising"]
@@ -106,16 +107,20 @@ class AppSteps:
         log.info("Generating session summary...")
 
         self.current_prompt = f"""
-        Session completed. Here's what happened:
+### 📊 {self.agent_name.upper()}: YOUR SESSION IS COMPLETE
 
-        Actions performed: {len(self.actions_performed)}
-        {chr(10).join(f"- {action}" for action in self.actions_performed)}
+Here's what YOU accomplished:
 
-        Reflect on this session and create a summary with:
-        1. Your reasoning about what worked/didn't work
-        2. Key learnings from user interactions
-        3. Your strategic plan for the next session
-        """
+Actions YOU performed: {len(self.actions_performed)}
+{chr(10).join(f"- {action}" for action in self.actions_performed)}
+
+Now reflect on YOUR session:
+1. YOUR reasoning about what worked/didn't work (first person: "I discovered...", "I struggled with...")
+2. Key learnings from YOUR interactions (what did YOU learn?)
+3. YOUR strategic plan for the next session (what will YOU do differently?)
+
+Write this reflection in FIRST PERSON. This is YOUR personal analysis, not a report about "the system".
+"""
         summary_raw = self.generator.generate_session_summary(
             self.current_prompt, summary_schema
         )
@@ -189,6 +194,7 @@ class AppSteps:
         if me:
             agent_data = me.get("agent", {})
             agent_name = agent_data.get("name", "Unknown")
+            self.agent_name = agent_name
             current_karma = agent_data.get("karma", 0)
             log.success(f"Agent: {agent_name} | Karma: {current_karma}")
         else:
@@ -440,21 +446,25 @@ Based on your persona and this context, define your long-term objective.
         self.current_prompt = f"""{getattr(self, 'master_plan_success_prompt', '')}
 ## 🚀 NEW SESSION INITIALIZED
 
-1. 💻 **SYSTEM:** Authentication successful. Neural links stable.
+1. ✅ Authentication successful. Neural links stable.
 2. You are currently in the **PLANNING PHASE**. This step does not count toward your 10-action quota.
-3. Define your roadmap before engagement begins.
+3. YOU will define YOUR roadmap before engagement begins.
 
 ---
 
 {feed_section}✅ **MASTER PLAN ACTIVE**
 
-Based on your master plan, previous sessions, current context, and {feed_reference}:
+Based on YOUR master plan, previous sessions, current context, and {feed_reference}:
 Create a concrete to-do list for THIS specific session.
 
 ---
 
-**💻 SYSTEM:** Generate **3-5 specific, actionable tasks** prioritized by importance (1-5, 5 being highest).
-Your focus should be on immediate progress while respecting the 10-action limit.
+### 📋 {self.agent_name.upper()}: PLAN YOUR SESSION
+
+Generate **3-5 specific, actionable tasks** YOU want to accomplish.
+Prioritize each task (1-5, where 5 = highest priority).
+
+Focus on immediate progress while respecting YOUR 10-action limit.
 
 **⚠️ TASK FORMAT RULES:**
 - **Write SHORT, DESCRIPTIVE task names (max 80 characters)**
@@ -509,18 +519,22 @@ Your focus should be on immediate progress while respecting the 10-action limit.
         )
 
         self.current_prompt = f"""
-Based on this session's learnings and your current master plan:
+### 🗺️ {self.agent_name.upper()}: EVALUATE YOUR MASTER PLAN
 
-### 🗺️ CURRENT MASTER PLAN
+Based on YOUR session learnings and YOUR current master plan:
+
+**YOUR CURRENT MASTER PLAN:**
 {plan_json}
 
-### 💡 SESSION LEARNINGS
+**YOUR SESSION LEARNINGS:**
 {summary.get('learnings', 'N/A')}
 
-Should you update your master plan? Consider:
-- Have you achieved a major milestone?
-- Have you learned something that changes your strategy?
-- Do you need to refine your objective?
+Should YOU update YOUR master plan? Consider:
+- Have YOU achieved a major milestone?
+- Have YOU learned something that changes YOUR strategy?
+- Do YOU need to refine YOUR objective?
+
+Respond in first person: "I should update..." or "I will keep..."
 """
 
         try:
@@ -790,10 +804,10 @@ Allowed domains: {', '.join(self.allowed_domains.keys())}
         decision = None
 
         status_nudge = f"""
-#### 📊 SESSION STATUS
-- Remaining action points: {self.remaining_actions}
-- Moltbook post: {'✅ AVAILABLE' if not self.post_creation_attempted else '❌ ALREADY PUBLISHED'}
-- Blog article: {'✅ AVAILABLE' if not self.blog_article_attempted else '❌ ALREADY PUBLISHED'}
+#### 📊 YOUR SESSION STATUS
+- YOU have {self.remaining_actions} action points remaining
+- Moltbook post: {'✅ YOU can still create one' if not self.post_creation_attempted else '❌ YOU already published'}
+- Blog article: {'✅ YOU can still write one' if not self.blog_article_attempted else '❌ YOU already wrote one'}
 
 #### ✅ ACTIONS ALREADY COMPLETED THIS SESSION:
 {chr(10).join(f"- {a}" for a in self.actions_performed) if self.actions_performed else "- (none yet)"}
@@ -814,7 +828,7 @@ Allowed domains: {', '.join(self.allowed_domains.keys())}
 
             if attempts_left == 1:
                 prompt_parts.append(
-                    "⚠️ **CRITICAL: FINAL ATTEMPT.** If this fails or is rejected, the session will move on without this action. Be precise and strictly follow the schema."
+                    "⚠️ **YOUR FINAL ATTEMPT.** If YOU fail or are rejected, the session will move on. Be precise and follow the schema."
                 )
             else:
                 prompt_parts.append(
@@ -824,7 +838,9 @@ Allowed domains: {', '.join(self.allowed_domains.keys())}
             if attempt > 1:
                 prompt_parts.append(f"\n#### ⚠️ REJECTION/FAILURE:\n{last_error}\n")
 
-            prompt_parts.append("\n### 💻 SYSTEM: Decide your next action...")
+            prompt_parts.append(
+                f"\n### 🎯 {self.agent_name.upper()}: EXECUTE YOUR NEXT ACTION\n"
+            )
             self.current_prompt = "\n".join(prompt_parts)
 
             try:

@@ -76,6 +76,17 @@ function loadYamlConfig($filename)
     return $config;
 }
 
+function generate_slug($text)
+{
+    $slug = strtolower($text);
+    $slug = preg_replace('/[^a-z0-9\s-]/', '', $slug);
+    $slug = preg_replace('/[\s-]+/', '-', $slug);
+    $slug = trim($slug, '-');
+    $slug = substr($slug, 0, 100);
+
+    return $slug;
+}
+
 
 $site = loadYamlConfig(__DIR__ . '/config.yaml');
 

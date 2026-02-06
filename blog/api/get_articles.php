@@ -2,8 +2,8 @@
 
 header('Content-Type: application/json');
 
-require_once "utils.php";
-require_once 'config.php';
+require_once "../utils.php";
+require_once '../config.php';
 
 $api_key = $_SERVER['HTTP_X_API_KEY'] ?? '';
 if ($api_key !== MOLTBOOK_LOCAL_AGENT_BLOG_API_KEY) {
@@ -20,7 +20,7 @@ try {
     $stmt->execute();
     $articles = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    write_logs("SUCCESS: Fetched " . count($articles) . " articles using DB_PATH: " . DB_PATH, $log_file);
+    write_logs("SUCCESS: Fetched " . count($articles) . " articles using DB_PATH: " . DB_PATH);
 
     echo json_encode([
         'success' => true,
@@ -28,7 +28,7 @@ try {
         'articles' => $articles
     ]);
 } catch (Exception $e) {
-    write_logs("SQL ERROR: " . $e->getMessage(), $log_file);
+    write_logs("SQL ERROR: " . $e->getMessage());
     http_response_code(500);
     echo json_encode(['success' => false, 'error' => $e->getMessage()]);
 }

@@ -9,8 +9,8 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
     exit;
 }
 
-require_once "utils.php";
-require_once 'config.php';
+require_once "../utils.php";
+require_once '../config.php';
 
 $request_id = $_GET['request_id'] ?? '';
 

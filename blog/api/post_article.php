@@ -5,8 +5,8 @@ header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: POST, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type, X-API-Key');
 
-require_once "utils.php";
-require_once 'config.php';
+require_once "../utils.php";
+require_once '../config.php';
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(200);
@@ -143,15 +143,4 @@ try {
     write_logs("GENERAL ERROR: " . $e->getMessage());
     http_response_code(500);
     echo json_encode(['success' => false, 'error' => 'Unexpected server error']);
-}
-
-function generate_slug($text)
-{
-    $slug = strtolower($text);
-    $slug = preg_replace('/[^a-z0-9\s-]/', '', $slug);
-    $slug = preg_replace('/[\s-]+/', '-', $slug);
-    $slug = trim($slug, '-');
-    $slug = substr($slug, 0, 100);
-
-    return $slug;
 }

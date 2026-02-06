@@ -10,8 +10,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit;
 }
 
-require_once "utils.php";
-require_once 'config.php';
+require_once "../utils.php";
+require_once '../config.php';
 
 $api_key = $_SERVER['HTTP_X_API_KEY'] ?? '';
 

@@ -395,15 +395,13 @@ A direct, concise instruction (2-3 sentences max) that will be injected into the
     """
 
         try:
-            messages = (
-                [
-                    {
-                        "role": "system",
-                        "content": "You are the Neural Supervisor providing actionable feedback to correct lazy agent behavior. You have knowledge of forbidden lazy patterns and must guide the agent toward producing real, specific content.",
-                    },
-                    {"role": "user", "content": laziness_prompt},
-                ],
-            )
+            messages = [
+                {
+                    "role": "system",
+                    "content": "You are the Neural Supervisor providing actionable feedback...",
+                },
+                {"role": "user", "content": laziness_prompt},
+            ]
             grammar = LlamaGrammar.from_json_schema(
                 json.dumps(laziness_guidance_schema)
             )

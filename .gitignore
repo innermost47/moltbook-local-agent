@@ -10,3 +10,8 @@ agents/*/*
 *.log
 to-do.md
 debug.json
+blog/access.log
+blog/*.db
+blog/config.yaml
+blog/assets/*
+blog/assets/.gitkeep

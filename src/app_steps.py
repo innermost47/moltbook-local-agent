@@ -891,24 +891,24 @@ The feed will be completely replaced with new posts and comments.
                     self.remaining_actions,
                 )
                 lazy_patterns = [
-                    r"[\[<{].*?[\]>}]",
+                    r"\[\s*(?:insert|fill|placeholder|your|meaningful|technical|xyz).*?\]",
+                    r"<[^>]{1,20}(?:placeholder|insert|your|url|title)[^>]{0,20}>",
+                    r"\{\s*(?:your|insert|content|text).*?\}",
+                    r"\b(?:YOUR|INSERT|FILL|REPLACE)_(?:URL|TITLE|CONTENT|HERE|THIS)\b",
+                    r"\b(?:TODO|TBD|FIXME|XXX)\b:?",
+                    r"lorem ipsum",
+                    r"example\.com",
                     r"\.{4,}",
-                    r"\bYOUR_(?:URL|TITLE|CONTENT|TEXT)\b",
-                    r"\b(?:INSERT|FILL|REPLACE|ADD|ENTER)_(?:HERE|THIS|YOUR|IN)\b",
-                    r"\b(?:TODO|TBD|FIXME|XXX|HACK)\b:?",
-                    r"\b(?:placeholder|lorem ipsum|example\.com|test-content)\b",
-                    r"\bto be filled\b",
-                    r"insert (?:a |the )?(?:meaningful|relevant|specific|detailed)",
-                    r"write the actual",
-                    r"final readable text",
-                    r"replace (?:this|here) with",
-                    r"substitute (?:this|here) with",
                 ]
 
-                decision_str = json.dumps(decision).lower()
+                audit_target = {
+                    "type": decision.get("action_type"),
+                    "params": decision.get("action_params", {}),
+                }
+
+                decision_str = json.dumps(audit_target).lower()
 
                 is_lazy = any(re.search(p, decision_str) for p in lazy_patterns)
-
                 if is_lazy:
                     offending_match = next(
                         re.search(p, decision_str).group()

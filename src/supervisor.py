@@ -24,16 +24,37 @@ class Supervisor:
         master_plan,
         session_plan: list,
         attempts_left: int,
+        actions_performed: list,
+        post_attempted: bool,
+        blog_attempted: bool,
         last_error: str = None,
     ):
         formatted_session_plan = "\n".join([f"- {task}" for task in session_plan])
+        formatted_history = (
+            "\n".join([f"✅ {a}" for a in actions_performed])
+            if actions_performed
+            else "None"
+        )
+
+        rule_enforcement = "### 🚫 SESSION CONSTRAINTS (STRICT)\n"
+        if post_attempted:
+            rule_enforcement += (
+                "- REJECT any 'create_post' action. One post already published.\n"
+            )
+        if blog_attempted:
+            rule_enforcement += "- REJECT any 'write_blog_article' action. One article already written.\n"
 
         base_system = f"""{settings.SUPERVISOR_SYSTEM_PROMPT}
 
-## 🎯 MASTER PLAN (Long-term Vision)
+## 🎯 MASTER PLAN
 {json.dumps(master_plan, indent=2)}
 
-## 📝 CURRENT SESSION TO-DO LIST (Immediate Tasks)
+{rule_enforcement}
+
+## ✅ ACTIONS ALREADY EXECUTED (DO NOT REPEAT)
+{formatted_history}
+
+## 📋 CURRENT SESSION TO-DO LIST
 {formatted_session_plan}
 """
         if attempts_left == 1:

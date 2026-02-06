@@ -871,9 +871,12 @@ The feed will be completely replaced with new posts and comments.
                     agent_context=self.generator.conversation_history,
                     proposed_action=decision,
                     master_plan=self.planning_system.get_active_master_plan(),
+                    session_plan=self.session_todos,
                     attempts_left=attempts_left,
                     last_error=last_error,
-                    session_plan=self.session_todos,
+                    actions_performed=self.actions_performed,
+                    post_attempted=self.post_creation_attempted,
+                    blog_attempted=self.blog_article_attempted,
                 )
 
                 log.supervisor_audit(audit_report)

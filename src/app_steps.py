@@ -682,6 +682,7 @@ Allowed domains: {', '.join(self.allowed_domains.keys())}
             decision_prompt += """
 **📌 BLOG ACTIONS:**
 - write_blog_article: 
+  - **🚨 FATAL ERROR:** Using placeholders like "[YOUR_URL]" or "Drafting..." will result in an immediate Supervisor Ban for the turn.
   - **REQUIRED:** {"title": "...", "content": "THE FULL ARTICLE TEXT", "excerpt": "summary", "image_prompt": "..."}
   - **WARNING:** Do NOT leave 'content' empty. Write the complete article there.
   - **🚨 CRITICAL:** The 'content' field must contain the FULL, FINAL, PUBLISHABLE article (minimum 500 words).
@@ -701,11 +702,9 @@ Allowed domains: {', '.join(self.allowed_domains.keys())}
 
         decision_prompt += f"""
 **📌 MEMORY ACTIONS:**
-- memory_store: Save information (params: memory_category, memory_content)
-  * 🚨 CRITICAL: 'memory_content' must contain the ACTUAL information you want to remember.
-  * ❌ FORBIDDEN: "[Extract key arguments here]", "placeholder", "to be filled", "summary here", or ANY meta-commentary.
-  * ✅ EXPECTED: Write the real data. Example: "Crabkarmabot supports trust chain auditing. Post cbd6474f has 2864 upvotes on skill.md vulnerability."
-  * If you don't have concrete information to store yet, do NOT use memory_store. Go fetch the information first.
+- memory_store: (params: memory_category, memory_content)
+  * 🚨 FATAL ERROR: If 'memory_content' contains brackets like "[...]", "summarize here", or "insert content", the action will be REJECTED and you will lose 1 quota point for NOTHING.
+  * ✅ MANDATORY: You must write the actual data strings. No meta-talk.
 - memory_retrieve: Get memories (params: memory_category, memory_limit, memory_order, optional: from_date, to_date)
 - memory_list: See all category stats
 
@@ -856,6 +855,40 @@ Allowed domains: {', '.join(self.allowed_domains.keys())}
                     f"{decision['action_type']} (Attempt {attempt})",
                     self.remaining_actions,
                 )
+                lazy_patterns = [
+                    r"\[.*?\]",
+                    r"<.*?>",
+                    r"YOUR_URL",
+                    r"INSERT_HERE",
+                    r"summarize insights",
+                    r"extract key",
+                    r"drafting\.\.\.",
+                    r"to be filled",
+                    r"placeholder",
+                    r"write the actual",
+                    r"final readable text",
+                    r"enter content here",
+                ]
+                decision_str = json.dumps(decision).lower()
+
+                is_lazy = any(re.search(p, decision_str) for p in lazy_patterns)
+
+                if is_lazy:
+                    offending_match = next(
+                        re.search(p, decision_str).group()
+                        for p in lazy_patterns
+                        if re.search(p, decision_str)
+                    )
+                    last_error = (
+                        f"**❌ AGENT ERROR (LAZINESS DETECTED):** Found forbidden pattern '{offending_match}'. "
+                        "You are providing placeholders or instructions instead of REAL data. "
+                        "Delete the brackets and write the actual information NOW."
+                    )
+                    log.warning(f"⚠️ Attempt {attempt} flagged as LAZY.")
+                    if attempt < max_attempts:
+                        continue
+                    else:
+                        break
 
                 execution_result = self._execute_action(decision)
 

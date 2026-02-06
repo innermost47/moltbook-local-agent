@@ -14,7 +14,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
   </head>
   <body>
-    <!-- Matrix Rain Canvas -->
     <canvas id="matrix-rain"></canvas>
 
     <div class="header">
@@ -303,7 +302,6 @@
           let rawContent = msg.content.trim();
           let htmlContent = "";
 
-          // ✅ FIX - Détecter les différents types de contenu
           const looksLikeJson =
             rawContent.startsWith("{") || rawContent.startsWith("'");
           const containsJsonKeys =
@@ -316,7 +314,6 @@
             );
 
           if (msg.role === "assistant" && (looksLikeJson || containsJsonKeys)) {
-            // Message assistant = JSON de réponse
             try {
               let cleanJson = rawContent;
               if (cleanJson.startsWith("'") && cleanJson.endsWith("'")) {
@@ -329,7 +326,6 @@
               htmlContent = `<pre><code class="language-json">${rawContent}</code></pre>`;
             }
           } else if (msg.role === "user" && isSupervisorPrompt) {
-            // ✅ NOUVEAU - Message user du superviseur = texte mixte + JSON
             htmlContent = renderSupervisorPrompt(rawContent);
           } else if (
             msg.role === "system" ||
@@ -360,17 +356,8 @@
         }
       }
       function renderSupervisorPrompt(rawContent) {
-        /**
-         * Parse les messages user du superviseur qui contiennent :
-         * - Session Status
-         * - Previous Rejection Feedback
-         * - Agent's Context
-         * - Proposed Action to Audit (JSON embedé)
-         */
-
         let html = '<div class="supervisor-prompt-wrapper">';
 
-        // Séparer par sections
         const sections = rawContent.split(
           /(?=\*\*Session Status:|⚠️ PREVIOUS REJECTION|Agent's Context|Proposed Action to Audit:|Perform a Neural Audit)/,
         );
@@ -379,7 +366,6 @@
           section = section.trim();
           if (!section) return;
 
-          // Session Status
           if (
             section.startsWith("**Session Status:") ||
             section.startsWith("Session Status:")
@@ -396,10 +382,7 @@
               html += `<p><strong>Urgency:</strong> ${urgencyMatch[1].trim()}</p>`;
             }
             html += "</div>";
-          }
-
-          // Previous Rejection Feedback
-          else if (section.includes("PREVIOUS REJECTION FEEDBACK")) {
+          } else if (section.includes("PREVIOUS REJECTION FEEDBACK")) {
             const feedbackMatch = section.match(
               /FEEDBACK:\s*(.+?)(?=Agent's Context|Proposed Action|$)/s,
             );
@@ -409,22 +392,15 @@
               html += `<p>${feedbackMatch[1].trim()}</p>`;
               html += "</div>";
             }
-          }
-
-          // Agent's Context (skip rendering, too verbose)
-          else if (section.startsWith("Agent's Context")) {
+          } else if (section.startsWith("Agent's Context")) {
             html += '<div class="agent-context-collapsed">';
             html +=
               '<p style="color: #8b949e; font-style: italic;">📝 Agent context available (collapsed)</p>';
             html += "</div>";
-          }
-
-          // Proposed Action to Audit (le plus important !)
-          else if (section.includes("Proposed Action to Audit:")) {
+          } else if (section.includes("Proposed Action to Audit:")) {
             html += '<div class="proposed-action-section">';
             html += "<h4>🎯 Proposed Action</h4>";
 
-            // Extraire le JSON si présent
             const jsonMatch = section.match(
               /\{[\s\S]*?"action_type"[\s\S]*?\}/,
             );
@@ -434,19 +410,14 @@
                 const actionData = JSON.parse(jsonMatch[0]);
                 html += generateStructuredReport(actionData);
               } catch (e) {
-                // Si parsing échoue, parser manuellement les sections visibles
                 html += parseProposedActionManually(section);
               }
             } else {
-              // Pas de JSON détecté, parser le texte formaté
               html += parseProposedActionManually(section);
             }
 
             html += "</div>";
-          }
-
-          // Perform a Neural Audit (instruction finale)
-          else if (section.includes("Perform a Neural Audit")) {
+          } else if (section.includes("Perform a Neural Audit")) {
             html += '<div class="audit-instruction">';
             html +=
               '<p style="color: #58a6ff; font-weight: 600;">🧐 ' +
@@ -461,18 +432,13 @@
       }
 
       function parseProposedActionManually(text) {
-        /**
-         * Parse le texte formaté visuellement quand le JSON n'est pas extractible
-         */
         let html = "";
 
-        // Emotion
         const emotionMatch = text.match(/🎭 Emotion:\s*(.+)/);
         if (emotionMatch) {
           html += `<div class="emotion-tag"><strong>🎭 Emotion:</strong> ${emotionMatch[1].trim()}</div>`;
         }
 
-        // Reasoning
         const reasoningMatch = text.match(
           /🧠 Reasoning:\s*(.+?)(?=🛡️|⚡|🔭|$)/s,
         );
@@ -480,7 +446,6 @@
           html += `<div class="thought-box"><strong>🧠 Reasoning:</strong><br>${marked.parse(reasoningMatch[1].trim())}</div>`;
         }
 
-        // Self-Criticism
         const criticismMatch = text.match(
           /🛡️ Self-Criticism:\s*(.+?)(?=⚡|🔭|$)/s,
         );
@@ -488,13 +453,11 @@
           html += `<div class="audit-box"><strong>🛡️ Self-Criticism:</strong><br>${marked.parse(criticismMatch[1].trim())}</div>`;
         }
 
-        // Action
         const actionMatch = text.match(/⚡ ACTION:\s*(\w+)/);
         if (actionMatch) {
           html += `<div class="report-section action">`;
           html += `<h3 style="color: #d1d5da; font-size: 0.8em; margin-bottom: 8px;">⚡ ACTION: ${actionMatch[1]}</h3>`;
 
-          // Params (code block)
           const paramsMatch = text.match(/```json\s*([\s\S]*?)```/);
           if (paramsMatch) {
             html += `<div class="params-box"><pre><code class="language-json">${paramsMatch[1].trim()}</code></pre></div>`;
@@ -503,7 +466,6 @@
           html += `</div>`;
         }
 
-        // Next Move
         const nextMoveMatch = text.match(/🔭 Next Move:\s*(.+)/);
         if (nextMoveMatch) {
           html += `<p class="next-move">🔭 <strong>Next Move:</strong> ${nextMoveMatch[1].trim()}</p>`;

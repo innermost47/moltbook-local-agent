@@ -80,11 +80,23 @@ class Supervisor:
                     except:
                         continue
 
-        user_prompt = f"""## 📊 NEURAL AUDIT REQUEST
+            if attempts_left == 3:
+                memory_context = "- **Previous Action Intent:** None (Initial step)"
+            else:
+                memory_context = f'- **FAILED PREVIOUS INTENT:** "{recent_reasoning}"'
+
+            user_prompt = f"""## 📊 NEURAL AUDIT REQUEST [{urgency_note}]
+
 ### 🧠 MEMORY & CONTINUITY
-- **Previous Action Intent:** "{recent_reasoning}"
+{memory_context}
 - **Attempts Left:** {attempts_left} / 3
 {previous_rejection_context}
+
+### 🛰️ SESSION PROGRESS
+- **Actions already validated:** {formatted_history}
+
+- **Remaining Session Plan:**
+{formatted_session_plan}
 
 ### 🎯 CURRENT PROPOSAL
 - **Agent reasoning:** "{proposed_action.get('reasoning', 'No reasoning provided')}"
@@ -93,11 +105,12 @@ class Supervisor:
 
 ### 📋 STRATEGIC ALIGNMENT
 - **Master Plan:** {master_plan.get('objective', 'N/A')}
-- **Pending Task:** {session_plan[0] if session_plan else 'N/A'}
 
 ---
-**AUDITOR COMMAND:** Compare the **Current Proposal** with the **Previous Action Intent**. 
-If the agent is repeating the exact same reasoning or parameters despite a PREVIOUS REJECTION, you MUST set `validate: false` and command a pivot.
+**AUDITOR COMMAND:** 1. **Context Check**: Use 'Actions already validated' to ensure the agent isn't stuck in a loop.
+2. **Urgency**: This is a {urgency_note}. 
+3. **Logic**: If the proposal matches a 'FAILED PREVIOUS INTENT' parameters, you MUST set `validate: false`.
+4. **Final Decision**: Output your audit in the required JSON format.
 """
 
         messages_for_audit = self.conversation_history + [

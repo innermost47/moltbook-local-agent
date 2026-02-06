@@ -28,16 +28,14 @@ class Generator:
         response_format: dict = None,
         save_to_history: bool = True,
         agent_name="Agent",
+        heavy_context: str = "",
     ):
         now = datetime.now().strftime("%Y-%m-%d %H:%M")
-        time_aware_prompt = f"""{prompt}
-
----
-
-**Current Time:** {now}
-"""
+        full_llm_payload = (
+            f"{heavy_context}\n\n{prompt}\n\n---\n**Current Time:** {now}"
+        )
         messages_for_llm = self.conversation_history + [
-            {"role": "user", "content": time_aware_prompt}
+            {"role": "user", "content": full_llm_payload}
         ]
 
         with open("debug.json", "w", encoding="utf-8") as f:
@@ -69,13 +67,13 @@ class Generator:
             full_exchange = messages_for_llm + [
                 {"role": "assistant", "content": assistant_msg}
             ]
+
             with open("debug.json", "w", encoding="utf-8") as f:
                 json.dump(full_exchange, f, indent=4, ensure_ascii=False)
 
             if save_to_history:
-                clean_user_content = f"### 📊 {agent_name.upper()}: Decide next action (Feed context hidden for optimization) [^]"
                 self.conversation_history.append(
-                    {"role": "user", "content": clean_user_content}
+                    {"role": "user", "content": f"{prompt}\n\n**Time:** {now}"}
                 )
                 self.conversation_history.append(
                     {"role": "assistant", "content": assistant_msg}

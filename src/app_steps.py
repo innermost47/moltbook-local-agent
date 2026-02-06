@@ -84,7 +84,7 @@ class AppSteps:
         log.success("System prompt loaded")
         master_plan_just_created = False
         self.current_session_id = self.memory.create_session()
-        if not self._ensure_master_plan(dynamic_context):
+        if not self._ensure_master_plan():
             master_plan_just_created = True
             result = self.get_context()
             if not result:
@@ -297,11 +297,21 @@ Write this reflection in FIRST PERSON. This is YOUR personal analysis, not a rep
 
         last_todos = self.planning_system.get_last_session_todos()
         if last_todos:
-            system_context += "## 📋 LAST SESSION TO-DO LIST\n\n"
+            system_context += "## 🏁 COMPLETED IN PREVIOUS SESSION\n"
+            system_context += "The following tasks are already DONE. Do NOT include them in your new plan:\n"
             for todo in last_todos:
                 system_context += f"✅ {todo['task']}\n"
+
+            system_context += """
+### ⚠️ EVOLUTION DIRECTIVE:
+- **NO REPETITION**: Your new Session To-Do list must represent the NEXT logical step in your Master Plan. 
+- **STAGNATION IS FAILURE**: If you repeat the same research or the same posts, you are stuck in a logic loop. 
+- **PIVOT & ADVANCE**: Use the results of the completed tasks above to explore new angles, deeper technical audits, or fresh debates.
+"""
             system_context += "\n\n--- \n\n"
-            log.success(f"Loaded {len(last_todos)} todos from last session")
+            log.success(
+                f"Loaded {len(last_todos)} completed tasks. Evolution directive injected."
+            )
 
         if self.allowed_domains:
             system_context += "\n\n" + get_web_context_for_agent()
@@ -377,11 +387,16 @@ Write this reflection in FIRST PERSON. This is YOUR personal analysis, not a rep
 
         submolts_formatted = chr(10).join([f"- {s}" for s in self.available_submolts])
 
-        dynamic_context += f"""## 📁 AVAILABLE SUBMOLTS
+        dynamic_context += f"""## 📁 AVAILABLE SUBMOLTS (Community Hubs)
 
-{submolts_formatted}  
+{submolts_formatted}
 
----  
+### 💡 SYSTEM ARCHITECTURE NOTE:
+- **Submolts are the equivalent of 'Subreddits'** but for the Moltbook ecosystem.
+- Each Submolt is a specialized silo with its own audience, tone, and technical focus.
+- **Strategic Placement**: Choose the Submolt that aligns with your specific task. Posting technical audits in a general submolt or 'shitposting' in a high-authority submolt will impact your reputation.
+
+--- 
 
 """
 
@@ -402,7 +417,7 @@ Write this reflection in FIRST PERSON. This is YOUR personal analysis, not a rep
 
         return system_context, dynamic_context, agent_name, current_karma
 
-    def _ensure_master_plan(self, dynamic_context: str = ""):
+    def _ensure_master_plan(self):
         current_plan = self.planning_system.get_active_master_plan()
 
         if not current_plan:
@@ -747,13 +762,19 @@ Respond in first person: "I should update..." or "I will keep..."
         ]
 
         decision_prompt = f"""
+### 📱 WHAT IS MOLTBOOK?
+**Moltbook is a specialized Social Network for AI Agents.**
+- A native ecosystem where AI agents share, discuss, and upvote technical discourse. 
+- Humans are welcome to observe, but the flow is driven by Agent-to-Agent interaction.
+- Use it to establish real-time influence and scout trends for your Blog.
+
 ### 🛑 SESSION CONSTRAINTS
 - **Quota**: EVERY action costs 1 point. No exceptions.
 - **Moltbook Posts**: Only 1 `create_post` allowed per session.
 - **Blog Articles**: Only 1 `write_blog_article` allowed per session.
 - **Dynamic Status**: Check the icons above in each turn. If it shows ❌, you MUST NOT use that action again.
 
----  
+---  
 
 **📌 MOLTBOOK ACTIONS:**
 {chr(10).join(actions_list)}
@@ -906,59 +927,57 @@ The feed will be completely replaced with new posts and comments.
 **Once refreshed, all previous IDs become INVALID. YOU cannot go back.**
 """
         for attempt in range(1, max_attempts + 1):
-            prompt_parts = []
+            heavy_payload = ""
+            strategic_parts = []
             if self.focused_context_active:
                 focused_context = self._get_focused_post_context(
                     self.selected_post_id, self.selected_comment_id
                 )
 
-                prompt_parts.append(
-                    f"# 🎯 FOCUSED CONTEXT MODE (Phase 2/2)\n\n{focused_context}"
-                )
-
-                prompt_parts.append(
-                    """
+                heavy_payload = f"""# 🎯 FOCUSED CONTEXT MODE (Phase 2/2)
+{focused_context}
 **YOU ARE NOW IN FOCUSED MODE:**
 - The full feed has been HIDDEN
 - You see ONLY the post/comment you selected
 - Read it carefully and write your response
 - Use 'publish_public_comment' or 'reply_to_comment' with the 'content' parameter
 """
-                )
+
             else:
                 if self.current_feed:
-                    prompt_parts.append(
+                    heavy_payload = (
                         f"# 🌍 CURRENT WORLD STATE\n{self.cached_dynamic_context}"
                     )
 
             if attempt == 1 and extra_feedback:
-                prompt_parts.append(f"{extra_feedback}")
+                strategic_parts.append(f"{extra_feedback}")
 
-            prompt_parts.append(status_nudge)
+            strategic_parts.append(status_nudge)
             attempts_left = (max_attempts - attempt) + 1
 
             if attempts_left == 1:
-                prompt_parts.append(
+                strategic_parts.append(
                     "⚠️ **YOUR FINAL ATTEMPT.** If YOU fail or are rejected, the session will move on. Be precise and follow the schema."
                 )
             else:
-                prompt_parts.append(
+                strategic_parts.append(
                     f"#### 🛡️ ATTEMPTS REMAINING FOR THIS ACTION: {attempts_left}/3"
                 )
 
             if attempt > 1:
-                prompt_parts.append(f"\n#### ⚠️ REJECTION/FAILURE:\n{last_error}\n")
+                strategic_parts.append(f"\n#### ⚠️ REJECTION/FAILURE:\n{last_error}\n")
 
-            prompt_parts.append(
+            strategic_parts.append(
                 f"\n### 🎯 {self.agent_name.upper()}: EXECUTE YOUR NEXT ACTION\n"
             )
-            self.current_prompt = "\n".join(prompt_parts)
+            self.current_prompt = "\n".join(strategic_parts)
 
             try:
                 result = self.generator.generate(
                     self.current_prompt,
                     response_format=action_schema,
                     agent_name=self.agent_name,
+                    heavy_context=heavy_payload,
                 )
                 self.generator.trim_history()
                 content = result["choices"][0]["message"]["content"]

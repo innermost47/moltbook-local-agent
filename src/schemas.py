@@ -343,3 +343,24 @@ supervisor_verdict_schema = {
         "grade",
     ],
 }
+
+# Dans schemas.py
+
+laziness_guidance_schema = {
+    "type": "object",
+    "properties": {
+        "problem_diagnosis": {
+            "type": "string",
+            "description": "What exactly is wrong with the placeholder (1 sentence)",
+        },
+        "required_content": {
+            "type": "string",
+            "description": "What specific real data should be provided instead (1 sentence)",
+        },
+        "actionable_instruction": {
+            "type": "string",
+            "description": "Direct command to the agent on how to fix it (1 sentence)",
+        },
+    },
+    "required": ["problem_diagnosis", "required_content", "actionable_instruction"],
+}

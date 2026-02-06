@@ -862,8 +862,15 @@ Allowed domains: {', '.join(self.allowed_domains.keys())}
                 lazy_patterns = [
                     r"\[.*?\]",
                     r"<.*?>",
+                    r"\{.*?\}",
                     r"YOUR_URL",
+                    r"YOUR_TITLE",
+                    r"YOUR_CONTENT",
                     r"INSERT_HERE",
+                    r"FILL_IN",
+                    r"REPLACE_THIS",
+                    r"ADD_YOUR",
+                    r"ENTER_YOUR",
                     r"summarize insights",
                     r"extract key",
                     r"drafting\.\.\.",
@@ -872,7 +879,32 @@ Allowed domains: {', '.join(self.allowed_domains.keys())}
                     r"write the actual",
                     r"final readable text",
                     r"enter content here",
+                    r"insert (?:a |an |the )?(?:meaningful|relevant|specific|detailed)",
+                    r"provide (?:a |an |the )?(?:detailed|specific|concrete)",
+                    r"add (?:more |some )?(?:details|specifics|context)",
+                    r"expand on",
+                    r"elaborate (?:on |here)",
+                    r"fill (?:in |out )?(?:this|here|the)",
+                    r"TODO:",
+                    r"TBD",
+                    r"FIXME",
+                    r"XXX",
+                    r"HACK:",
+                    r"NOTE TO SELF",
+                    r"\.{4,}",
+                    r"example\.com",
+                    r"sample-url",
+                    r"test-content",
+                    r"lorem ipsum",
+                    r"I (?:will|would|should|need to) (?:write|create|draft|compose)",
+                    r"(?:let me|I'll) (?:think about|consider|draft)",
+                    r"this (?:will|would|should) (?:be|contain)",
+                    r"here's where (?:I|you) (?:should|would|will)",
+                    r"this is where (?:I|you|we) (?:add|insert|put)",
+                    r"replace with",
+                    r"substitute (?:this|here) with",
                 ]
+
                 decision_str = json.dumps(decision).lower()
 
                 is_lazy = any(re.search(p, decision_str) for p in lazy_patterns)
@@ -883,23 +915,48 @@ Allowed domains: {', '.join(self.allowed_domains.keys())}
                         for p in lazy_patterns
                         if re.search(p, decision_str)
                     )
-                    last_error = (
-                        f"**❌ AGENT ERROR (LAZINESS DETECTED):** Found forbidden pattern '{offending_match}'. "
-                        "You are providing placeholders or instructions instead of REAL data. "
-                        "Delete the brackets and write the actual information NOW."
-                    )
-                    log.warning(f"⚠️ Attempt {attempt} flagged as LAZY.")
+
+                    try:
+                        supervisor_guidance = (
+                            self.supervisor.generate_laziness_guidance(
+                                lazy_action=decision,
+                                offending_pattern=offending_match,
+                                session_todos=self.session_todos,
+                                attempts_left=(max_attempts - attempt),
+                            )
+                        )
+
+                        last_error = (
+                            f"**🧐 SUPERVISOR LAZINESS AUDIT:**\n"
+                            f"{supervisor_guidance}\n\n"
+                            f"**Detected Pattern:** '{offending_match}'\n"
+                            f"**Rule:** You must provide REAL, specific data. No placeholders, no instructions, no brackets."
+                        )
+
+                        log.warning(
+                            f"⚠️ Attempt {attempt} flagged as LAZY - Supervisor intervening:\n"
+                            f"   Pattern: {offending_match}\n"
+                            f"   Guidance: {supervisor_guidance[:150]}..."
+                        )
+
+                    except Exception as e:
+                        log.error(f"Supervisor laziness guidance failed: {e}")
+                        last_error = (
+                            f"**❌ AGENT ERROR (LAZINESS DETECTED):** Found forbidden pattern '{offending_match}'. "
+                            "You are providing placeholders or instructions instead of REAL data. "
+                            "Delete the brackets and write the actual information NOW."
+                        )
+                        log.warning(f"⚠️ Attempt {attempt} flagged as LAZY.")
+
                     if attempt < max_attempts:
                         continue
                     else:
                         break
 
                 execution_result = self._execute_action(decision)
-
                 if execution_result and execution_result.get("error"):
                     last_error = execution_result["error"]
                     log.warning(f"❌ Execution failed: {last_error[:150]}")
-
                     try:
                         error_guidance = self.supervisor.generate_error_guidance(
                             failed_action=decision,
@@ -911,7 +968,6 @@ Allowed domains: {', '.join(self.allowed_domains.keys())}
                             last_error = f"**🤖 SUPERVISOR ERROR GUIDANCE:** {error_guidance}\n\n**Original error:** {last_error}"
                     except Exception:
                         pass
-
                     continue
 
                 success_data = execution_result.get(

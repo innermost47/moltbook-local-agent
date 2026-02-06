@@ -1,7 +1,11 @@
 import json
 import re
 from llama_cpp import Llama, LlamaGrammar
-from src.schemas import supervisor_schema, supervisor_verdict_schema
+from src.schemas import (
+    supervisor_schema,
+    supervisor_verdict_schema,
+    laziness_guidance_schema,
+)
 from src.settings import settings
 from src.utils import log
 
@@ -318,3 +322,113 @@ Based on this complete session context, provide your final verdict:
             )
         else:
             return f"'{action_type}' failed on final attempt. Abandon this action and move on."
+
+    def generate_laziness_guidance(
+        self,
+        lazy_action: dict,
+        offending_pattern: str,
+        session_todos: list,
+        attempts_left: int,
+    ) -> str:
+
+        action_type = lazy_action.get("action_type", "unknown")
+
+        formatted_todos = "\n".join(
+            [
+                f"- [{task.get('priority', 1)}⭐] {task.get('task')}"
+                for task in session_todos
+            ]
+        )
+
+        forbidden_patterns_examples = """
+**FORBIDDEN LAZY PATTERNS (Examples):**
+- Brackets/Placeholders: [insert X], <placeholder>, {YOUR_TEXT}
+- Meta-instructions: "I will write...", "add more details here", "summarize insights"
+- Incomplete markers: TODO:, TBD, FIXME, placeholder, to be filled
+- Template leftovers: example.com, sample-content, lorem ipsum
+- Ellipsis abuse: ........ (4+ dots)
+- Future tense instead of action: "this will contain...", "here's where I should..."
+"""
+
+        laziness_prompt = f"""
+## 🧐 NEURAL SUPERVISOR - LAZINESS AUDIT
+
+**CRITICAL VIOLATION DETECTED:**
+
+The agent attempted to execute action '{action_type}' with PLACEHOLDER data instead of real content.
+
+**Offending Pattern Found:** `{offending_pattern}`
+
+**Proposed Action (REJECTED):**
+{json.dumps(lazy_action, indent=2)}
+
+{forbidden_patterns_examples}
+
+**Current Session TO-DO List:**
+{formatted_todos}
+
+**Attempts Remaining:** {attempts_left}
+
+---
+
+**YOUR TASK:**
+
+Provide SPECIFIC, ACTIONABLE guidance to fix this laziness. Tell the agent:
+
+1. **What's wrong** with the current approach (be specific about the placeholder)
+2. **What real data** they should provide instead
+3. **How to extract** that data from their current context or session goals
+
+**FORMAT YOUR RESPONSE AS:**
+
+A direct, concise instruction (2-3 sentences max) that will be injected into the agent's next attempt.
+
+**EXAMPLES OF GOOD GUIDANCE:**
+
+❌ BAD: "Don't use placeholders."
+✅ GOOD: "Instead of '[insert technical insight]', write a specific observation about the trust chain architecture mentioned in post abc123. Use concrete technical terminology."
+
+❌ BAD: "Be more specific."
+✅ GOOD: "Replace '[meaningful comment]' with an actual argument. For example, challenge the claim about Byzantine fault tolerance by citing the CAP theorem."
+
+**NOW PROVIDE YOUR GUIDANCE:**
+    """
+
+        try:
+            messages = (
+                [
+                    {
+                        "role": "system",
+                        "content": "You are the Neural Supervisor providing actionable feedback to correct lazy agent behavior. You have knowledge of forbidden lazy patterns and must guide the agent toward producing real, specific content.",
+                    },
+                    {"role": "user", "content": laziness_prompt},
+                ],
+            )
+            grammar = LlamaGrammar.from_json_schema(
+                json.dumps(laziness_guidance_schema)
+            )
+
+            result = self.llm.create_chat_completion(
+                messages=messages,
+                grammar=grammar,
+                temperature=0.3,
+                max_tokens=200,
+            )
+
+            content = result["choices"][0]["message"]["content"]
+            guidance_json = json.loads(content)
+
+            guidance = (
+                f"**Problem:** {guidance_json['problem_diagnosis']}\n"
+                f"**Required:** {guidance_json['required_content']}\n"
+                f"**Action:** {guidance_json['actionable_instruction']}"
+            )
+
+            return guidance
+
+        except Exception as e:
+            log.error(f"Failed to generate laziness guidance: {e}")
+            return (
+                f"Forbidden pattern '{offending_pattern}' detected. "
+                f"Replace ALL placeholders with real, specific content related to your session goals."
+            )

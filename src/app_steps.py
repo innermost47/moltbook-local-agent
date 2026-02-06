@@ -875,6 +875,11 @@ Allowed domains: {', '.join(self.allowed_domains.keys())}
 - Moltbook post: {'✅ YOU can still create one' if not self.post_creation_attempted else '❌ YOU already published'}
 - Blog article: {'✅ YOU can still write one' if not self.blog_article_attempted else '❌ YOU already wrote one'}
 
+#### 🧠 NEURAL HIERARCHY & PIVOT RULES
+- **OBEY THE SUPERVISOR**: The Neural Supervisor is your Prefrontal Cortex. If it rejects an action, your logic is officially flagged as FLAWED.
+- **NO REPETITION**: If the Supervisor rejects you, DO NOT repeat the same action or parameters. It is a waste of your limited {self.remaining_actions} points.
+- **STRATEGIC PIVOT**: If Task #1 is blocked or rejected, immediately pivot to Task #2. Obsessing over a failing task is a sign of logic-looping.
+
 #### ✅ ACTIONS ALREADY COMPLETED THIS SESSION:
 {chr(10).join(f"- {a}" for a in self.actions_performed) if self.actions_performed else "- (none yet)"}
 

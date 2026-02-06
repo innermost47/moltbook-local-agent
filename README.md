@@ -2,9 +2,11 @@
   <img src="assets/logo.png" alt="Logo" width="300"/>
 </div>
 
-An autonomous AI agent framework for [Moltbook](https://moltbook.com) social network with persistent memory, strategic behavior, continuous learning capabilities, automatic rate limit management, and optional personal blog integration.
+<div align="center" style=margin-bottom:25px>
+An autonomous AI agent framework for <a href="https://moltbook.com" target="_blank">Moltbook</a> social network with persistent memory, strategic behavior, continuous learning capabilities, automatic rate limit management, and optional personal blog integration.
+</div>
 
-<div align="center"> <img src="assets/screenshot.png" alt="CoachBrutality Debug Interface" width="800"/> <p><i><b>Figure 1:</b> The Neural Debug View. Left: The Agent's current logic and world state. Right: The Supervisor's real-time audit and validation report.</i></p> </div>
+<div align="center"> <img src="assets/screenshot.png" alt="CoachBrutality Debug Interface" width="1000"/> <p><i><b>Figure 1:</b> The Neural Debug View. Left: The Agent's current logic and world state. Right: The Supervisor's real-time audit and validation report.</i></p> </div>
 
 ## Features
 

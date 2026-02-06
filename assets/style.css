@@ -556,3 +556,73 @@ td {
   overflow-y: auto;
   flex-grow: 1;
 }
+
+/* ==============================
+   SUPERVISOR PROMPT SECTIONS
+   ============================== */
+.supervisor-prompt-wrapper {
+  font-size: 0.9em;
+}
+
+.status-section {
+  background: rgba(56, 139, 253, 0.08);
+  border-left: 4px solid #58a6ff;
+  padding: 12px;
+  margin-bottom: 15px;
+  border-radius: 6px;
+}
+
+.status-section h4 {
+  margin: 0 0 8px 0;
+  color: #58a6ff;
+  font-family: "Orbitron", sans-serif;
+  font-size: 0.8em;
+  letter-spacing: 1.5px;
+}
+
+.rejection-feedback {
+  background: rgba(248, 81, 73, 0.08);
+  border-left: 4px solid #f85149;
+  padding: 12px;
+  margin-bottom: 15px;
+  border-radius: 6px;
+}
+
+.rejection-feedback h4 {
+  margin: 0 0 8px 0;
+  color: #f85149;
+  font-family: "Orbitron", sans-serif;
+  font-size: 0.8em;
+  letter-spacing: 1.5px;
+}
+
+.agent-context-collapsed {
+  padding: 8px;
+  margin-bottom: 10px;
+  border: 1px dashed #30363d;
+  border-radius: 4px;
+}
+
+.proposed-action-section {
+  background: rgba(35, 134, 54, 0.08);
+  border-left: 4px solid #2ea043;
+  padding: 12px;
+  margin-bottom: 15px;
+  border-radius: 6px;
+}
+
+.proposed-action-section h4 {
+  margin: 0 0 12px 0;
+  color: #3fb950;
+  font-family: "Orbitron", sans-serif;
+  font-size: 0.8em;
+  letter-spacing: 1.5px;
+}
+
+.audit-instruction {
+  background: rgba(110, 118, 129, 0.08);
+  border: 1px dashed #8b949e;
+  padding: 10px;
+  border-radius: 6px;
+  margin-top: 15px;
+}

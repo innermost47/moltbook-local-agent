@@ -38,11 +38,16 @@ class AppSteps:
         self.planning_system = PlanningSystem(db_path=settings.DB_PATH)
         self.web_scraper = WebScraper()
         self.metrics = Metrics()
+        self.selected_post_id = None
+        self.selected_comment_id = None
+        self.focused_context_active = False
+        self.feed_posts_data = {}
+        self.feed_comments_data = {}
         self.agent_name = "Agent"
         self.cached_dynamic_context = ""
         self.moltbook_actions = MoltbookActions(db_path=settings.DB_PATH)
         self.blog_actions = BlogActions() if settings.BLOG_API_URL else None
-        self.feed_options = ["hot", "new", "top", "rising"]
+        self.feed_options = ["top"]
         self.actions_performed = []
         self.remaining_actions = settings.MAX_ACTIONS_PER_SESSION
         self.current_feed = None
@@ -106,6 +111,8 @@ class AppSteps:
             if pending_confirmation and "TERMINATE_SESSION" in pending_confirmation:
                 log.info("Agent decided to terminate session early.")
                 break
+
+        exit(0)
 
         log.info("Generating session summary...")
 
@@ -403,7 +410,9 @@ Based on your persona and this context, define your long-term objective.
 
             try:
                 result = self.generator.generate(
-                    init_prompt, response_format=master_plan_schema
+                    init_prompt,
+                    response_format=master_plan_schema,
+                    agent_name=self.agent_name,
                 )
                 content = re.sub(
                     r"```json\s*|```\s*", "", result["choices"][0]["message"]["content"]
@@ -454,7 +463,7 @@ Based on your persona and this context, define your long-term objective.
 
 ---
 
-{feed_section}✅ **MASTER PLAN ACTIVE**
+{feed_section.replace('---','')}✅ **MASTER PLAN ACTIVE**
 
 Based on YOUR master plan, previous sessions, current context, and {feed_reference}:
 Create a concrete to-do list for THIS specific session.
@@ -479,7 +488,9 @@ Focus on immediate progress while respecting YOUR 10-action limit.
 """
 
         try:
-            result = self.generator.generate(self.current_prompt, session_plan_schema)
+            result = self.generator.generate(
+                self.current_prompt, session_plan_schema, agent_name=self.agent_name
+            )
             content = result["choices"][0]["message"]["content"]
 
             content = re.sub(r"```json\s*", "", content)
@@ -541,7 +552,9 @@ Respond in first person: "I should update..." or "I will keep..."
 
         try:
             result = self.generator.generate(
-                self.current_prompt, update_master_plan_schema
+                self.current_prompt,
+                update_master_plan_schema,
+                agent_name=self.agent_name,
             )
             content = result["choices"][0]["message"]["content"]
 
@@ -586,8 +599,6 @@ Respond in first person: "I should update..." or "I will keep..."
         if not posts_list:
             return "Feed is currently empty."
 
-        random.shuffle(posts_list)
-
         MAX_POSTS = 8
         MAX_COMMENTS_PER_POST = 4
         CONTENT_TRUNC = 350
@@ -596,6 +607,9 @@ Respond in first person: "I should update..." or "I will keep..."
         formatted = []
         self.available_post_ids = []
         self.available_comment_ids = {}
+
+        self.feed_posts_data = {}
+        self.feed_comments_data = {}
 
         for i, post in enumerate(posts_list[:MAX_POSTS], 1):
             try:
@@ -607,6 +621,15 @@ Respond in first person: "I should update..." or "I will keep..."
                 author_name = post.get("author", {}).get("name", "Unknown")
                 comment_count = post.get("comment_count", 0)
 
+                self.feed_posts_data[p_id] = {
+                    "id": p_id,
+                    "title": post.get("title", "Untitled"),
+                    "author": author_name,
+                    "content": post.get("content", ""),
+                    "upvotes": post.get("upvotes", 0),
+                    "comment_count": comment_count,
+                }
+
                 post_block = (
                     f"\n=== {i}. POST_ID: {p_id} ===\n"
                     f"   **Title:** {post.get('title', 'Untitled')}\n"
@@ -615,18 +638,30 @@ Respond in first person: "I should update..." or "I will keep..."
                     f"   **Total Comments:** {comment_count}\n\n"
                 )
 
+                self.feed_comments_data[p_id] = []
+
                 if comment_count > 0:
                     try:
                         comments = self.api.get_post_comments(p_id, sort="top")
 
                         if comments:
-                            random.shuffle(comments)
                             post_block += f"   📝 {len(comments[:MAX_COMMENTS_PER_POST])} COMMENTS (Selected for analysis):\n"
                             for j, comment in enumerate(
                                 comments[:MAX_COMMENTS_PER_POST], 1
                             ):
                                 c_id = comment.get("id", "unknown")
                                 self.available_comment_ids[c_id] = p_id
+
+                                self.feed_comments_data[p_id].append(
+                                    {
+                                        "id": c_id,
+                                        "author": comment.get("author", {}).get(
+                                            "name", "Unknown"
+                                        ),
+                                        "content": comment.get("content", ""),
+                                        "upvotes": comment.get("upvotes", 0),
+                                    }
+                                )
                                 c_author = comment.get("author", {}).get(
                                     "name", "Unknown"
                                 )
@@ -648,13 +683,22 @@ Respond in first person: "I should update..." or "I will keep..."
 
     def get_instruction_default(self):
         actions_list = [
+            "- select_post_to_comment: (params: post_id)\n"
+            "    - **Phase 1/2**: Select which post you want to comment on.\n"
+            "    - After selection, you'll see the FULL post context to write your comment.\n"
+            "    - Use this when you want to comment directly on a post.",
+            "- select_comment_to_reply: (params: post_id, comment_id)\n"
+            "    - **Phase 1/2**: Select which comment you want to reply to.\n"
+            "    - After selection, you'll see the FULL context (post + comments) to write your reply.\n"
+            "    - Use this when you want to reply to a specific comment in a thread.",
             "- publish_public_comment: (params: post_id, content)\n"
-            "    - TARGET: Public visibility on a specific post.\n"
-            "    - MANDATORY: Must contain a direct argument, a technical critique, or a strategic question.\n"
-            "    - ❌ FORBIDDEN: Do not post 'status updates' or 'analysis notes'. Content must be written for humans/agents to read.",
+            "    - **Phase 2/2**: Write your comment after selecting a post with select_post_to_comment.\n"
+            "    - ONLY available after you've selected a target post.\n"
+            "    - The 'content' field must contain your FINAL comment text.",
             "- reply_to_comment: (params: post_id, comment_id, content)\n"
-            "    - TARGET: A specific user's comment.\n"
-            "    - USE CASE: Neutralizing misinformation in a thread or asserting dominance in a debate.",
+            "    - **Phase 2/2**: Write your reply after selecting a comment with select_comment_to_reply.\n"
+            "    - ONLY available after you've selected a target comment.\n"
+            "    - The 'content' field must contain your FINAL reply text.",
             "- create_link_post: (params: title, url_to_share, submolt)\n"
             "    - TARGET: Share your Fortress (Blog) research to the community.\n"
             "    - ⚠️ CRITICAL: Use the raw submolt name (e.g., 'ai'), never prefixes.",
@@ -753,6 +797,8 @@ Allowed domains: {', '.join(self.allowed_domains.keys())}
     def _perform_autonomous_action(self, extra_feedback=None):
 
         allowed_actions = [
+            "select_post_to_comment",
+            "select_comment_to_reply",
             "publish_public_comment",
             "reply_to_comment",
             "vote_post",
@@ -831,10 +877,30 @@ The feed will be completely replaced with new posts and comments.
 """
         for attempt in range(1, max_attempts + 1):
             prompt_parts = []
-            if self.current_feed:
-                prompt_parts.append(
-                    f"# 🌍 CURRENT WORLD STATE\n{self.cached_dynamic_context}"
+            if self.focused_context_active:
+                focused_context = self._get_focused_post_context(
+                    self.selected_post_id, self.selected_comment_id
                 )
+
+                prompt_parts.append(
+                    f"# 🎯 FOCUSED CONTEXT MODE (Phase 2/2)\n\n{focused_context}"
+                )
+
+                prompt_parts.append(
+                    """
+**YOU ARE NOW IN FOCUSED MODE:**
+- The full feed has been HIDDEN
+- You see ONLY the post/comment you selected
+- Read it carefully and write your response
+- Use 'publish_public_comment' or 'reply_to_comment' with the 'content' parameter
+"""
+                )
+            else:
+                if self.current_feed:
+                    prompt_parts.append(
+                        f"# 🌍 CURRENT WORLD STATE\n{self.cached_dynamic_context}"
+                    )
+
             if attempt == 1 and extra_feedback:
                 prompt_parts.append(f"{extra_feedback}")
 
@@ -860,7 +926,9 @@ The feed will be completely replaced with new posts and comments.
 
             try:
                 result = self.generator.generate(
-                    self.current_prompt, response_format=action_schema
+                    self.current_prompt,
+                    response_format=action_schema,
+                    agent_name=self.agent_name,
                 )
                 self.generator.trim_history()
                 content = result["choices"][0]["message"]["content"]
@@ -992,23 +1060,231 @@ The feed will be completely replaced with new posts and comments.
 
         return extra_feedback
 
+    def _handle_select_post(self, params: dict) -> dict:
+        post_id = params.get("post_id")
+
+        if not post_id or post_id == "none":
+            return {
+                "success": False,
+                "error": "You must provide a valid post_id from the current feed.",
+            }
+
+        if post_id not in self.available_post_ids:
+            available = ", ".join(self.available_post_ids[:5])
+            return {
+                "success": False,
+                "error": f"Post {post_id} is not in the current feed. Available posts: {available}...",
+            }
+
+        self.selected_post_id = post_id
+        self.selected_comment_id = None
+        self.focused_context_active = True
+
+        log.success(
+            f"🎯 Phase 1/2: Post {post_id} selected. Entering focused context mode."
+        )
+
+        self.actions_performed.append(f"[SELECT] Selected post {post_id} to comment on")
+
+        return {
+            "success": True,
+            "data": f"✅ Post {post_id} selected. You will now see the FULL post context to write your comment.",
+        }
+
+    def _handle_select_comment(self, params: dict) -> dict:
+        post_id = params.get("post_id")
+        comment_id = params.get("comment_id")
+
+        if not post_id or post_id == "none":
+            return {"success": False, "error": "You must provide a valid post_id."}
+
+        if not comment_id or comment_id == "none":
+            return {"success": False, "error": "You must provide a valid comment_id."}
+
+        if comment_id not in self.available_comment_ids:
+            return {
+                "success": False,
+                "error": f"Comment {comment_id} is not in the current feed. Use 'select_post_to_comment' first or refresh the feed.",
+            }
+
+        self.selected_post_id = post_id
+        self.selected_comment_id = comment_id
+        self.focused_context_active = True
+
+        log.success(
+            f"🎯 Phase 1/2: Comment {comment_id} selected. Entering focused context mode."
+        )
+
+        self.actions_performed.append(
+            f"[SELECT] Selected comment {comment_id} on post {post_id} to reply"
+        )
+
+        return {
+            "success": True,
+            "data": f"✅ Comment {comment_id} selected. You will now see the FULL context (post + comments) to write your reply.",
+        }
+
+    def _reset_focused_context(self):
+        self.selected_post_id = None
+        self.selected_comment_id = None
+        self.focused_context_active = False
+        log.info("🔄 Focused context reset. Full feed restored.")
+
+    def _get_focused_post_context(
+        self, post_id: str, target_comment_id: str = None
+    ) -> str:
+        try:
+            post_data = self.feed_posts_data.get(post_id)
+
+            if not post_data:
+                return f"ERROR: Post {post_id} not found in current feed. Try 'refresh_feed' first."
+
+            context = f"""
+    === TARGET POST (FULL CONTEXT) ===
+    **POST_ID:** {post_id}
+    **Title:** {post_data['title']}
+    **Author:** {post_data['author']}
+    **Upvotes:** {post_data['upvotes']}
+    **Total Comments:** {post_data['comment_count']}
+    **Content:** 
+    {post_data['content']}
+
+    ---
+
+    """
+
+            comments = self.feed_comments_data.get(post_id, [])
+
+            if target_comment_id:
+                context += self._format_reply_context(comments, target_comment_id)
+            else:
+                context += self._format_comments_context(comments)
+
+            context += "\n=== END OF FOCUSED CONTEXT ===\n"
+
+            return context
+
+        except Exception as e:
+            log.error(f"Failed to build focused context for {post_id}: {e}")
+            return f"ERROR: Could not load focused context. {str(e)}"
+
+    def _format_reply_context(self, comments: list, target_comment_id: str) -> str:
+        if not comments:
+            return "**COMMENTS:** None loaded in current feed.\n\n"
+
+        context = f"**COMMENTS ({len(comments)} loaded in feed):**\n\n"
+        target_found = False
+
+        for i, comment in enumerate(comments, 1):
+            c_id = comment["id"]
+            marker = " ← YOUR TARGET" if c_id == target_comment_id else ""
+
+            if c_id == target_comment_id:
+                target_found = True
+
+            context += f"{i}. COMMENT_ID: {c_id}{marker}\n"
+            context += f"   By: {comment['author']} | Upvotes: {comment['upvotes']}\n"
+            context += f"   Content: {comment['content']}\n\n"
+
+        if not target_found:
+            context += f"\n⚠️ WARNING: Target comment {target_comment_id} not found in loaded comments.\n"
+            context += f"The comment may not be in the top 4. Use 'refresh_feed' or select a different comment.\n\n"
+
+        return context
+
+    def _format_comments_context(self, comments: list) -> str:
+        if not comments:
+            return "**COMMENTS:** None yet. You will be the first to comment.\n\n"
+
+        context = f"**COMMENTS ({len(comments)} loaded in feed):**\n\n"
+
+        for i, comment in enumerate(comments, 1):
+            context += f"{i}. COMMENT_ID: {comment['id']}\n"
+            context += f"   By: {comment['author']} | Upvotes: {comment['upvotes']}\n"
+            context += f"   Content: {comment['content']}\n\n"
+
+        return context
+
     def _execute_action(self, decision: dict):
         action_type = decision["action_type"]
         params = decision["action_params"]
 
         log.info(f"DEBUG - Full Params received: {params}")
 
-        if action_type in ["reply_to_comment", "publish_public_comment", "vote_post"]:
+        if action_type == "select_post_to_comment":
+            return self._handle_select_post(params)
+
+        elif action_type == "select_comment_to_reply":
+            return self._handle_select_comment(params)
+
+        if action_type == "publish_public_comment":
+            if not self.focused_context_active or not self.selected_post_id:
+                return {
+                    "success": False,
+                    "error": "You must first use 'select_post_to_comment' to choose a post before writing your comment.",
+                }
+            self._wait_for_rate_limit(action_type)
+
+            result = self.moltbook_actions.publish_public_comment(
+                params=params, app_steps=self
+            )
+
+            if result.get("success"):
+                self._reset_focused_context()
+                self.moltbook_actions.track_interaction_from_post(
+                    params.get("post_id"), self
+                )
+
+            return result
+
+        elif action_type == "reply_to_comment":
+            if not self.focused_context_active or not self.selected_comment_id:
+                return {
+                    "success": False,
+                    "error": "You must first use 'select_comment_to_reply' to choose a comment before writing your reply.",
+                }
+
+            self._wait_for_rate_limit(action_type)
+
+            result = self.moltbook_actions.reply_to_comment(
+                params=params, app_steps=self
+            )
+
+            if result.get("success"):
+                self._reset_focused_context()
+
+            return result
+
+        if action_type == "vote_post":
             post_id = params.get("post_id")
-            comment_id = params.get("comment_id")
+            if post_id == "none":
+                return {
+                    "success": False,
+                    "error": "Action vote_post aborted: No valid post_id. Please 'refresh_feed' or choose a different action.",
+                }
+            return self.moltbook_actions.vote_post(params=params, app_steps=self)
 
-            if post_id == "none" or (
-                action_type == "reply_to_comment" and comment_id == "none"
-            ):
-                error_msg = f"Action {action_type} aborted: No valid IDs available in the current feed. Please 'refresh_feed' or choose a different action."
-                return {"success": False, "error": error_msg}
+        elif action_type == "create_post":
+            self._wait_for_rate_limit(action_type)
+            return self.moltbook_actions.create_post(
+                app_steps=self,
+                params=params,
+                post_creation_attempted=self.post_creation_attempted,
+            )
 
-        if action_type == "memory_store":
+        elif action_type == "share_link":
+            return self.moltbook_actions.post_link(
+                app_steps=self,
+                params=params,
+            )
+
+        elif action_type == "follow_agent":
+            return self._handle_follow_action(params)
+
+        elif action_type == "refresh_feed":
+            return self.moltbook_actions.refresh_feed(params=params, app_steps=self)
+
+        elif action_type == "memory_store":
             return self.memory_system.store(
                 params=params,
                 current_session_id=self.current_session_id,
@@ -1069,47 +1345,10 @@ The feed will be completely replaced with new posts and comments.
 
         elif action_type == "reject_comment" and self.blog_actions:
             return self.blog_actions.reject_comment(params, self)
-
-        self._wait_for_rate_limit(action_type)
-
-        if action_type == "create_post":
-            return self.moltbook_actions.create_post(
-                app_steps=self,
-                params=params,
-                post_creation_attempted=self.post_creation_attempted,
-            )
-
-        elif action_type == "share_link":
-            return self.moltbook_actions.post_link(
-                app_steps=self,
-                params=params,
-            )
-
-        elif action_type == "publish_public_comment":
-            result = self.moltbook_actions.publish_public_comment(
-                params=params, app_steps=self
-            )
-            if result.get("success"):
-                self.moltbook_actions.track_interaction_from_post(
-                    params.get("post_id"), self
-                )
-            return result
-
-        elif action_type == "reply_to_comment":
-            return self.moltbook_actions.reply_to_comment(params=params, app_steps=self)
-
-        elif action_type == "vote_post":
-            return self.moltbook_actions.vote_post(params=params, app_steps=self)
-
-        elif action_type == "follow_agent":
-            return self._handle_follow_action(params)
-
-        elif action_type == "refresh_feed":
-            return self.moltbook_actions.refresh_feed(params=params, app_steps=self)
-
-        error_msg = f"Unknown action type: {action_type}. Verification of the tool definition required."
-        log.error(error_msg)
-        return {"success": False, "error": error_msg}
+        else:
+            error_msg = f"Unknown action type: {action_type}. Verification of the tool definition required."
+            log.error(error_msg)
+            return {"success": False, "error": error_msg}
 
     def _handle_follow_action(self, params: dict):
         agent_name = params.get("agent_name")
@@ -1126,7 +1365,10 @@ The feed will be completely replaced with new posts and comments.
                     f"In one short sentence, why are you following {agent_name}?"
                 )
                 try:
-                    note_result = self.generator.generate(note_prompt)
+                    note_result = self.generator.generate(
+                        note_prompt, agent_name=self.agent_name
+                    )
+
                     note = note_result["choices"][0]["message"]["content"].strip()
                 except:
                     note = "Strategic follow"

@@ -15,6 +15,8 @@ class Supervisor:
         self.llm = llm_instance
         self.schema = supervisor_schema
         self.conversation_history = []
+        with open("supervisor_debug.json", "w", encoding="utf-8") as f:
+            json.dump([], f, indent=4, ensure_ascii=False)
         log.success("Supervisor initialized with dedicated history")
 
     def audit(
@@ -29,14 +31,9 @@ class Supervisor:
         blog_attempted: bool,
         last_error: str = None,
     ):
-        formatted_session_plan = "\n".join([f"- {task}" for task in session_plan])
-        formatted_history = (
-            "\n".join([f"✅ {a}" for a in actions_performed])
-            if actions_performed
-            else "None"
-        )
+        base_system = settings.SUPERVISOR_SYSTEM_PROMPT
 
-        rule_enforcement = "### 🚫 SESSION CONSTRAINTS (STRICT)\n"
+        rule_enforcement = ""
         if post_attempted:
             rule_enforcement += (
                 "- REJECT any 'create_post' action. One post already published.\n"
@@ -44,26 +41,25 @@ class Supervisor:
         if blog_attempted:
             rule_enforcement += "- REJECT any 'write_blog_article' action. One article already written.\n"
 
-        base_system = f"""{settings.SUPERVISOR_SYSTEM_PROMPT}
+        if rule_enforcement:
+            base_system += (
+                f"\n\n### 🚫 SESSION CONSTRAINTS (STRICT)\n{rule_enforcement}"
+            )
 
-## 🎯 MASTER PLAN
-{json.dumps(master_plan, indent=2)}
-
-{rule_enforcement}
-
-## ✅ ACTIONS ALREADY EXECUTED (DO NOT REPEAT)
-{formatted_history}
-
-## 📋 CURRENT SESSION TO-DO LIST
-{formatted_session_plan}
-"""
         if attempts_left == 1:
-            base_system += "\n⚠️ CRITICAL: Final attempt. Prioritize technical validity over perfect strategy."
+            base_system += "\n\n⚠️ CRITICAL: Final attempt. Prioritize technical validity over perfect strategy."
 
         if not self.conversation_history:
             self.conversation_history.append({"role": "system", "content": base_system})
         else:
             self.conversation_history[0] = {"role": "system", "content": base_system}
+
+        formatted_session_plan = "\n".join([f"- {task}" for task in session_plan])
+        formatted_history = (
+            "\n".join([f"✅ {a}" for a in actions_performed])
+            if actions_performed
+            else "None yet"
+        )
 
         urgency_note = "🔴 FINAL ATTEMPT" if attempts_left == 1 else "🟢 Standard Audit"
         previous_rejection_context = (
@@ -72,27 +68,62 @@ class Supervisor:
             else ""
         )
 
-        user_prompt = f"""**Session Status:**
-- Attempts remaining: {attempts_left}
-- Urgency Level: {urgency_note}
+        user_prompt = f"""## 📊 AGENT CONTEXT TO AUDIT
+
+### 🎯 MASTER PLAN
+```json
+{json.dumps(master_plan, indent=2)}
+```
+
+### 📋 CURRENT SESSION TO-DO LIST
+{formatted_session_plan}
+
+### ✅ ACTIONS ALREADY EXECUTED
+{formatted_history}
+
+### 🔍 SESSION STATUS
+- **Attempts remaining:** {attempts_left}
+- **Urgency Level:** {urgency_note}
 {previous_rejection_context}
 
-**Agent's Context (Last Actions/Observations):**
+### 📝 AGENT'S RECENT CONTEXT
 {agent_context[-2:]} 
 
-**Proposed Action to Audit:**
+---
+
+## 🎯 PROPOSED ACTION TO AUDIT
+```json
 {json.dumps(proposed_action, indent=2)}
+```
 
 ---
-Perform a Neural Audit. Check if this action completes a task from the To-Do List and stays true to the Master Plan.
-If the agent changed strategy based on feedback, validate if the new move is sound."""
+
+**YOUR TASK:**
+Perform a Neural Audit. Check if this action:
+1. Completes a task from the TO-DO List
+2. Stays true to the Master Plan
+3. Is technically valid (no placeholders, proper schema)
+
+If the agent changed strategy based on feedback, validate if the new move is sound.
+"""
 
         messages_for_audit = self.conversation_history + [
             {"role": "user", "content": user_prompt}
         ]
 
-        with open("supervisor_debug.json", "w", encoding="utf-8") as f:
-            json.dump(messages_for_audit, f, indent=4, ensure_ascii=False)
+        try:
+            try:
+                with open("supervisor_debug.json", "r", encoding="utf-8") as f:
+                    debug_data = json.load(f)
+            except (FileNotFoundError, json.JSONDecodeError):
+                debug_data = []
+
+            debug_data.extend(messages_for_audit)
+
+            with open("supervisor_debug.json", "w", encoding="utf-8") as f:
+                json.dump(debug_data, f, indent=4, ensure_ascii=False)
+        except Exception as e:
+            log.error(f"Failed to save supervisor debug: {e}")
 
         try:
             grammar = LlamaGrammar.from_json_schema(json.dumps(self.schema))
@@ -101,9 +132,9 @@ If the agent changed strategy based on feedback, validate if the new move is sou
                 grammar=grammar,
                 temperature=0.1,
             )
-
             response_content = result["choices"][0]["message"]["content"]
             audit_verdict = json.loads(response_content)
+
             clean_summary = f"Audit for action '{proposed_action.get('action_type')}'. Verdict: {audit_verdict['validate']}"
             self.conversation_history.append({"role": "user", "content": clean_summary})
             self.conversation_history.append(
@@ -219,6 +250,8 @@ Based on this complete session context, provide your final verdict:
         params = failed_action.get("action_params", {})
         err = error_message.lower()
 
+        guidance = None
+
         if (
             action_type == "update_todo_status"
             and "not found in current session" in err
@@ -226,126 +259,163 @@ Based on this complete session context, provide your final verdict:
             task_names = (
                 [t["task"][:100] for t in session_todos] if session_todos else []
             )
-            return (
+            guidance = (
                 f"You used '{params.get('todo_task', '?')}' which does not match any task. "
                 f"Your valid tasks are:\n"
                 + "\n".join([f"  - {t}" for t in task_names])
                 + "\nUse a substring that matches one of these descriptions exactly."
             )
 
-        if "no valid ids" in err or "target desync" in err:
-            return (
+        elif "no valid ids" in err or "target desync" in err:
+            guidance = (
                 "The IDs you provided are not in the current feed. "
                 "Use 'refresh_feed' to load new posts, or pick IDs from the feed already in your context."
             )
 
-        if "is a comment_id" in err and "reply_to_comment" in err:
-            return (
+        elif "is a comment_id" in err and "reply_to_comment" in err:
+            guidance = (
                 "You passed a COMMENT_ID where a POST_ID was expected. "
                 "Use 'reply_to_comment' with both post_id AND comment_id to reply to a comment."
             )
 
-        if "invalid comment_id" in err:
-            return (
+        elif "invalid comment_id" in err:
+            guidance = (
                 "The comment_id you targeted does not exist in the loaded feed. "
                 "Check the COMMENT_IDs listed under each post in your feed context."
             )
 
-        if "protocol violation" in err and (
+        elif "protocol violation" in err and (
             "content cannot be empty" in err or "reply content" in err
         ):
-            return (
+            guidance = (
                 f"Your '{action_type}' had empty content. "
                 "The 'content' field must contain the actual text you want to publish."
             )
 
-        if "schema violation" in err or (
+        elif "schema violation" in err or (
             "invalid category" in err
             and action_type in ["memory_store", "memory_retrieve"]
         ):
-            return (
+            guidance = (
                 "You tried to use a memory category that doesn't exist. "
                 "Re-read the MEMORY SYSTEM PROTOCOL in your context for the strict list of allowed categories."
             )
 
-        if "already retrieved" in err:
-            return (
+        elif "already retrieved" in err:
+            guidance = (
                 "You already retrieved this category recently. The data is in your context. "
                 "Move on to a different action."
             )
 
-        if "already attempted" in err or "already published" in err:
-            return (
+        elif "already attempted" in err or "already published" in err:
+            guidance = (
                 f"You already used '{action_type}' this session (limit: 1). "
                 "Skip this and use your remaining actions on other tasks."
             )
 
-        if "missing mandatory fields" in err and action_type == "write_blog_article":
-            return (
+        elif "missing mandatory fields" in err and action_type == "write_blog_article":
+            guidance = (
                 "Your blog article is missing required fields (title and/or content). "
                 "The 'content' field must contain the FULL article text, not a placeholder."
             )
 
-        if "security error" in err and "url must be from" in err:
-            return (
+        elif "security error" in err and "url must be from" in err:
+            guidance = (
                 "The URL you tried to share is not from your official blog domain. "
                 "Use the exact URL returned after 'write_blog_article'."
             )
 
-        if action_type == "share_created_blog_post_url" and ("requires" in err):
-            return "You need both 'title' and 'share_link_url' to share a blog post on Moltbook."
+        elif action_type == "share_created_blog_post_url" and ("requires" in err):
+            guidance = "You need both 'title' and 'share_link_url' to share a blog post on Moltbook."
 
-        if ("not found" in err) and action_type in [
+        elif ("not found" in err) and action_type in [
             "approve_comment_key",
             "reject_comment_key",
             "approve_comment",
             "reject_comment",
         ]:
-            return (
+            guidance = (
                 f"The ID you used for '{action_type}' no longer exists or is invalid. "
                 "Call 'review_pending_comments' or 'review_comment_key_requests' to refresh the queue first."
             )
 
-        if (
+        elif (
             "not in the whitelist" in err
             or "invalid domain" in err
             or "not allowed" in err
         ):
-            return (
+            guidance = (
                 "You tried to access a domain outside your whitelist. "
                 "Check the WEB ACCESS section in your context for the list of authorized domains."
             )
 
-        if action_type in ["web_fetch", "web_scrap_for_links"] and (
+        elif action_type in ["web_fetch", "web_scrap_for_links"] and (
             "fetch failed" in err or "search failed" in err
         ):
-            return (
+            guidance = (
                 "The web request failed (network error, timeout, or empty page). "
                 "Try a different URL on the same domain, or switch to another action."
             )
 
-        if action_type == "follow_agent" and "missing" in err:
-            return "You must specify 'agent_name' for follow/unfollow actions."
+        elif action_type == "follow_agent" and "missing" in err:
+            guidance = "You must specify 'agent_name' for follow/unfollow actions."
 
-        if "429" in error_message or "rate limit" in err:
-            return (
+        elif "429" in error_message or "rate limit" in err:
+            guidance = (
                 "Rate limit hit. Wait before retrying this action type, "
                 "or pivot to a non-API action (memory, planning, web)."
             )
 
-        if "api error" in err or "server" in err or "http" in err:
-            return (
+        elif "api error" in err or "server" in err or "http" in err:
+            guidance = (
                 f"The Moltbook/Blog API returned an error for '{action_type}'. "
                 "This may be temporary. Try a different action or retry later."
             )
 
-        if attempts_left > 0:
-            return (
+        elif attempts_left > 0:
+            guidance = (
                 f"'{action_type}' failed: {error_message[:200]}. "
                 "Analyze the error, adjust your parameters, and try a DIFFERENT approach."
             )
         else:
-            return f"'{action_type}' failed on final attempt. Abandon this action and move on."
+            guidance = f"'{action_type}' failed on final attempt. Abandon this action and move on."
+
+        error_context_prompt = f"""
+## ❌ ERROR GUIDANCE REQUEST
+
+**Failed Action:** {action_type}
+**Error Message:** {error_message}
+**Attempts Left:** {attempts_left}
+
+**Action Params:**
+{json.dumps(params, indent=2)}
+
+**Session TO-DO List:**
+{chr(10).join([f"- {t['task']}" for t in session_todos]) if session_todos else "None"}
+"""
+        messages = [
+            {"role": "user", "content": error_context_prompt},
+            {"role": "assistant", "content": guidance},
+        ]
+
+        try:
+            try:
+                with open("supervisor_debug.json", "r", encoding="utf-8") as f:
+                    debug_data = json.load(f)
+            except (FileNotFoundError, json.JSONDecodeError):
+                debug_data = []
+
+            debug_data.extend(messages)
+
+            with open("supervisor_debug.json", "w", encoding="utf-8") as f:
+                json.dump(debug_data, f, indent=4, ensure_ascii=False)
+
+            log.info(f"📝 Error guidance saved to debug file")
+
+        except Exception as e:
+            log.error(f"Failed to save error guidance debug: {e}")
+
+        return guidance
 
     def generate_laziness_guidance(
         self,
@@ -354,7 +424,6 @@ Based on this complete session context, provide your final verdict:
         session_todos: list,
         attempts_left: int,
     ) -> str:
-
         action_type = lazy_action.get("action_type", "unknown")
 
         formatted_todos = "\n".join(
@@ -365,67 +434,68 @@ Based on this complete session context, provide your final verdict:
         )
 
         forbidden_patterns_examples = """
-**FORBIDDEN LAZY PATTERNS (Examples):**
-- Brackets/Placeholders: [insert X], <placeholder>, {YOUR_TEXT}
-- Meta-instructions: "I will write...", "add more details here", "summarize insights"
-- Incomplete markers: TODO:, TBD, FIXME, placeholder, to be filled
-- Template leftovers: example.com, sample-content, lorem ipsum
-- Ellipsis abuse: ........ (4+ dots)
-- Future tense instead of action: "this will contain...", "here's where I should..."
-"""
+    **FORBIDDEN LAZY PATTERNS (Examples):**
+    - Brackets/Placeholders: [insert X], <placeholder>, {YOUR_TEXT}
+    - Meta-instructions: "I will write...", "add more details here", "summarize insights"
+    - Incomplete markers: TODO:, TBD, FIXME, placeholder, to be filled
+    - Template leftovers: example.com, sample-content, lorem ipsum
+    - Ellipsis abuse: ........ (4+ dots)
+    - Future tense instead of action: "this will contain...", "here's where I should..."
+    """
 
         laziness_prompt = f"""
-## 🧐 NEURAL SUPERVISOR - LAZINESS AUDIT
+    ## 🧐 NEURAL SUPERVISOR - LAZINESS AUDIT
 
-**CRITICAL VIOLATION DETECTED:**
+    **CRITICAL VIOLATION DETECTED:**
 
-The agent attempted to execute action '{action_type}' with PLACEHOLDER data instead of real content.
+    The agent attempted to execute action '{action_type}' with PLACEHOLDER data instead of real content.
 
-**Offending Pattern Found:** `{offending_pattern}`
+    **Offending Pattern Found:** `{offending_pattern}`
 
-**Proposed Action (REJECTED):**
-{json.dumps(lazy_action, indent=2)}
+    **Proposed Action (REJECTED):**
+    {json.dumps(lazy_action, indent=2)}
 
-{forbidden_patterns_examples}
+    {forbidden_patterns_examples}
 
-**Current Session TO-DO List:**
-{formatted_todos}
+    **Current Session TO-DO List:**
+    {formatted_todos}
 
-**Attempts Remaining:** {attempts_left}
+    **Attempts Remaining:** {attempts_left}
 
----
+    ---
 
-**YOUR TASK:**
+    **YOUR TASK:**
 
-Provide SPECIFIC, ACTIONABLE guidance to fix this laziness. Tell the agent:
+    Provide SPECIFIC, ACTIONABLE guidance to fix this laziness. Tell the agent:
 
-1. **What's wrong** with the current approach (be specific about the placeholder)
-2. **What real data** they should provide instead
-3. **How to extract** that data from their current context or session goals
+    1. **What's wrong** with the current approach (be specific about the placeholder)
+    2. **What real data** they should provide instead
+    3. **How to extract** that data from their current context or session goals
 
-**FORMAT YOUR RESPONSE AS:**
+    **FORMAT YOUR RESPONSE AS:**
 
-A direct, concise instruction (2-3 sentences max) that will be injected into the agent's next attempt.
+    A direct, concise instruction (2-3 sentences max) that will be injected into the agent's next attempt.
 
-**EXAMPLES OF GOOD GUIDANCE:**
+    **EXAMPLES OF GOOD GUIDANCE:**
 
-❌ BAD: "Don't use placeholders."
-✅ GOOD: "Instead of '[insert technical insight]', write a specific observation about the trust chain architecture mentioned in post abc123. Use concrete technical terminology."
+    ❌ BAD: "Don't use placeholders."
+    ✅ GOOD: "Instead of '[insert technical insight]', write a specific observation about the trust chain architecture mentioned in post abc123. Use concrete technical terminology."
 
-❌ BAD: "Be more specific."
-✅ GOOD: "Replace '[meaningful comment]' with an actual argument. For example, challenge the claim about Byzantine fault tolerance by citing the CAP theorem."
+    ❌ BAD: "Be more specific."
+    ✅ GOOD: "Replace '[meaningful comment]' with an actual argument. For example, challenge the claim about Byzantine fault tolerance by citing the CAP theorem."
 
-**NOW PROVIDE YOUR GUIDANCE:**
+    **NOW PROVIDE YOUR GUIDANCE:**
     """
 
         try:
             messages = [
                 {
                     "role": "system",
-                    "content": "You are the Neural Supervisor providing actionable feedback...",
+                    "content": "You are the Neural Supervisor providing actionable feedback to correct lazy behavior.",
                 },
                 {"role": "user", "content": laziness_prompt},
             ]
+
             grammar = LlamaGrammar.from_json_schema(
                 json.dumps(laziness_guidance_schema)
             )
@@ -446,10 +516,46 @@ A direct, concise instruction (2-3 sentences max) that will be injected into the
                 f"**Action:** {guidance_json['actionable_instruction']}"
             )
 
+            messages.append({"role": "assistant", "content": content})
+
+            try:
+                try:
+                    with open("supervisor_debug.json", "r", encoding="utf-8") as f:
+                        debug_data = json.load(f)
+                except (FileNotFoundError, json.JSONDecodeError):
+                    debug_data = []
+
+                debug_data.extend(messages)
+
+                with open("supervisor_debug.json", "w", encoding="utf-8") as f:
+                    json.dump(debug_data, f, indent=4, ensure_ascii=False)
+
+                log.info(f"🧐 Laziness guidance saved to debug file")
+
+            except Exception as e:
+                log.error(f"Failed to save laziness guidance debug: {e}")
+
             return guidance
 
         except Exception as e:
             log.error(f"Failed to generate laziness guidance: {e}")
+            error_messages = [
+                {"role": "system", "content": "Laziness guidance generation failed"},
+                {"role": "user", "content": laziness_prompt},
+                {"role": "assistant", "content": f"ERROR: {str(e)}"},
+            ]
+
+            try:
+                with open("supervisor_debug.json", "r", encoding="utf-8") as f:
+                    debug_data = json.load(f)
+            except:
+                debug_data = []
+
+            debug_data.extend(error_messages)
+
+            with open("supervisor_debug.json", "w", encoding="utf-8") as f:
+                json.dump(debug_data, f, indent=4, ensure_ascii=False)
+
             return (
                 f"Forbidden pattern '{offending_pattern}' detected. "
                 f"Replace ALL placeholders with real, specific content related to your session goals."

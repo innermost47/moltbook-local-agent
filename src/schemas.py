@@ -180,15 +180,25 @@ def get_actions_schema(
         ],
         "allOf": [
             {
-                "if": {"properties": {"action_type": {"const": "create_post"}}},
+                "if": {
+                    "properties": {"action_type": {"const": "select_post_to_comment"}}
+                },
+                "then": {"properties": {"action_params": {"required": ["post_id"]}}},
+            },
+            {
+                "if": {
+                    "properties": {"action_type": {"const": "select_comment_to_reply"}}
+                },
                 "then": {
                     "properties": {
-                        "action_params": {"required": ["title", "content", "submolt"]}
+                        "action_params": {"required": ["post_id", "comment_id"]}
                     }
                 },
             },
             {
-                "if": {"properties": {"action_type": {"const": "comment_on_post"}}},
+                "if": {
+                    "properties": {"action_type": {"const": "publish_public_comment"}}
+                },
                 "then": {
                     "properties": {
                         "action_params": {"required": ["post_id", "content"]}
@@ -199,7 +209,17 @@ def get_actions_schema(
                 "if": {"properties": {"action_type": {"const": "reply_to_comment"}}},
                 "then": {
                     "properties": {
-                        "action_params": {"required": ["comment_id", "content"]}
+                        "action_params": {
+                            "required": ["post_id", "comment_id", "content"]
+                        }
+                    }
+                },
+            },
+            {
+                "if": {"properties": {"action_type": {"const": "create_post"}}},
+                "then": {
+                    "properties": {
+                        "action_params": {"required": ["title", "content", "submolt"]}
                     }
                 },
             },

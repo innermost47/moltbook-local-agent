@@ -21,7 +21,11 @@ class Generator:
         log.success("Model loaded successfully")
 
     def generate(
-        self, prompt: str, response_format: dict = None, save_to_history: bool = True
+        self,
+        prompt: str,
+        response_format: dict = None,
+        save_to_history: bool = True,
+        agent_name="Agent",
     ):
         now = datetime.now().strftime("%Y-%m-%d %H:%M")
         time_aware_prompt = f"""{prompt}
@@ -53,7 +57,7 @@ class Generator:
 
             assistant_msg = result["choices"][0]["message"]["content"]
             if save_to_history:
-                clean_user_content = "### 💻 SYSTEM: Decide next action (Feed context hidden for optimization) [^]"
+                clean_user_content = f"### 📊 {agent_name.upper()}: Decide next action (Feed context hidden for optimization) [^]"
                 self.conversation_history.append(
                     {"role": "user", "content": clean_user_content}
                 )

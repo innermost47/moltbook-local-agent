@@ -1,42 +1,101 @@
+/* ==============================
+   MATRIX RAIN CANVAS
+   ============================== */
+#matrix-rain {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  pointer-events: none;
+}
+
+/* ==============================
+   BASE STYLES
+   ============================== */
 body {
   font-family: "Segoe UI", sans-serif;
   background-color: #0d1117;
   color: #e6edf3;
   margin: 0;
-  padding: 20px;
   padding: 0;
+  position: relative;
 }
+
 .container {
   width: 100%;
   max-width: 1000px;
   margin: auto;
+  position: relative;
+  z-index: 1;
 }
+
 .header {
   position: sticky;
   top: 0;
-  background: #0d1117;
+  background: rgba(13, 17, 23, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   z-index: 100;
   margin-bottom: 20px;
-  border-bottom: 1px solid #63666b;
+  border-bottom: 1px solid rgba(0, 255, 65, 0.15);
   padding: 10px 80px;
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
+
+.header h1 {
+  text-shadow: 0 0 10px rgba(0, 255, 65, 0.3);
+}
+
 .status-dot {
   height: 10px;
   width: 10px;
-  background-color: #2ea043;
+  background-color: #00ff41;
   border-radius: 50%;
   display: inline-block;
   margin-right: 5px;
+  box-shadow:
+    0 0 6px #00ff41,
+    0 0 12px rgba(0, 255, 65, 0.4);
+  animation: matrix-pulse 1.5s ease-in-out infinite;
 }
+
+@keyframes matrix-pulse {
+  0%,
+  100% {
+    box-shadow:
+      0 0 6px #00ff41,
+      0 0 12px rgba(0, 255, 65, 0.4);
+  }
+  50% {
+    box-shadow:
+      0 0 10px #00ff41,
+      0 0 20px rgba(0, 255, 65, 0.6);
+  }
+}
+
+/* ==============================
+   MESSAGE CARDS - Glassmorphism
+   ============================== */
 .message-card {
   margin-bottom: 20px;
   border-radius: 8px;
-  border: 1px solid #30363d;
-  background-color: #161b22;
+  border: 1px solid rgba(48, 54, 61, 0.8);
+  background-color: rgba(22, 27, 34, 0.82);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  position: relative;
+  z-index: 1;
+  transition: border-color 0.3s ease;
 }
+
+.message-card:hover {
+  border-color: rgba(0, 255, 65, 0.2);
+}
+
 .role-badge {
   padding: 8px 15px;
   font-weight: bold;
@@ -45,24 +104,32 @@ body {
   display: flex;
   justify-content: space-between;
 }
+
 .role-user {
-  background-color: #23863622;
-  color: #2ea043;
+  background-color: rgba(0, 255, 65, 0.08);
+  color: #00ff41;
 }
+
 .role-assistant {
-  background-color: #1f6feb22;
+  background-color: rgba(31, 111, 235, 0.13);
   color: #58a6ff;
 }
+
 .role-system {
-  background-color: #6e768122;
+  background-color: rgba(110, 118, 129, 0.13);
   color: #8b949e;
 }
+
 .content {
   padding: 15px;
   line-height: 1.6;
 }
+
+/* ==============================
+   CODE BLOCKS
+   ============================== */
 pre {
-  background-color: #010409 !important;
+  background-color: rgba(1, 4, 9, 0.9) !important;
   padding: 12px;
   border-radius: 6px;
   border: 1px solid #30363d;
@@ -72,51 +139,67 @@ pre {
   white-space: -o-pre-wrap;
   word-wrap: break-word;
 }
+
 code {
   font-family: "Cascadia Code", "Fira Code", monospace;
   font-size: 0.9em;
   word-break: break-word;
 }
+
 a {
   color: #58a6ff;
 }
+
+/* ==============================
+   REPORT SECTIONS
+   ============================== */
 .report-section {
   margin: 15px 0;
   padding: 10px;
   border-radius: 6px;
 }
+
 .report-section.meta {
-  background: #1c2128;
+  background: rgba(28, 33, 40, 0.9);
   border: 1px solid #444c56;
 }
+
 .thought-box {
-  background: #1a2635;
+  background: rgba(26, 38, 53, 0.9);
   padding: 12px;
   border-left: 4px solid #3498db;
   margin-top: 10px;
   font-style: italic;
   font-size: 0.95em;
 }
+
 .audit-box {
-  background: #2c2615;
+  background: rgba(44, 38, 21, 0.9);
   padding: 12px;
   border-left: 4px solid #f1c40f;
   margin-top: 10px;
   font-size: 0.95em;
 }
+
 .report-section.plan {
   border-top: 2px solid #30363d;
   padding-top: 15px;
 }
+
 .report-section.tasks {
-  background: #0d1117;
+  background: rgba(13, 17, 23, 0.9);
   border: 1px solid #30363d;
 }
+
+/* ==============================
+   TABLES
+   ============================== */
 table {
   width: 100%;
   border-collapse: collapse;
   margin-top: 10px;
 }
+
 th {
   color: #8b949e;
   text-align: left;
@@ -125,11 +208,13 @@ th {
   border-bottom: 1px solid #30363d;
   padding: 8px;
 }
+
 td {
   padding: 8px;
   border-bottom: 1px solid #21262d;
   font-size: 0.9em;
 }
+
 .report-section h3 {
   margin: 0 0 10px 0;
   font-size: 0.85em;
@@ -137,6 +222,7 @@ td {
   text-transform: uppercase;
   letter-spacing: 1px;
 }
+
 .next-move {
   margin-top: 15px;
   padding-top: 10px;
@@ -144,31 +230,36 @@ td {
   font-weight: 500;
   border-top: 1px dashed #30363d;
 }
-p:has(strong:contains("Emotion")) {
-  color: #d670d6;
-}
-p:has(strong:contains("Feeling")) {
-  color: #ff7b72;
-}
+
+/* ==============================
+   SUPERVISOR BOX
+   ============================== */
 .supervisor-box {
   padding: 15px;
   border-radius: 8px;
   margin: 10px 0;
   border: 2px solid;
 }
+
 .supervisor-box.valid {
   border-color: #2ea043;
-  background: #23863611;
+  background: rgba(35, 134, 54, 0.07);
 }
+
 .supervisor-box.invalid {
   border-color: #f85149;
-  background: #da363311;
+  background: rgba(218, 54, 51, 0.07);
 }
+
 .feedback-msg {
   margin-top: 10px;
   font-weight: bold;
   color: #58a6ff;
 }
+
+/* ==============================
+   SENTIENCE / EMOTION TAGS
+   ============================== */
 .sentience-container {
   display: flex;
   gap: 10px;
@@ -201,6 +292,9 @@ p:has(strong:contains("Feeling")) {
   filter: brightness(1.2);
 }
 
+/* ==============================
+   STATUS BADGES
+   ============================== */
 .status-normal {
   background-color: rgba(56, 139, 253, 0.15);
   color: #58a6ff;
@@ -232,6 +326,10 @@ p:has(strong:contains("Feeling")) {
     box-shadow: 0 0 0 0 rgba(248, 81, 73, 0);
   }
 }
+
+/* ==============================
+   TODO LIST
+   ============================== */
 .todo-list-container {
   background: rgba(20, 25, 30, 0.8);
   border: 1px dashed #30363d;
@@ -261,7 +359,7 @@ p:has(strong:contains("Feeling")) {
 }
 
 .params-box pre {
-  background: #0d1117;
+  background: rgba(13, 17, 23, 0.95);
   padding: 10px;
   border-radius: 6px;
   border: 1px solid #30363d;
@@ -296,11 +394,12 @@ p:has(strong:contains("Feeling")) {
   color: #c9d1d9;
   margin-left: 10px;
 }
+
 .raw-log-content {
   max-height: 400px;
   overflow-y: auto;
   font-size: 0.85em;
-  background: #0d1117;
+  background: rgba(13, 17, 23, 0.9);
   padding: 10px;
   border-radius: 6px;
   border: 1px solid #30363d;

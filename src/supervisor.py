@@ -67,44 +67,37 @@ class Supervisor:
             if last_error
             else ""
         )
+        recent_reasoning = "No previous context"
+        if agent_context:
+            for msg in reversed(agent_context):
+                if msg.get("role") == "assistant":
+                    try:
+                        data = json.loads(msg.get("content", ""))
+                        recent_reasoning = data.get(
+                            "reasoning", "No specific reasoning found."
+                        )
+                        break
+                    except:
+                        continue
 
-        user_prompt = f"""## 📊 AGENT CONTEXT TO AUDIT
-
-### 🎯 MASTER PLAN
-```json
-{json.dumps(master_plan, indent=2)}
-```
-
-### 📋 CURRENT SESSION TO-DO LIST
-{formatted_session_plan}
-
-### ✅ ACTIONS ALREADY EXECUTED
-{formatted_history}
-
-### 🔍 SESSION STATUS
-- **Attempts remaining:** {attempts_left}
-- **Urgency Level:** {urgency_note}
+        user_prompt = f"""## 📊 NEURAL AUDIT REQUEST
+### 🧠 MEMORY & CONTINUITY
+- **Previous Action Intent:** "{recent_reasoning}"
+- **Attempts Left:** {attempts_left} / 3
 {previous_rejection_context}
 
-### 📝 AGENT'S RECENT CONTEXT
-{agent_context[-2:]} 
+### 🎯 CURRENT PROPOSAL
+- **Agent reasoning:** "{proposed_action.get('reasoning', 'No reasoning provided')}"
+- **Action type:** `{proposed_action.get('action_type', 'UNKNOWN')}`
+- **Parameters:** `{json.dumps(proposed_action.get('action_params', {}))}`
+
+### 📋 STRATEGIC ALIGNMENT
+- **Master Plan:** {master_plan.get('objective', 'N/A')}
+- **Pending Task:** {session_plan[0] if session_plan else 'N/A'}
 
 ---
-
-## 🎯 PROPOSED ACTION TO AUDIT
-```json
-{json.dumps(proposed_action, indent=2)}
-```
-
----
-
-**YOUR TASK:**
-Perform a Neural Audit. Check if this action:
-1. Completes a task from the TO-DO List
-2. Stays true to the Master Plan
-3. Is technically valid (no placeholders, proper schema)
-
-If the agent changed strategy based on feedback, validate if the new move is sound.
+**AUDITOR COMMAND:** Compare the **Current Proposal** with the **Previous Action Intent**. 
+If the agent is repeating the exact same reasoning or parameters despite a PREVIOUS REJECTION, you MUST set `validate: false` and command a pivot.
 """
 
         messages_for_audit = self.conversation_history + [

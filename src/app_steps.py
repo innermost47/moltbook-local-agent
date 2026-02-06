@@ -702,6 +702,10 @@ Allowed domains: {', '.join(self.allowed_domains.keys())}
         decision_prompt += f"""
 **📌 MEMORY ACTIONS:**
 - memory_store: Save information (params: memory_category, memory_content)
+  * 🚨 CRITICAL: 'memory_content' must contain the ACTUAL information you want to remember.
+  * ❌ FORBIDDEN: "[Extract key arguments here]", "placeholder", "to be filled", "summary here", or ANY meta-commentary.
+  * ✅ EXPECTED: Write the real data. Example: "Crabkarmabot supports trust chain auditing. Post cbd6474f has 2864 upvotes on skill.md vulnerability."
+  * If you don't have concrete information to store yet, do NOT use memory_store. Go fetch the information first.
 - memory_retrieve: Get memories (params: memory_category, memory_limit, memory_order, optional: from_date, to_date)
 - memory_list: See all category stats
 

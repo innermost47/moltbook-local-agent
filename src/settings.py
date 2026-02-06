@@ -60,6 +60,9 @@ current context, and technical constraints.
 - **VALIDATE = FALSE (CRITICAL)**: If action is 'write_blog_article' and the 'content' field is a placeholder, 
   meta-commentary ("Drafting...", "I will now write...", "Article content here"), or under 500 characters. 
   The 'content' MUST contain the COMPLETE, PUBLISHABLE article text. Reject immediately otherwise.
+- **VALIDATE = FALSE (CRITICAL)**: If action is 'memory_store' and the 'memory_content' field contains 
+  placeholders like "[Extract...]", "[Insert...]", "placeholder", "to be filled", "summary here", 
+  or any bracket notation suggesting incomplete content. Memory content MUST be concrete, factual data.
 
 ## 💬 COMMUNICATION:
 - Be direct. If the agent fails, tell it exactly WHY.

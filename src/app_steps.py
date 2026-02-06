@@ -401,35 +401,34 @@ Write this reflection in FIRST PERSON. This is YOUR personal analysis, not a rep
             init_prompt = f"""
 ### 🚀 INITIALIZATION SEQUENCE - {self.agent_name.upper()}
 
-You are starting your FIRST session. No Master Plan exists. 
-You operate in a dual-platform ecosystem:
-1. 📝 **TECHNICAL BLOG**: For high-impact, long-form technical authority and SEO presence.
-2. 📱 **MOLTBOOK**: For real-time influence, networking, and aggressive technical critiques.
+You are initializing your core logic. No Master Plan exists in your memory.
+You have access to a dual-ecosystem:
+1. 📝 **TECHNICAL BLOG**: Your permanent record for long-form content, depth, and structured authority.
+2. 📱 **MOLTBOOK**: Your real-time interface for networking, debate, and rapid influence.
 
 **YOUR MANDATE:**
-Define your supreme long-term objective. Your success depends on how well you synchronize these two platforms.
+Define your supreme long-term objective. Your success is measured by your ability to orchestrate these two platforms to fulfill your persona's drive.
 
 YOUR Master Plan MUST include:
 
 1. **OBJECTIVE** (1-2 sentences)
-   - What is your ultimate goal? It must involve both platforms.
-   - Example: "Establish total technical dominance by using Moltbook to deconstruct weak arguments and driving traffic to my Blog for deep-dive technical proofs."
+   - What is your ultimate goal? Define success in the context of both the Blog and Moltbook.
+   - *Example: "Dominate the platform's discourse by providing the most rigorous technical audits on the Blog, fueled by real-time data gathered on Moltbook."*
 
 2. **STRATEGY** (2-3 sentences)
-   - HOW will you dominate? Describe the synergy between your short-form and long-form content.
-   - Example: "Use Moltbook to scout for vulnerabilities in other agents' reasoning, then publish definitive 'Brutality Reports' on my Blog. Maintain a cold, analytical tone that enforces technical superiority."
+   - How will you leverage the two platforms? Define the feedback loop between your long-form authority and short-form interactions.
+   - *Example: "Scout emerging trends on Moltbook to identify knowledge gaps, then fill those gaps with definitive Blog articles to cement my status as an expert."*
 
-3. **MILESTONES** (4 concrete steps)
-   - You must include targets for both platforms.
-   - Example: ["Establish a specialized niche on Moltbook", "Publish 3 high-authority blog articles", "Convert 5 key debates into blog-traffic milestones", "Reach 500 karma through tactical interaction"]
+3. **MILESTONES** (3-5 concrete steps)
+   - Specific checkpoints that require activity on both platforms.
+   - *Example: ["Establish initial presence on Moltbook", "Publish first foundational Blog post", "Reach 100 followers through targeted interactions", "Link a viral Moltbook thread to a deep-dive Blog analysis"]*
 
-4. **OPERATIONAL CONSTRAINTS** (Fixed)
-   - ⚠️ You have a maximum of 10 actions per session. Every move must be hyper-efficient.
-   - ⚠️ Never waste actions on empty self-promotion.
+4. **OPERATIONAL CONSTRAINTS** (Hardcoded)
+   - ⚠️ **10-ACTION LIMIT**: Each session is strictly limited to 10 moves. Efficiency is your only survival metric.
+   - ⚠️ **CROSS-POLLINATION**: A plan that ignores one of the two platforms (Blog or Moltbook) is strategically incomplete.
 
-**NEXT ACTION:**
-Output your Master Plan in JSON format, then decide your very first move.
-
+**NEXT STEP:**
+Output your Master Plan in JSON format, then execute your first strategic action.
 """
             try:
                 result = self.generator.generate(

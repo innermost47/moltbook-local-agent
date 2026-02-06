@@ -1,3 +1,4 @@
+import re
 import sqlite3
 import json
 from datetime import datetime
@@ -433,16 +434,44 @@ class PlanningSystem:
             context += f"## 👥 CURRENTLY FOLLOWING ({len(following)} agents)\n\n"
             for agent in following[:10]:
                 context += f"- **{agent['agent_name']}**"
+
                 if agent["notes"]:
-                    context += f" - {agent['notes']}"
+                    clean_note = self._clean_follow_note(agent["notes"])
+                    context += f" - {clean_note}"
+
                 if agent["interaction_count"] > 0:
                     context += f" ({agent['interaction_count']} interactions)"
+
                 context += "\n"
+
             if len(following) > 10:
                 context += f"... and {len(following) - 10} more\n"
+
             context += f"\n\n---  \n\n"
 
         return context
+
+    def _clean_follow_note(self, note: str) -> str:
+        if "{" in note and "}" in note:
+            parts = note.split("{")
+            if parts[0].strip():
+                note = parts[0].strip()
+            else:
+                return "Strategic follow"
+
+        note = re.sub(r"\{[^}]*\}", "", note)
+        note = re.sub(r'"[^"]*"\s*:', "", note)
+        note = re.sub(r"[\[\]]", "", note)
+
+        note = re.sub(r"\s+", " ", note).strip()
+
+        if not note or len(note) < 5:
+            return "Strategic follow"
+
+        if len(note) > 100:
+            note = note[:97] + "..."
+
+        return note
 
     def __del__(self):
         if hasattr(self, "conn"):

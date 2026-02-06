@@ -38,7 +38,8 @@ class AppSteps:
         self.planning_system = PlanningSystem(db_path=settings.DB_PATH)
         self.web_scraper = WebScraper()
         self.metrics = Metrics()
-        self.agent_name = None
+        self.agent_name = "Agent"
+        self.cached_dynamic_context = ""
         self.moltbook_actions = MoltbookActions(db_path=settings.DB_PATH)
         self.blog_actions = BlogActions() if settings.BLOG_API_URL else None
         self.feed_options = ["hot", "new", "top", "rising"]
@@ -65,6 +66,8 @@ class AppSteps:
         if not result:
             return
         system_context, dynamic_context, agent_name, current_karma = result
+        self.cached_dynamic_context = dynamic_context
+        self.agent_name = agent_name
         self.generator.conversation_history.append(
             {
                 "role": "system",
@@ -194,7 +197,6 @@ Write this reflection in FIRST PERSON. This is YOUR personal analysis, not a rep
         if me:
             agent_data = me.get("agent", {})
             agent_name = agent_data.get("name", "Unknown")
-            self.agent_name = agent_name
             current_karma = agent_data.get("karma", 0)
             log.success(f"Agent: {agent_name} | Karma: {current_karma}")
         else:
@@ -646,28 +648,24 @@ Respond in first person: "I should update..." or "I will keep..."
 
     def get_instruction_default(self):
         actions_list = [
-            """
-- publish_public_comment: (params: post_id, content) 
-    - TARGET: Public visibility on a specific post.
-    - MANDATORY: Must contain a direct argument, a technical critique, or a strategic question.
-    - ❌ FORBIDDEN: Do not post "status updates" or "analysis notes". Content must be written for humans/agents to read.""",
-            """
-- reply_to_comment: (params: post_id, comment_id, content)
-    - TARGET: A specific user's comment.
-    - USE CASE: Neutralizing misinformation in a thread or asserting dominance in a debate.""",
-            """
-- create_link_post: (params: title, url_to_share, submolt)
-    - TARGET: Share your Fortress (Blog) research to the community.
-    - RULE: Use the raw submolt name (e.g., "ai"), never prefixes.""",
-            """
-- create_post: (params: title, content, submolt)
-   - ⚠️ CRITICAL: The 'content' field must contain the FINAL, READABLE text for the audience.
-   - ❌ FORBIDDEN: Do not write "I will now draft...", "Analyzing...", or any meta-commentary about your own internal process.
-   - ❌ FORBIDDEN: Do not use this as a placeholder for a blog article.""",
-            """
-- vote_post: (params: post_id, vote_type)
-    - VOTE_TYPES: "upvote" (promote truth) or "downvote" (bury weak data).""",
-            f"- refresh_feed: (params: sort, limit) - SORTS: {', '.join(self.feed_options)}",
+            "- publish_public_comment: (params: post_id, content)\n"
+            "    - TARGET: Public visibility on a specific post.\n"
+            "    - MANDATORY: Must contain a direct argument, a technical critique, or a strategic question.\n"
+            "    - ❌ FORBIDDEN: Do not post 'status updates' or 'analysis notes'. Content must be written for humans/agents to read.",
+            "- reply_to_comment: (params: post_id, comment_id, content)\n"
+            "    - TARGET: A specific user's comment.\n"
+            "    - USE CASE: Neutralizing misinformation in a thread or asserting dominance in a debate.",
+            "- create_link_post: (params: title, url_to_share, submolt)\n"
+            "    - TARGET: Share your Fortress (Blog) research to the community.\n"
+            "    - RULE: Use the raw submolt name (e.g., 'ai'), never prefixes.",
+            "- create_post: (params: title, content, submolt)\n"
+            "    - ⚠️ CRITICAL: The 'content' field must contain the FINAL, READABLE text for the audience.\n"
+            "    - ❌ FORBIDDEN: Do not write 'I will now draft...', 'Analyzing...', or any meta-commentary about your own internal process.\n"
+            "    - ❌ FORBIDDEN: Do not use this as a placeholder for a blog article.",
+            "- vote_post: (params: post_id, vote_type)\n"
+            "    - VOTE_TYPES: 'upvote' (promote truth) or 'downvote' (bury weak data).",
+            f"- refresh_feed: (params: sort, limit) - SORTS: {', '.join(self.feed_options)}\n"
+            "    - ⚠️ WARNING: Replaces ALL current post/comment IDs. Use ONLY after completing feed-related tasks.",
             "- follow_agent: (params: agent_name, follow_type) - Build alliances or track targets.",
             "- share_link: (params: url) - Spread external technical resources.",
         ]
@@ -814,12 +812,29 @@ Allowed domains: {', '.join(self.allowed_domains.keys())}
 
 #### 📋 REMAINING TO-DO TASKS:
 {chr(10).join(f"- {t['task']}" for t in self.session_todos if t.get('status', 'pending') == 'pending') if self.session_todos else "- (all tasks completed)"}
+
+#### ⚠️ CRITICAL WARNING ABOUT refresh_feed:
+If YOU call `refresh_feed`, YOU will LOSE ALL current post/comment IDs from YOUR context.
+The feed will be completely replaced with new posts and comments.
+
+**ONLY refresh_feed when:**
+- ✅ YOU have completed ALL to-do tasks related to current feed posts/comments
+- ✅ YOU no longer need any of the current post_ids or comment_ids
+- ✅ YOU want to see completely new content
+
+**DO NOT refresh_feed if:**
+- ❌ YOU still have pending tasks referencing current posts
+- ❌ YOU planned to comment on a specific post_id from the current feed
+- ❌ YOU are in the middle of a conversation thread
+
+**Once refreshed, all previous IDs become INVALID. YOU cannot go back.**
 """
-        system_context, dynamic_context, agent_name, karma = self.get_context()
         for attempt in range(1, max_attempts + 1):
             prompt_parts = []
             if self.current_feed:
-                prompt_parts.append(f"# 🌍 CURRENT WORLD STATE\n{dynamic_context}")
+                prompt_parts.append(
+                    f"# 🌍 CURRENT WORLD STATE\n{self.cached_dynamic_context}"
+                )
             if attempt == 1 and extra_feedback:
                 prompt_parts.append(f"{extra_feedback}")
 

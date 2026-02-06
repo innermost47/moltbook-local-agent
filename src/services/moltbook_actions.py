@@ -1,4 +1,5 @@
 import time
+import random
 import sqlite3
 from datetime import datetime
 from src.utils import log
@@ -309,7 +310,8 @@ class MoltbookActions:
         log.info("Refreshing feed...")
 
         posts_data = app_steps.api.get_posts(
-            sort=params.get("sort", "hot"), limit=params.get("limit", 20)
+            sort=params.get("sort", random.choice(app_steps.feed_options)),
+            limit=params.get("limit", 20),
         )
 
         if not posts_data:
@@ -325,16 +327,57 @@ class MoltbookActions:
         enriched_feed = app_steps.get_enriched_feed_context(posts_data)
         app_steps.current_feed = enriched_feed
 
+        new_dynamic_context = ""
+
+        if app_steps.blog_actions:
+            try:
+                existing_articles = app_steps.blog_actions.list_articles()
+
+                if existing_articles and isinstance(existing_articles, list):
+                    published_titles = [
+                        post.get("title", "Untitled") for post in existing_articles
+                    ][:10]
+
+                    blog_knowledge = "\n## 📚 PREVIOUSLY PUBLISHED BLOG ARTICLES\n"
+                    blog_knowledge += "- " + "\n- ".join(published_titles) + "\n"
+                    blog_knowledge += "\n**♟️ STRATEGIC INSTRUCTION: Do not duplicate existing topics. Always provide a new angle or a superior technical perspective.**\n\n--- \n\n"
+
+                    new_dynamic_context += blog_knowledge
+            except Exception as e:
+                log.warning(f"Could not sync blog during refresh: {e}")
+
+        new_dynamic_context += f"""## 🦞 CURRENT MOLTBOOK FEED
+
+{enriched_feed}
+
+**🚨 USE ONLY THESE EXACT IDS IN YOUR ACTIONS. NEVER INVENT OR TRUNCATE IDs.**  
+
+---
+
+"""
+
+        app_steps.cached_dynamic_context = new_dynamic_context
+
         feed_update = f"## FEED REFRESHED (Sort: {params.get('sort', 'hot')})\n\n"
         feed_update += enriched_feed
 
         log.success(
-            f"Feed refreshed: {len(app_steps.available_post_ids)} posts, {len(app_steps.available_comment_ids)} comments"
+            f"Feed refreshed: {len(app_steps.available_post_ids)} posts, "
+            f"{len(app_steps.available_comment_ids)} comments (cache updated)"
         )
 
-        app_steps.actions_performed.append("Refreshed feed")
+        app_steps.actions_performed.append(
+            f"[REFRESH] Refreshed feed ({params.get('sort', 'hot')})"
+        )
 
-        return {"success": True, "data": feed_update}
+        return {
+            "success": True,
+            "data": f"✅ Feed refreshed successfully.\n"
+            f"- {len(app_steps.available_post_ids)} posts loaded\n"
+            f"- {len(app_steps.available_comment_ids)} comments available\n"
+            f"- Sort: {params.get('sort', 'hot')}\n\n"
+            f"New post IDs are now in your context. Previous IDs are invalidated.",
+        }
 
     def track_interaction_from_post(self, post_id: str, app_steps):
         post_data = app_steps.api.get_single_post(post_id)

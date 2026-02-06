@@ -570,8 +570,8 @@ Should you update your master plan? Consider:
 
         random.shuffle(posts_list)
 
-        MAX_POSTS = 6
-        MAX_COMMENTS_PER_POST = 3
+        MAX_POSTS = 8
+        MAX_COMMENTS_PER_POST = 4
         CONTENT_TRUNC = 350
         COMMENT_TRUNC = 150
 
@@ -603,7 +603,7 @@ Should you update your master plan? Consider:
 
                         if comments:
                             random.shuffle(comments)
-                            post_block += f"   📝 TOP {len(comments[:MAX_COMMENTS_PER_POST])} COMMENTS (Selected for analysis):\n"
+                            post_block += f"   📝 {len(comments[:MAX_COMMENTS_PER_POST])} COMMENTS (Selected for analysis):\n"
                             for j, comment in enumerate(
                                 comments[:MAX_COMMENTS_PER_POST], 1
                             ):

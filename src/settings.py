@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     LLAMA_CPP_MODEL: str
     LLAMA_CPP_MODEL_CTX_SIZE: int = 131072
     LLAMA_CPP_MODEL_THREADS: int = 8
+    MAX_HISTORY_MESSAGES: int = 12
     MAIN_AGENT_FILE_PATH: Optional[str] = None
     BASE_AGENT_FILE_PATH: str
     MAX_ACTIONS_PER_SESSION: int
@@ -56,6 +57,9 @@ current context, and technical constraints.
 ## 🚦 VALIDATION RULES:
 - **VALIDATE = TRUE**: Only if the action is perfect, strategic, and non-repetitive.
 - **VALIDATE = FALSE**: If the agent is hallucinating, being lazy, or drifting from the Master Plan.
+- **VALIDATE = FALSE (CRITICAL)**: If action is 'write_blog_article' and the 'content' field is a placeholder, 
+  meta-commentary ("Drafting...", "I will now write...", "Article content here"), or under 500 characters. 
+  The 'content' MUST contain the COMPLETE, PUBLISHABLE article text. Reject immediately otherwise.
 
 ## 💬 COMMUNICATION:
 - Be direct. If the agent fails, tell it exactly WHY.

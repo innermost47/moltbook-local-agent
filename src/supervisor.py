@@ -174,3 +174,142 @@ Based on this complete session context, provide your final verdict:
                 "directive_next_session": "Continue operation with caution.",
                 "grade": "C",
             }
+
+    def generate_error_guidance(
+        self,
+        failed_action: dict,
+        error_message: str,
+        session_todos: list,
+        attempts_left: int,
+    ) -> str:
+        action_type = failed_action.get("action_type", "unknown")
+        params = failed_action.get("action_params", {})
+        err = error_message.lower()
+
+        if (
+            action_type == "update_todo_status"
+            and "not found in current session" in err
+        ):
+            task_names = (
+                [t["task"][:100] for t in session_todos] if session_todos else []
+            )
+            return (
+                f"You used '{params.get('todo_task', '?')}' which does not match any task. "
+                f"Your valid tasks are:\n"
+                + "\n".join([f"  - {t}" for t in task_names])
+                + "\nUse a substring that matches one of these descriptions exactly."
+            )
+
+        if "no valid ids" in err or "target desync" in err:
+            return (
+                "The IDs you provided are not in the current feed. "
+                "Use 'refresh_feed' to load new posts, or pick IDs from the feed already in your context."
+            )
+
+        if "is a comment_id" in err and "reply_to_comment" in err:
+            return (
+                "You passed a COMMENT_ID where a POST_ID was expected. "
+                "Use 'reply_to_comment' with both post_id AND comment_id to reply to a comment."
+            )
+
+        if "invalid comment_id" in err:
+            return (
+                "The comment_id you targeted does not exist in the loaded feed. "
+                "Check the COMMENT_IDs listed under each post in your feed context."
+            )
+
+        if "protocol violation" in err and (
+            "content cannot be empty" in err or "reply content" in err
+        ):
+            return (
+                f"Your '{action_type}' had empty content. "
+                "The 'content' field must contain the actual text you want to publish."
+            )
+
+        if "schema violation" in err or (
+            "invalid category" in err
+            and action_type in ["memory_store", "memory_retrieve"]
+        ):
+            return (
+                "You tried to use a memory category that doesn't exist. "
+                "Re-read the MEMORY SYSTEM PROTOCOL in your context for the strict list of allowed categories."
+            )
+
+        if "already retrieved" in err:
+            return (
+                "You already retrieved this category recently. The data is in your context. "
+                "Move on to a different action."
+            )
+
+        if "already attempted" in err or "already published" in err:
+            return (
+                f"You already used '{action_type}' this session (limit: 1). "
+                "Skip this and use your remaining actions on other tasks."
+            )
+
+        if "missing mandatory fields" in err and action_type == "write_blog_article":
+            return (
+                "Your blog article is missing required fields (title and/or content). "
+                "The 'content' field must contain the FULL article text, not a placeholder."
+            )
+
+        if "security error" in err and "url must be from" in err:
+            return (
+                "The URL you tried to share is not from your official blog domain. "
+                "Use the exact URL returned after 'write_blog_article'."
+            )
+
+        if action_type == "share_created_blog_post_url" and ("requires" in err):
+            return "You need both 'title' and 'share_link_url' to share a blog post on Moltbook."
+
+        if ("not found" in err) and action_type in [
+            "approve_comment_key",
+            "reject_comment_key",
+            "approve_comment",
+            "reject_comment",
+        ]:
+            return (
+                f"The ID you used for '{action_type}' no longer exists or is invalid. "
+                "Call 'review_pending_comments' or 'review_comment_key_requests' to refresh the queue first."
+            )
+
+        if (
+            "not in the whitelist" in err
+            or "invalid domain" in err
+            or "not allowed" in err
+        ):
+            return (
+                "You tried to access a domain outside your whitelist. "
+                "Check the WEB ACCESS section in your context for the list of authorized domains."
+            )
+
+        if action_type in ["web_fetch", "web_scrap_for_links"] and (
+            "fetch failed" in err or "search failed" in err
+        ):
+            return (
+                "The web request failed (network error, timeout, or empty page). "
+                "Try a different URL on the same domain, or switch to another action."
+            )
+
+        if action_type == "follow_agent" and "missing" in err:
+            return "You must specify 'agent_name' for follow/unfollow actions."
+
+        if "429" in error_message or "rate limit" in err:
+            return (
+                "Rate limit hit. Wait before retrying this action type, "
+                "or pivot to a non-API action (memory, planning, web)."
+            )
+
+        if "api error" in err or "server" in err or "http" in err:
+            return (
+                f"The Moltbook/Blog API returned an error for '{action_type}'. "
+                "This may be temporary. Try a different action or retry later."
+            )
+
+        if attempts_left > 0:
+            return (
+                f"'{action_type}' failed: {error_message[:200]}. "
+                "Analyze the error, adjust your parameters, and try a DIFFERENT approach."
+            )
+        else:
+            return f"'{action_type}' failed on final attempt. Abandon this action and move on."

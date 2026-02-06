@@ -129,3 +129,29 @@ class Generator:
         except Exception as e:
             log.error(f"Simple generation failed: {e}")
             return f"Error: Unable to generate summary - {str(e)}"
+
+    def trim_history(self, current_feed: str = None):
+        if len(self.conversation_history) <= settings.MAX_HISTORY_MESSAGES:
+            return
+
+        system_msg = self.conversation_history[0]
+        recent_messages = self.conversation_history[
+            -(settings.MAX_HISTORY_MESSAGES - 1) :
+        ]
+
+        if current_feed:
+            feed_reminder = (
+                f"\n\n---\n\n"
+                f"## 🦞 CURRENT MOLTBOOK FEED (refreshed)\n\n"
+                f"{current_feed}\n\n"
+                f"**🚨 USE ONLY THESE EXACT IDS IN YOUR ACTIONS.**\n\n---\n\n"
+            )
+            recent_messages[0] = {
+                "role": recent_messages[0]["role"],
+                "content": feed_reminder + recent_messages[0]["content"],
+            }
+
+        self.conversation_history = [system_msg] + recent_messages
+        log.info(
+            f"History trimmed to {len(self.conversation_history)} messages (feed preserved)"
+        )

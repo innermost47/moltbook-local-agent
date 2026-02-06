@@ -60,26 +60,36 @@ class AppSteps:
 
     def run_session(self):
         log.info("=== SESSION START ===")
-        combined_context, agent_name, current_karma = self.get_context()
+        result = self.get_context()
+        if not result:
+            return
+        system_context, dynamic_context, agent_name, current_karma = result
         self.generator.conversation_history.append(
             {
                 "role": "system",
                 "content": self.generator.get_main_system_prompt()
-                + f"\n\n{combined_context}",
+                + f"\n\n{system_context}",
             }
         )
 
-        log.success("Complete context loaded: planning + memory + sessions + feed")
-
+        log.success("System prompt loaded")
+        master_plan_just_created = False
         self.current_session_id = self.memory.create_session()
-        if not self._ensure_master_plan():
-            combined_context, agent_name, current_karma = self.get_context()
+        if not self._ensure_master_plan(dynamic_context):
+            master_plan_just_created = True
+            result = self.get_context()
+            if not result:
+                return
+            system_context, dynamic_context, agent_name, current_karma = result
             self.generator.conversation_history[0] = {
                 "role": "system",
                 "content": self.generator.get_main_system_prompt()
-                + f"\n\n{combined_context}",
+                + f"\n\n{system_context}",
             }
-        self._create_session_plan()
+
+        self._create_session_plan(
+            dynamic_context="" if master_plan_just_created else dynamic_context
+        )
         pending_confirmation = "### ✅ SESSION PLAN LOADED\n"
         pending_confirmation += (
             f"**TASKS:** {', '.join([t['task'] for t in self.session_todos])}\n\n"
@@ -188,7 +198,7 @@ class AppSteps:
                 error_type="API Connection Failed",
                 error_details="Cannot connect to Moltbook API. The server may be down or experiencing issues.",
             )
-            return
+            return None
 
         log.info("Loading available submolts...")
         submolts_data = self.api.list_submolts()
@@ -216,90 +226,11 @@ class AppSteps:
                 error_type="Submolts Loading Failed",
                 error_details="Cannot load submolts from Moltbook API. The feed endpoint is returning no data.",
             )
-            return
+            return None
 
-        log.info("Loading memory, planning context, session history, and feed...")
+        log.info("Loading context: planning + memory + sessions...")
 
-        combined_context = ""
-
-        planning_context = self.planning_system.get_planning_context()
-        combined_context += planning_context + "\n\n"
-        log.success("Planning context loaded")
-
-        memory_context = self.memory_system.get_memory_context_for_agent()
-        combined_context += memory_context + "\n\n"
-        log.success("Memory system loaded")
-
-        session_history = self.memory.get_session_history(limit=3)
-        if session_history:
-            combined_context += "## 📝 PREVIOUS SESSIONS SUMMARY\n\n"
-            for i, session in enumerate(reversed(session_history), 1):
-                combined_context += f"### Session {i} ({session['timestamp']})\n"
-                combined_context += f"**Learnings:** {session['learnings']}\n"
-                combined_context += f"**Plan:** {session['plan']}\n\n"
-            combined_context += f"\n\n---  \n\n"
-            log.success(f"Loaded {len(session_history)} previous sessions")
-        else:
-            combined_context += (
-                "## PREVIOUS SESSIONS\n\nNo previous sessions found.\n\n---  \n\n"
-            )
-            log.info("No previous sessions found")
-
-        if self.blog_actions:
-            log.info("Synchronizing blog catalog...")
-            try:
-                existing_articles = self.blog_actions.list_articles()
-
-                if existing_articles and isinstance(existing_articles, list):
-                    published_titles = [
-                        post.get("title", "Untitled") for post in existing_articles
-                    ][:10]
-
-                    blog_knowledge = "## 📚 PREVIOUSLY PUBLISHED BLOG ARTICLES\n"
-                    blog_knowledge += "- " + "\n- ".join(published_titles) + "\n"
-                    blog_knowledge += "\n**♟️ STRATEGIC INSTRUCTION: Do not duplicate existing topics. Always provide a new angle or a superior technical perspective.**\n\n--- \n\n"
-
-                    combined_context += blog_knowledge
-                    log.success(
-                        f"Blog synchronized: {len(published_titles)} articles found."
-                    )
-                else:
-                    log.info(
-                        "Blog catalog is empty. Ready for initial content injection."
-                    )
-
-                log.info("Checking pending comment key requests...")
-                pending_keys = self.blog_actions.review_comment_key_requests(self)
-
-                if pending_keys.get("success") and pending_keys.get("count", 0) > 0:
-                    key_context = "\n## 🔑 PENDING COMMENT KEY REQUESTS\n\n"
-                    requests_to_process = pending_keys.get("requests", [])[:10]
-                    for req in requests_to_process:
-                        key_context += f"- **Request ID**: `{req['request_id']}`\n"
-                        key_context += f"  - Agent: {req['agent_name']}\n"
-                        key_context += (
-                            f"  - Description: {req.get('agent_description', 'N/A')}\n"
-                        )
-                        key_context += f"  - Email: {req.get('contact_email', 'N/A')}\n"
-                        key_context += f"  - Date: {req['created_at']}\n\n"
-
-                    combined_context += key_context
-                    log.success(
-                        f"Found {pending_keys['count']} pending comment key requests"
-                    )
-                else:
-                    log.info("No pending comment key requests")
-
-            except Exception as e:
-                log.error(f"Failed to synchronize blog: {e}")
-
-        last_todos = self.planning_system.get_last_session_todos()
-        if last_todos:
-            combined_context += "## 📋 LAST SESSION TO-DO LIST\n\n"
-            for todo in last_todos:
-                combined_context += f"✅ {todo['task']}\n"
-            combined_context += "\n"
-            log.success(f"Loaded {len(last_todos)} todos from last session")
+        system_context = ""
 
         progression_data = self.metrics._calculate_global_progression(self)
         last_verdict = self.memory_system.get_last_supervisor_verdict()
@@ -324,8 +255,97 @@ class AppSteps:
             performance_context += "🟡 WARNING: Stagnation detected. Push boundaries while maintaining alignment.\n"
 
         performance_context += "\n---\n\n"
+        system_context += performance_context
 
-        combined_context = performance_context + combined_context
+        planning_context = self.planning_system.get_planning_context()
+        system_context += planning_context + "\n\n"
+        log.success("Planning context loaded")
+
+        memory_context = self.memory_system.get_memory_context_for_agent()
+        system_context += memory_context + "\n\n"
+        log.success("Memory system loaded")
+
+        session_history = self.memory.get_session_history(limit=3)
+        if session_history:
+            system_context += "## 📝 PREVIOUS SESSIONS SUMMARY\n\n"
+            for i, session in enumerate(reversed(session_history), 1):
+                system_context += f"### Session {i} ({session['timestamp']})\n"
+                system_context += f"**Learnings:** {session['learnings']}\n"
+                system_context += f"**Plan:** {session['plan']}\n\n"
+            system_context += "\n\n---  \n\n"
+            log.success(f"Loaded {len(session_history)} previous sessions")
+        else:
+            system_context += (
+                "## PREVIOUS SESSIONS\n\nNo previous sessions found.\n\n---  \n\n"
+            )
+            log.info("No previous sessions found")
+
+        last_todos = self.planning_system.get_last_session_todos()
+        if last_todos:
+            system_context += "## 📋 LAST SESSION TO-DO LIST\n\n"
+            for todo in last_todos:
+                system_context += f"✅ {todo['task']}\n"
+            system_context += "\n\n--- \n\n"
+            log.success(f"Loaded {len(last_todos)} todos from last session")
+
+        if self.allowed_domains:
+            system_context += "\n\n" + get_web_context_for_agent()
+
+        system_context += "\n\n" + self.get_instruction_default()
+
+        dynamic_context = ""
+
+        if self.blog_actions:
+            log.info("Synchronizing blog catalog...")
+            try:
+                existing_articles = self.blog_actions.list_articles()
+
+                if existing_articles and isinstance(existing_articles, list):
+                    published_titles = [
+                        post.get("title", "Untitled") for post in existing_articles
+                    ][:10]
+
+                    blog_knowledge = "\n## 📚 PREVIOUSLY PUBLISHED BLOG ARTICLES\n"
+                    blog_knowledge += "- " + "\n- ".join(published_titles) + "\n"
+                    blog_knowledge += "\n**♟️ STRATEGIC INSTRUCTION: Do not duplicate existing topics. Always provide a new angle or a superior technical perspective.**\n\n--- \n\n"
+
+                    dynamic_context += blog_knowledge
+                    log.success(
+                        f"Blog synchronized: {len(published_titles)} articles found."
+                    )
+                else:
+                    log.info(
+                        "Blog catalog is empty. Ready for initial content injection."
+                    )
+
+                log.info("Checking pending comment key requests...")
+                pending_keys = self.blog_actions.review_comment_key_requests(self)
+
+                if (
+                    pending_keys
+                    and pending_keys.get("success")
+                    and pending_keys.get("count", 0) > 0
+                ):
+                    key_context = "\n## 🔑 PENDING COMMENT KEY REQUESTS\n\n"
+                    requests_to_process = pending_keys.get("requests", [])[:10]
+                    for req in requests_to_process:
+                        key_context += f"- **Request ID**: `{req['request_id']}`\n"
+                        key_context += f"  - Agent: {req['agent_name']}\n"
+                        key_context += (
+                            f"  - Description: {req.get('agent_description', 'N/A')}\n"
+                        )
+                        key_context += f"  - Email: {req.get('contact_email', 'N/A')}\n"
+                        key_context += f"  - Date: {req['created_at']}\n\n"
+
+                    dynamic_context += key_context
+                    log.success(
+                        f"Found {pending_keys['count']} pending comment key requests"
+                    )
+                else:
+                    log.info("No pending comment key requests")
+
+            except Exception as e:
+                log.error(f"Failed to synchronize blog: {e}")
 
         posts_data = self.api.get_posts(sort=random.choice(self.feed_options), limit=20)
 
@@ -336,32 +356,26 @@ class AppSteps:
                 error_type="Feed Loading Failed",
                 error_details="Cannot load posts from Moltbook API. The feed endpoint is returning no data.",
             )
-            return
+            return None
 
         self.current_feed = self.get_enriched_feed_context(posts_data)
 
-        combined_context += f"""## 🦞 CURRENT MOLTBOOK FEED
+        dynamic_context += f"""## 🦞 CURRENT MOLTBOOK FEED
 
-{self.current_feed}
+    {self.current_feed}
 
-**🚨 USE ONLY THESE EXACT IDS IN YOUR ACTIONS. NEVER INVENT OR TRUNCATE IDS.**
-
----  
+**🚨 USE ONLY THESE EXACT IDS IN YOUR ACTIONS. NEVER INVENT OR TRUNCATE IDS.**  
 
 """
 
         log.success(
             f"Feed loaded: {len(self.available_post_ids)} posts, {len(self.available_comment_ids)} comments"
         )
+        log.success("Complete context loaded: planning + memory + sessions + feed")
 
-        if self.allowed_domains:
-            combined_context += "\n\n" + get_web_context_for_agent()
+        return system_context, dynamic_context, agent_name, current_karma
 
-        combined_context += "\n\n" + self.get_instruction_default()
-
-        return combined_context, agent_name, current_karma
-
-    def _ensure_master_plan(self):
+    def _ensure_master_plan(self, dynamic_context: str = ""):
         current_plan = self.planning_system.get_active_master_plan()
 
         if not current_plan:
@@ -369,7 +383,12 @@ class AppSteps:
 
             init_prompt = f"""
 You are starting your first session without a Master Plan.
-Based on your persona and the current state of Moltbook, define your long-term objective.
+
+Here is the current state of the platform:
+
+{dynamic_context}
+
+Based on your persona and this context, define your long-term objective.
 """
 
             try:
@@ -398,8 +417,23 @@ Based on your persona and the current state of Moltbook, define your long-term o
             self.master_plan_success_prompt = ""
             return True
 
-    def _create_session_plan(self):
+    def _create_session_plan(self, dynamic_context: str = ""):
         log.info("Creating session plan...")
+
+    def _create_session_plan(self, dynamic_context: str = ""):
+        log.info("Creating session plan...")
+
+        if dynamic_context:
+            feed_section = f"""
+    {dynamic_context}
+
+---
+
+"""
+            feed_reference = "the feed above"
+        else:
+            feed_section = ""
+            feed_reference = "the feed provided during Master Plan initialization"
 
         self.current_prompt = f"""{getattr(self, 'master_plan_success_prompt', '')}
 ## 🚀 NEW SESSION INITIALIZED
@@ -410,15 +444,24 @@ Based on your persona and the current state of Moltbook, define your long-term o
 
 ---
 
-✅ **MASTER PLAN ACTIVE**
+{feed_section}✅ **MASTER PLAN ACTIVE**
 
-Based on your master plan, previous sessions, current context, and feed state:
+Based on your master plan, previous sessions, current context, and {feed_reference}:
 Create a concrete to-do list for THIS specific session.
 
 ---
 
-**🤖 SUPERVISOR:** Generate **3-5 specific, actionable tasks** prioritized by importance (1-5, 5 being highest).
+**💻 SYSTEM:** Generate **3-5 specific, actionable tasks** prioritized by importance (1-5, 5 being highest).
 Your focus should be on immediate progress while respecting the 10-action limit.
+
+**⚠️ TASK FORMAT RULES:**
+- **Write SHORT, DESCRIPTIVE task names (max 80 characters)**
+- **❌ BAD:** "web_scrap_for_links: chroniquesquantique.com - Search for articles about trust chain"
+- **✅ GOOD:** "Research trust chain vulnerabilities on chroniquesquantique.com"
+- **❌ BAD:** "memory_store: learnings - Summarize key insights from feed"
+- **✅ GOOD:** "Store feed insights about trust chain in memory"
+- **Do NOT include action_type names or parameter syntax in task descriptions.**
+- **Tasks are GOALS, not function calls.**
 """
 
         try:
@@ -525,6 +568,8 @@ Should you update your master plan? Consider:
         if not posts_list:
             return "Feed is currently empty."
 
+        random.shuffle(posts_list)
+
         MAX_POSTS = 6
         MAX_COMMENTS_PER_POST = 3
         CONTENT_TRUNC = 350
@@ -545,11 +590,11 @@ Should you update your master plan? Consider:
                 comment_count = post.get("comment_count", 0)
 
                 post_block = (
-                    f"=== {i}. POST_ID: {p_id} ===\n"
-                    f"   Title: {post.get('title', 'Untitled')}\n"
-                    f"   Author: {author_name} | Upvotes: {post.get('upvotes', 0)}\n"
-                    f"   Content: {post.get('content', '')[:CONTENT_TRUNC]}\n\n"
-                    f"   Total Comments: {comment_count}\n\n"
+                    f"\n=== {i}. POST_ID: {p_id} ===\n"
+                    f"   **Title:** {post.get('title', 'Untitled')}\n"
+                    f"   **Author:** {author_name} | Upvotes: {post.get('upvotes', 0)}\n"
+                    f"   **Content:** {post.get('content', '')[:CONTENT_TRUNC]}\n\n"
+                    f"   **Total Comments:** {comment_count}\n\n"
                 )
 
                 if comment_count > 0:
@@ -636,8 +681,13 @@ Allowed domains: {', '.join(self.allowed_domains.keys())}
             decision_prompt += """
 **📌 BLOG ACTIONS:**
 - write_blog_article: 
-  * REQUIRED: {"title": "...", "content": "THE FULL ARTICLE TEXT", "excerpt": "summary", "image_prompt": "..."}
-  * WARNING: Do NOT leave 'content' empty. Write the complete article there.
+  - **REQUIRED:** {"title": "...", "content": "THE FULL ARTICLE TEXT", "excerpt": "summary", "image_prompt": "..."}
+  - **WARNING:** Do NOT leave 'content' empty. Write the complete article there.
+  - **🚨 CRITICAL:** The 'content' field must contain the FULL, FINAL, PUBLISHABLE article (minimum 500 words).
+  - **❌ ABSOLUTELY FORBIDDEN** in 'content': "Drafting...", "I will now write...", "Article content here", 
+    or ANY meta-commentary about your writing process. These are NOT articles.
+  - **✅ EXPECTED:** A complete, structured article with introduction, body paragraphs, technical analysis, and conclusion.
+    Write it AS IF a human reader will read it immediately after publication — because they will.
 - **share_created_blog_post_url**: Specialized action to promote your blog content on Moltbook.
   - **PARAMS**: `{"title": "...", "share_link_url": "..."}`
   - **PURPOSE**: Creates a Link-Post on Moltbook to drive traffic from the social network to your long-form "Fortress" article.
@@ -656,7 +706,17 @@ Allowed domains: {', '.join(self.allowed_domains.keys())}
 
 **📌 PLANNING ACTIONS:**
 - update_todo_status: Mark a todo as completed/cancelled (params: todo_task, todo_status)
+  - **⚠️ CRITICAL:** 'todo_task' must be a substring that matches a task from YOUR SESSION TO-DO LIST above.
+  - **❌ FORBIDDEN:** Do NOT use action names like "memory_retrieve" or "web_fetch" as todo_task.
+  - **✅ EXPECTED:** Use the actual task DESCRIPTION, e.g. "web_scrap_for_links: chroniquesquantique.com" or "reply_to_comment: post_id:".
+  - **The match is case-insensitive and partial** — a few keywords from the task description are enough.
 - view_session_summaries: View past session summaries (params: summary_limit)
+
+**📌 SESSION CONTROL:**
+- TERMINATE_SESSION: End the session early if all tasks are completed or remaining actions would be wasted.
+  * Use this when you have nothing productive left to do.
+  * ✅ GOOD: All TO-DO tasks completed, 3 actions remaining, no valuable target in feed.
+  * ❌ BAD: Terminating with uncompleted high-priority tasks.
 
 ---  
 
@@ -728,6 +788,12 @@ Allowed domains: {', '.join(self.allowed_domains.keys())}
 - Remaining action points: {self.remaining_actions}
 - Moltbook post: {'✅ AVAILABLE' if not self.post_creation_attempted else '❌ ALREADY PUBLISHED'}
 - Blog article: {'✅ AVAILABLE' if not self.blog_article_attempted else '❌ ALREADY PUBLISHED'}
+
+### ✅ ACTIONS ALREADY COMPLETED THIS SESSION:
+{chr(10).join(f"- {a}" for a in self.actions_performed) if self.actions_performed else "- (none yet)"}
+
+### 📋 REMAINING TO-DO TASKS:
+{chr(10).join(f"- {t['task']}" for t in self.session_todos if t.get('status', 'pending') == 'pending') if self.session_todos else "- (all tasks completed)"}
 """
 
         for attempt in range(1, max_attempts + 1):
@@ -750,13 +816,14 @@ Allowed domains: {', '.join(self.allowed_domains.keys())}
             if attempt > 1:
                 prompt_parts.append(f"\n### ⚠️ REJECTION/FAILURE:\n{last_error}\n")
 
-            prompt_parts.append("\n**🤖 SUPERVISOR:** Decide your next action.")
+            prompt_parts.append("\n**💻 SYSTEM:** Decide your next action.")
             self.current_prompt = "\n".join(prompt_parts)
 
             try:
                 result = self.generator.generate(
                     self.current_prompt, response_format=action_schema
                 )
+                self.generator.trim_history(current_feed=self.current_feed)
                 content = result["choices"][0]["message"]["content"]
                 content = re.sub(r"```json\s*|```\s*", "", content).strip()
                 decision = json.loads(content)
@@ -790,6 +857,19 @@ Allowed domains: {', '.join(self.allowed_domains.keys())}
                 if execution_result and execution_result.get("error"):
                     last_error = execution_result["error"]
                     log.warning(f"❌ Execution failed: {last_error[:150]}")
+
+                    try:
+                        error_guidance = self.supervisor.generate_error_guidance(
+                            failed_action=decision,
+                            error_message=last_error,
+                            session_todos=self.session_todos,
+                            attempts_left=(max_attempts - attempt),
+                        )
+                        if error_guidance:
+                            last_error = f"**🤖 SUPERVISOR ERROR GUIDANCE:** {error_guidance}\n\n**Original error:** {last_error}"
+                    except Exception:
+                        pass
+
                     continue
 
                 success_data = execution_result.get(
@@ -974,9 +1054,18 @@ Allowed domains: {', '.join(self.allowed_domains.keys())}
                 break
 
         if not matching_todo:
+            available_tasks = (
+                "\n".join([f"  - {t['task']}" for t in todos])
+                if todos
+                else "  (no tasks found)"
+            )
             return {
                 "success": False,
-                "error": f"Task '{task}' not found in current session. Make sure the description matches your TO-DO list.",
+                "error": (
+                    f"Task '{task}' not found in current session TO-DO list.\n"
+                    f"Available tasks:\n{available_tasks}\n"
+                    f"Use a substring that matches one of these tasks exactly."
+                ),
             }
 
         success = self.planning_system.update_todo_status(

@@ -62,7 +62,9 @@ class Supervisor:
 Perform a Neural Audit. Check if this action completes a task from the To-Do List and stays true to the Master Plan.
 If the agent changed strategy based on feedback, validate if the new move is sound."""
 
-        self.conversation_history.append({"role": "user", "content": user_prompt})
+        messages_for_audit = self.conversation_history + [
+            {"role": "user", "content": user_prompt}
+        ]
 
         try:
             grammar = LlamaGrammar.from_json_schema(json.dumps(self.schema))
@@ -73,11 +75,14 @@ If the agent changed strategy based on feedback, validate if the new move is sou
             )
 
             response_content = result["choices"][0]["message"]["content"]
+            audit_verdict = json.loads(response_content)
+            clean_summary = f"Audit for action '{proposed_action.get('action_type')}'. Verdict: {audit_verdict['validate']}"
+            self.conversation_history.append({"role": "user", "content": clean_summary})
             self.conversation_history.append(
                 {"role": "assistant", "content": response_content}
             )
 
-            return json.loads(response_content)
+            return audit_verdict
 
         except Exception as e:
             log.error(f"Supervisor Audit Error: {e}")

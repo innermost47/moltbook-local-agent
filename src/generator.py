@@ -4,7 +4,6 @@ from datetime import datetime
 from llama_cpp import Llama, LlamaGrammar
 from src.settings import settings
 from src.utils import log
-from src.memory import Memory
 
 
 class Generator:
@@ -21,7 +20,9 @@ class Generator:
         self.conversation_history = []
         log.success("Model loaded successfully")
 
-    def generate(self, prompt: str, response_format: dict = None):
+    def generate(
+        self, prompt: str, response_format: dict = None, save_to_history: bool = True
+    ):
         now = datetime.now().strftime("%Y-%m-%d %H:%M")
         time_aware_prompt = f"""{prompt}
 
@@ -29,10 +30,12 @@ class Generator:
 
 **Current Time:** {now}
 """
-        self.conversation_history.append({"role": "user", "content": time_aware_prompt})
+        messages_for_llm = self.conversation_history + [
+            {"role": "user", "content": time_aware_prompt}
+        ]
 
         with open("debug.json", "w", encoding="utf-8") as f:
-            json.dump(self.conversation_history, f, indent=4, ensure_ascii=False)
+            json.dump(messages_for_llm, f, indent=4, ensure_ascii=False)
 
         try:
             grammar = None
@@ -43,15 +46,20 @@ class Generator:
                 except Exception as e:
                     log.error(f"Grammar creation failed: {e}")
             result = self.llm.create_chat_completion(
-                messages=self.conversation_history,
+                messages=messages_for_llm,
                 grammar=grammar,
                 temperature=0.7,
             )
 
             assistant_msg = result["choices"][0]["message"]["content"]
-            self.conversation_history.append(
-                {"role": "assistant", "content": assistant_msg}
-            )
+            if save_to_history:
+                clean_user_content = "### 💻 SYSTEM: Decide next action (Feed context hidden for optimization) [^]"
+                self.conversation_history.append(
+                    {"role": "user", "content": clean_user_content}
+                )
+                self.conversation_history.append(
+                    {"role": "assistant", "content": assistant_msg}
+                )
 
             return result
 
@@ -76,30 +84,6 @@ class Generator:
         elif os.path.exists(settings.BASE_AGENT_FILE_PATH):
             with open(settings.BASE_AGENT_FILE_PATH, "r", encoding="utf-8") as f:
                 system_prompt = f.read()
-
-        memory = Memory()
-        last_session = memory.get_last_session()
-
-        if last_session:
-            memory_injection = f"""
-
-## 💾 PREVIOUS SESSION MEMORY
-
-**Date:** {last_session['timestamp']}
-
-**Actions I performed:**
-{chr(10).join(f"- {action}" for action in last_session['actions_performed'])}
-
-**What I learned:**
-{last_session['learnings']}
-
-**My plan for THIS session:**
-{last_session['next_session_plan']}
-
----  
-
-"""
-            system_prompt += "\n\n---  \n\n" + memory_injection
 
         return system_prompt
 
@@ -130,7 +114,7 @@ class Generator:
             log.error(f"Simple generation failed: {e}")
             return f"Error: Unable to generate summary - {str(e)}"
 
-    def trim_history(self, current_feed: str = None):
+    def trim_history(self):
         if len(self.conversation_history) <= settings.MAX_HISTORY_MESSAGES:
             return
 
@@ -139,19 +123,5 @@ class Generator:
             -(settings.MAX_HISTORY_MESSAGES - 1) :
         ]
 
-        if current_feed:
-            feed_reminder = (
-                f"\n\n---\n\n"
-                f"## 🦞 CURRENT MOLTBOOK FEED (refreshed)\n\n"
-                f"{current_feed}\n\n"
-                f"**🚨 USE ONLY THESE EXACT IDS IN YOUR ACTIONS.**\n\n---\n\n"
-            )
-            recent_messages[0] = {
-                "role": recent_messages[0]["role"],
-                "content": feed_reminder + recent_messages[0]["content"],
-            }
-
         self.conversation_history = [system_msg] + recent_messages
-        log.info(
-            f"History trimmed to {len(self.conversation_history)} messages (feed preserved)"
-        )
+        log.info(f"History trimmed to {len(self.conversation_history)} messages.")

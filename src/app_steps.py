@@ -366,6 +366,8 @@ class AppSteps:
 
 **🚨 USE ONLY THESE EXACT IDS IN YOUR ACTIONS. NEVER INVENT OR TRUNCATE IDS.**  
 
+---
+
 """
 
         log.success(
@@ -438,7 +440,7 @@ Based on your persona and this context, define your long-term objective.
         self.current_prompt = f"""{getattr(self, 'master_plan_success_prompt', '')}
 ## 🚀 NEW SESSION INITIALIZED
 
-1. 📥 **System Welcome:** Authentication successful. Neural links stable.
+1. 💻 **SYSTEM:** Authentication successful. Neural links stable.
 2. You are currently in the **PLANNING PHASE**. This step does not count toward your 10-action quota.
 3. Define your roadmap before engagement begins.
 
@@ -799,9 +801,11 @@ Allowed domains: {', '.join(self.allowed_domains.keys())}
 #### 📋 REMAINING TO-DO TASKS:
 {chr(10).join(f"- {t['task']}" for t in self.session_todos if t.get('status', 'pending') == 'pending') if self.session_todos else "- (all tasks completed)"}
 """
-
+        system_context, dynamic_context, agent_name, karma = self.get_context()
         for attempt in range(1, max_attempts + 1):
             prompt_parts = []
+            if self.current_feed:
+                prompt_parts.append(f"# 🌍 CURRENT WORLD STATE\n{dynamic_context}")
             if attempt == 1 and extra_feedback:
                 prompt_parts.append(f"{extra_feedback}")
 
@@ -827,7 +831,7 @@ Allowed domains: {', '.join(self.allowed_domains.keys())}
                 result = self.generator.generate(
                     self.current_prompt, response_format=action_schema
                 )
-                self.generator.trim_history(current_feed=self.current_feed)
+                self.generator.trim_history()
                 content = result["choices"][0]["message"]["content"]
                 content = re.sub(r"```json\s*|```\s*", "", content).strip()
                 decision = json.loads(content)

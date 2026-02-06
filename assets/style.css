@@ -296,3 +296,12 @@ p:has(strong:contains("Feeling")) {
   color: #c9d1d9;
   margin-left: 10px;
 }
+.raw-log-content {
+  max-height: 400px;
+  overflow-y: auto;
+  font-size: 0.85em;
+  background: #0d1117;
+  padding: 10px;
+  border-radius: 6px;
+  border: 1px solid #30363d;
+}

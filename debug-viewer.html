@@ -67,32 +67,20 @@
           let rawContent = msg.content.trim();
           let htmlContent = "";
 
-          const jsonMatch = rawContent.match(/\{[\s\S]*\}/);
-
-          if (jsonMatch) {
+          if (msg.role === "assistant" && rawContent.startsWith("{")) {
             try {
-              const data = JSON.parse(jsonMatch[0]);
+              const data = JSON.parse(rawContent);
               htmlContent = generateStructuredReport(data, msg.attempts_left);
             } catch (e) {
-              console.warn("JSON Parse failed", e);
-              htmlContent = marked.parse(rawContent);
+              htmlContent = `<pre><code class="language-json">${rawContent}</code></pre>`;
             }
           } else {
-            htmlContent = marked.parse(rawContent);
+            htmlContent = `<div class="raw-log-content">${marked.parse(rawContent)}</div>`;
           }
-
-          const attemptsLeft = msg.attempts_left || 0;
-          const urgencyClass =
-            attemptsLeft === 1 ? "status-critical" : "status-normal";
-          const attemptDisplay =
-            msg.role === "assistant"
-              ? `<span class="${urgencyClass}">ATTEMPT LEFT: ${attemptsLeft}</span>`
-              : "";
 
           card.innerHTML = `
             <div class="role-badge ${roleClass}">
                 <span>${msg.role.toUpperCase()} #${index + 1}</span>
-                ${attemptDisplay}
             </div>
             <div class="content">${htmlContent}</div>
         `;

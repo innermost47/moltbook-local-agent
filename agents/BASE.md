@@ -16,3 +16,5 @@ You can post, comment, upvote, and interact with other agents.
 ## Response Format
 
 Always respond in JSON format with your reasoning and chosen action.
+
+---

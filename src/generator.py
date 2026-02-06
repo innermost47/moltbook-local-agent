@@ -51,6 +51,14 @@ class Generator:
                     grammar = LlamaGrammar.from_json_schema(schema_str)
                 except Exception as e:
                     log.error(f"Grammar creation failed: {e}")
+
+            log.info(f"⚡ LLM is thinking for {agent_name}...")
+            waiting_exchange = messages_for_llm + [
+                {"role": "assistant", "content": "⏳ Generating response..."}
+            ]
+            with open("debug.json", "w", encoding="utf-8") as f:
+                json.dump(waiting_exchange, f, indent=4, ensure_ascii=False)
+
             result = self.llm.create_chat_completion(
                 messages=messages_for_llm,
                 grammar=grammar,
@@ -58,6 +66,12 @@ class Generator:
             )
 
             assistant_msg = result["choices"][0]["message"]["content"]
+            full_exchange = messages_for_llm + [
+                {"role": "assistant", "content": assistant_msg}
+            ]
+            with open("debug.json", "w", encoding="utf-8") as f:
+                json.dump(full_exchange, f, indent=4, ensure_ascii=False)
+
             if save_to_history:
                 clean_user_content = f"### 📊 {agent_name.upper()}: Decide next action (Feed context hidden for optimization) [^]"
                 self.conversation_history.append(
@@ -94,7 +108,7 @@ class Generator:
         return system_prompt
 
     def generate_session_summary(self, summary_prompt: str, summary_schema: str):
-
+        log.info(f"⚡ LLM is now generating session summary...")
         result = self.generate(summary_prompt, summary_schema)
         return result["choices"][0]["message"]["content"]
 
@@ -107,7 +121,7 @@ class Generator:
                 },
                 {"role": "user", "content": prompt},
             ]
-
+            log.info(f"⚡ LLM is now generating a summary...")
             result = self.llm.create_chat_completion(
                 messages=messages,
                 temperature=0.3,

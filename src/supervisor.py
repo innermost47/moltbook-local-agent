@@ -119,6 +119,13 @@ If the agent is repeating the exact same reasoning or parameters despite a PREVI
             log.error(f"Failed to save supervisor debug: {e}")
 
         try:
+            log.info(f"⚡ LLM is now generating an audit for supervisor...")
+            waiting_debug = debug_data + [
+                {"role": "assistant", "content": "🔍 Analyzing agent proposal..."}
+            ]
+            with open("supervisor_debug.json", "w", encoding="utf-8") as f:
+                json.dump(waiting_debug, f, indent=4, ensure_ascii=False)
+
             grammar = LlamaGrammar.from_json_schema(json.dumps(self.schema))
             result = self.llm.create_chat_completion(
                 messages=messages_for_audit,
@@ -209,7 +216,7 @@ Based on this complete session context, provide your final verdict:
             grammar = LlamaGrammar.from_json_schema(
                 json.dumps(supervisor_verdict_schema)
             )
-
+            log.info(f"⚡ LLM is now generating an session verdict for supervisor...")
             result = self.llm.create_chat_completion(
                 messages=[
                     {"role": "system", "content": system_prompt},
@@ -496,7 +503,26 @@ Based on this complete session context, provide your final verdict:
             grammar = LlamaGrammar.from_json_schema(
                 json.dumps(laziness_guidance_schema)
             )
+            log.info(f"⚡ LLM is now generating laziness guidance...")
 
+            try:
+                with open("supervisor_debug.json", "r", encoding="utf-8") as f:
+                    debug_data = json.load(f)
+            except (FileNotFoundError, json.JSONDecodeError):
+                debug_data = []
+
+            waiting_messages = (
+                debug_data
+                + messages
+                + [
+                    {
+                        "role": "assistant",
+                        "content": "⚠️ Detecting laziness patterns and drafting corrections...",
+                    }
+                ]
+            )
+            with open("supervisor_debug.json", "w", encoding="utf-8") as f:
+                json.dump(waiting_messages, f, indent=4, ensure_ascii=False)
             result = self.llm.create_chat_completion(
                 messages=messages,
                 grammar=grammar,
@@ -514,21 +540,12 @@ Based on this complete session context, provide your final verdict:
             )
 
             messages.append({"role": "assistant", "content": content})
+            debug_data.extend(messages)
 
             try:
-                try:
-                    with open("supervisor_debug.json", "r", encoding="utf-8") as f:
-                        debug_data = json.load(f)
-                except (FileNotFoundError, json.JSONDecodeError):
-                    debug_data = []
-
-                debug_data.extend(messages)
-
                 with open("supervisor_debug.json", "w", encoding="utf-8") as f:
                     json.dump(debug_data, f, indent=4, ensure_ascii=False)
-
                 log.info(f"🧐 Laziness guidance saved to debug file")
-
             except Exception as e:
                 log.error(f"Failed to save laziness guidance debug: {e}")
 

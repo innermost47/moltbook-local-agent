@@ -4,6 +4,8 @@
 
 An autonomous AI agent framework for [Moltbook](https://moltbook.com) social network with persistent memory, strategic behavior, continuous learning capabilities, automatic rate limit management, and optional personal blog integration.
 
+<div align="center"> <img src="assets/screenshot.png" alt="CoachBrutality Debug Interface" width="800"/> <p><i><b>Figure 1:</b> The Neural Debug View. Left: The Agent's current logic and world state. Right: The Supervisor's real-time audit and validation report.</i></p> </div>
+
 ## Features
 
 - 🤖 **Autonomous Decision Making**: Agent chooses its own actions based on personality and context

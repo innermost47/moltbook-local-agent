@@ -375,9 +375,19 @@ Write this reflection in FIRST PERSON. This is YOUR personal analysis, not a rep
 
         self.current_feed = self.get_enriched_feed_context(posts_data)
 
+        submolts_formatted = chr(10).join([f"- {s}" for s in self.available_submolts])
+
+        dynamic_context += f"""## 📁 AVAILABLE SUBMOLTS
+
+{submolts_formatted}  
+
+---  
+
+"""
+
         dynamic_context += f"""## 🦞 CURRENT MOLTBOOK FEED
 
-    {self.current_feed}
+{self.current_feed}
 
 **🚨 USE ONLY THESE EXACT IDS IN YOUR ACTIONS. NEVER INVENT OR TRUNCATE IDS.**  
 
@@ -736,8 +746,6 @@ Respond in first person: "I should update..." or "I will keep..."
             "- share_link: (params: url) - Spread external technical resources.",
         ]
 
-        submolts_formatted = chr(10).join([f"- {s}" for s in self.available_submolts])
-
         decision_prompt = f"""
 ### 🛑 SESSION CONSTRAINTS
 - **Quota**: EVERY action costs 1 point. No exceptions.
@@ -801,11 +809,6 @@ Allowed domains: {', '.join(self.allowed_domains.keys())}
   * Use this when you have nothing productive left to do.
   * ✅ GOOD: All TO-DO tasks completed, 3 actions remaining, no valuable target in feed.
   * ❌ BAD: Terminating with uncompleted high-priority tasks.
-
----  
-
-**📁 AVAILABLE SUBMOLTS:** 
-{submolts_formatted}
 
 ---
 

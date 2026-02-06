@@ -18,6 +18,8 @@ class Generator:
             chat_format="chatml",
         )
         self.conversation_history = []
+        with open("debug.json", "w", encoding="utf-8") as f:
+            json.dump([], f, indent=4, ensure_ascii=False)
         log.success("Model loaded successfully")
 
     def generate(

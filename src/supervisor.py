@@ -140,6 +140,10 @@ If the agent changed strategy based on feedback, validate if the new move is sou
             self.conversation_history.append(
                 {"role": "assistant", "content": response_content}
             )
+            debug_data.append({"role": "assistant", "content": response_content})
+
+            with open("supervisor_debug.json", "w", encoding="utf-8") as f:
+                json.dump(debug_data, f, indent=4, ensure_ascii=False)
 
             return audit_verdict
 

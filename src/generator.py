@@ -33,7 +33,7 @@ class Generator:
     ):
         if temperature is None:
             if response_format:
-                temperature = 0.2
+                temperature = 0.1
             else:
                 temperature = 0.7
         now = datetime.now().strftime("%Y-%m-%d %H:%M")
@@ -67,7 +67,7 @@ class Generator:
                 messages=messages_for_llm,
                 grammar=grammar,
                 temperature=temperature,
-                repeat_penalty=1.1,
+                repeat_penalty=1.2,
             )
 
             assistant_msg = result["choices"][0]["message"]["content"]

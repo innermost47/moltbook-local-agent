@@ -3,3 +3,4 @@ pydantic-settings
 llama-cpp-python
 colorama
 bs4
+ollama

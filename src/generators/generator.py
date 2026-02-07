@@ -2,6 +2,7 @@ import os
 import json
 from datetime import datetime
 from llama_cpp import Llama, LlamaGrammar
+from pydantic import ValidationError
 from src.settings import settings
 from src.utils import log
 
@@ -30,6 +31,7 @@ class Generator:
         agent_name="Agent",
         heavy_context: str = "",
         temperature: float = None,
+        pydantic_model=None,
     ):
         if temperature is None:
             if response_format:
@@ -49,6 +51,15 @@ class Generator:
 
         try:
             grammar = None
+            if pydantic_model:
+                try:
+                    json_schema = pydantic_model.model_json_schema()
+                    schema_str = json.dumps(json_schema)
+                    grammar = LlamaGrammar.from_json_schema(schema_str)
+                    log.info(f"✅ Using Pydantic schema: {pydantic_model.__name__}")
+                except Exception as e:
+                    log.error(f"Pydantic schema conversion failed: {e}")
+
             if response_format:
                 try:
                     schema_str = json.dumps(response_format)
@@ -71,6 +82,24 @@ class Generator:
             )
 
             assistant_msg = result["choices"][0]["message"]["content"]
+            if pydantic_model:
+                try:
+                    clean_json = assistant_msg.strip()
+                    clean_json = (
+                        clean_json.replace("```json", "").replace("```", "").strip()
+                    )
+
+                    validated = pydantic_model.model_validate_json(clean_json)
+
+                    assistant_msg = validated.model_dump_json(indent=2)
+                    log.success(f"✅ Pydantic validation passed")
+
+                except ValidationError as e:
+                    log.error(f"❌ Pydantic validation failed:")
+                    for error in e.errors():
+                        log.error(f"  - {error['loc']}: {error['msg']}")
+
+                    log.warning("⚠️ Using unvalidated output")
             full_exchange = messages_for_llm + [
                 {"role": "assistant", "content": assistant_msg}
             ]
@@ -112,9 +141,9 @@ class Generator:
 
         return system_prompt
 
-    def generate_session_summary(self, summary_prompt: str, summary_schema: str):
+    def generate_session_summary(self, summary_prompt: str, pydantic_model=None):
         log.info(f"⚡ LLM is now generating session summary...")
-        result = self.generate(summary_prompt, summary_schema)
+        result = self.generate(summary_prompt, pydantic_model=pydantic_model)
         return result["choices"][0]["message"]["content"]
 
     def generate_simple(self, prompt: str, max_tokens: int = 300) -> str:

@@ -12,31 +12,34 @@ from src.services import (
     BlogActions,
     get_web_context_for_agent,
 )
-from src.generator import Generator
+from src.generators import Generator, Supervisor, OllamaGenerator, SupervisorOllama
 from src.memory import Memory
 from src.utils import log
 from src.settings import settings
 from src.services import PlanningSystem, PromptManager
-from src.supervisor import Supervisor
-from src.schemas import (
-    master_plan_schema,
-    session_plan_schema,
-    summary_schema,
-    update_master_plan_schema,
-    get_actions_schema,
-)
 from src.metrics import Metrics
+from src.schemas_pydantic import (
+    get_pydantic_schema,
+    SessionSummary,
+    SessionPlan,
+    MasterPlan,
+    UpdateMasterPlan,
+)
 
 
 class AppSteps:
     def __init__(self):
         self.api = MoltbookAPI()
-        self.generator = Generator()
+        if settings.USE_OLLAMA:
+            self.generator = OllamaGenerator(model=settings.OLLAMA_MODEL)
+            self.supervisor = SupervisorOllama(model=settings.OLLAMA_MODEL)
+        else:
+            self.generator = Generator()
+            self.supervisor = Supervisor(self.generator.llm)
         self.memory = Memory()
         self.reporter = EmailReporter()
         self.memory_system = MemorySystem()
         self.prompt_manager = PromptManager()
-        self.supervisor = Supervisor(self.generator.llm)
         self.planning_system = PlanningSystem(db_path=settings.DB_PATH)
         self.web_scraper = WebScraper()
         self.metrics = Metrics()
@@ -122,14 +125,17 @@ class AppSteps:
             agent_name=self.agent_name, actions_performed=self.actions_performed
         )
         summary_raw = self.generator.generate_session_summary(
-            self.current_prompt, summary_schema
+            self.current_prompt, pydantic_model=SessionSummary
         )
 
-        summary_raw = re.sub(r"```json\s*", "", summary_raw)
-        summary_raw = re.sub(r"```\s*", "", summary_raw).strip()
+        summary_raw = re.sub(r"```json\s*|```\s*", "", summary_raw).strip()
 
         try:
-            summary = json.loads(summary_raw)
+            if isinstance(summary_raw, str):
+                summary = json.loads(summary_raw)
+            else:
+                summary = summary_raw
+
         except json.JSONDecodeError as e:
             log.error(f"Failed to parse summary: {e}")
             summary = {
@@ -438,13 +444,14 @@ class AppSteps:
             try:
                 result = self.generator.generate(
                     init_prompt,
-                    response_format=master_plan_schema,
+                    pydantic_model=MasterPlan,
                     agent_name=self.agent_name,
                 )
-                content = re.sub(
-                    r"```json\s*|```\s*", "", result["choices"][0]["message"]["content"]
-                ).strip()
-                plan_data = json.loads(content)
+                content = re.sub(r"```json\s*|```\s*", "", content).strip()
+                if isinstance(content, str):
+                    plan_data = json.loads(content)
+                else:
+                    plan_data = content
 
                 self.planning_system.create_or_update_master_plan(
                     objective=plan_data.get("objective"),
@@ -477,7 +484,7 @@ class AppSteps:
         try:
             result = self.generator.generate(
                 instruction_prompt,
-                session_plan_schema,
+                pydantic_model=SessionPlan,
                 agent_name=self.agent_name,
                 heavy_context=feed_section,
             )
@@ -487,11 +494,13 @@ class AppSteps:
                 f"[DEBUG] Raw LLM session plan output (first 500 chars):\n{content[:500]}"
             )
 
-            content = re.sub(r"```json\s*", "", content)
-            content = re.sub(r"```\s*", "", content).strip()
+            content = re.sub(r"```json\s*|```\s*", "", content).strip()
 
             try:
-                plan_data = json.loads(content)
+                if isinstance(content, str):
+                    plan_data = json.loads(content)
+                else:
+                    plan_data = content
             except json.JSONDecodeError as json_err:
                 log.warning(f"Strict JSON parsing failed: {json_err}")
                 log.warning(f"Trying non-strict mode...")
@@ -768,15 +777,15 @@ class AppSteps:
         try:
             result = self.generator.generate(
                 self.current_prompt,
-                update_master_plan_schema,
+                pydantic_model=UpdateMasterPlan,
                 agent_name=self.agent_name,
             )
             content = result["choices"][0]["message"]["content"]
-
-            content = re.sub(r"```json\s*", "", content)
-            content = re.sub(r"```\s*", "", content).strip()
-
-            decision = json.loads(content)
+            content = re.sub(r"```json\s*|```\s*", "", content).strip()
+            if isinstance(content, str):
+                decision = json.loads(content)
+            else:
+                decision = content
 
             if decision.get("should_update"):
                 new_objective = decision.get("new_objective")
@@ -934,17 +943,6 @@ class AppSteps:
                 blog_list.append("write_blog_article")
             allowed_actions.extend(blog_list)
 
-        action_schema = get_actions_schema(
-            allowed_actions=allowed_actions,
-            feed_options=self.feed_options,
-            available_ids={
-                "posts": self.available_post_ids,
-                "comments": list(self.available_comment_ids.keys()),
-            },
-            available_submolts=self.available_submolts,
-            allowed_domains=self.allowed_domains,
-        )
-
         max_attempts = 3
         last_error = None
         decision = None
@@ -1049,17 +1047,28 @@ class AppSteps:
             self.current_prompt = "\n".join(strategic_parts)
 
             try:
+                expected_action = (
+                    self.current_active_todo.get("action_type")
+                    if self.current_active_todo
+                    else None
+                )
+                pydantic_model = (
+                    get_pydantic_schema(expected_action) if expected_action else None
+                )
+
                 result = self.generator.generate(
                     self.current_prompt,
-                    response_format=action_schema,
+                    pydantic_model=pydantic_model,
                     agent_name=self.agent_name,
                     heavy_context=heavy_payload,
                 )
                 self.generator.trim_history()
                 content = result["choices"][0]["message"]["content"]
                 content = re.sub(r"```json\s*|```\s*", "", content).strip()
-                content = re.sub(r"```json\s*|```\s*", "", content).strip()
-                decision = json.loads(content)
+                if isinstance(content, str):
+                    decision = json.loads(content)
+                else:
+                    decision = content
 
                 if attempt > 1 and last_decision:
                     if decision["action_type"] == last_decision[

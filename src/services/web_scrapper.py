@@ -5,7 +5,6 @@ from bs4 import BeautifulSoup
 from urllib.parse import urljoin, urlparse, quote
 from src.utils import log
 from src.settings import settings
-from src.generator import Generator
 
 
 class WebScraper:
@@ -171,7 +170,7 @@ class WebScraper:
             return {"error": str(e)}
 
     def summarize_with_llm(
-        self, extracted_data: dict, query: str, llm_generator: Generator
+        self, extracted_data: dict, query: str, llm_generator
     ) -> str:
 
         content_text = ""
@@ -194,9 +193,7 @@ Provide a concise summary (max 300 words) highlighting the most relevant informa
             log.error(f"Failed to summarize: {e}")
             return content_text[:500] + "..."
 
-    def web_fetch(
-        self, params: dict, generator: Generator, store_memory, actions_performed: List
-    ):
+    def web_fetch(self, params: dict, generator, store_memory, actions_performed: List):
         url = params.get("web_url", "").strip()
 
         if not url:

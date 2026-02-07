@@ -45,6 +45,9 @@ class Settings(BaseSettings):
     BLOG_BASE_URL: Optional[str] = None
     USE_SUPERVISOR: bool
 
+    USE_OLLAMA: bool
+    OLLAMA_MODEL: str
+
     model_config = SettingsConfigDict(
         env_file=Path(__file__).resolve().parent.parent / ".env",
         env_file_encoding="utf-8",

@@ -125,28 +125,54 @@
       }
 
       async function fetchLogs() {
-        fetchFile("debug.json", lastJsonString, (data, raw) => {
+        let agentUpdated = false;
+        let supervisorUpdated = false;
+
+        await fetchFile("debug.json", lastJsonString, (data, raw) => {
           lastJsonString = raw;
           renderLogs(data, logsContainer);
+          agentUpdated = true;
         });
 
-        fetchFile("supervisor_debug.json", lastSupervisorJson, (data, raw) => {
-          lastSupervisorJson = raw;
+        await fetchFile(
+          "supervisor_debug.json",
+          lastSupervisorJson,
+          (data, raw) => {
+            lastSupervisorJson = raw;
 
-          const supervisorPanel = document.querySelector(".panel:last-child");
-          const agentPanel = document.querySelector(".panel:first-child");
+            const supervisorPanel = document.querySelector(".panel:last-child");
+            const agentPanel = document.querySelector(".panel:first-child");
 
-          if (checkSupervisorStatus(data)) {
-            supervisorPanel.style.display = "none";
-            agentPanel.style.flex = "1 1 100%";
-          } else {
-            supervisorPanel.style.display = "flex";
-            agentPanel.style.flex = "1";
-            renderLogs(data, supervisorLogsContainer);
-          }
-        });
+            if (checkSupervisorStatus(data)) {
+              supervisorPanel.style.display = "none";
+              agentPanel.style.flex = "1 1 100%";
+            } else {
+              supervisorPanel.style.display = "flex";
+              agentPanel.style.flex = "1";
+              renderLogs(data, supervisorLogsContainer);
+              supervisorUpdated = true;
+            }
+          },
+        );
 
         lastUpdateSpan.innerText = new Date().toLocaleTimeString();
+
+        if (agentUpdated || supervisorUpdated) {
+          if (supervisorUpdated) {
+            const lastSupervisorMsg = supervisorLogsContainer.lastElementChild;
+            if (lastSupervisorMsg) {
+              lastSupervisorMsg.scrollIntoView({
+                behavior: "smooth",
+                block: "end",
+              });
+            }
+          } else if (agentUpdated) {
+            const lastAgentMsg = logsContainer.lastElementChild;
+            if (lastAgentMsg) {
+              lastAgentMsg.scrollIntoView({ behavior: "smooth", block: "end" });
+            }
+          }
+        }
       }
 
       async function fetchFile(fileName, lastString, callback) {
@@ -370,8 +396,12 @@
           .querySelectorAll("pre code")
           .forEach((el) => hljs.highlightElement(el));
 
-        if (targetContainer.id === "logs") {
-          window.scrollTo(0, document.body.scrollHeight);
+        const lastMessage = targetContainer.lastElementChild;
+        if (lastMessage) {
+          const parentPanel = targetContainer.closest(".panel");
+          if (parentPanel) {
+            lastMessage.scrollIntoView({ behavior: "smooth", block: "end" });
+          }
         }
       }
       function renderSupervisorPrompt(rawContent) {

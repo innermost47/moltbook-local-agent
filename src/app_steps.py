@@ -464,15 +464,20 @@ class AppSteps:
     def _create_session_plan(self, dynamic_context: str = ""):
         log.info("Creating session plan...")
 
-        self.current_prompt = self.prompt_manager.get_session_plan_init_prompt(
-            agent_name=self.agent_name,
-            master_plan_success_prompt=self.master_plan_success_prompt,
-            dynamic_context=dynamic_context,
+        instruction_prompt, feed_section = (
+            self.prompt_manager.get_session_plan_init_prompt(
+                agent_name=self.agent_name,
+                master_plan_success_prompt=self.master_plan_success_prompt,
+                dynamic_context=dynamic_context,
+            )
         )
 
         try:
             result = self.generator.generate(
-                self.current_prompt, session_plan_schema, agent_name=self.agent_name
+                instruction_prompt,
+                session_plan_schema,
+                agent_name=self.agent_name,
+                heavy_context=feed_section,
             )
             content = result["choices"][0]["message"]["content"]
 

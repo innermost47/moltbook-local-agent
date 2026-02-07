@@ -446,15 +446,13 @@ Output your Master Plan in JSON format, then execute your first strategic action
             feed_section = ""
             feed_reference = " and the available actions"
 
-        return f"""{master_plan_success_prompt}
+        instruction_prompt = f"""{master_plan_success_prompt}
 ## 🚀 NEW SESSION INITIALIZED
 1. ✅ Authentication successful. Neural links stable.
 2. You are currently in the **PLANNING PHASE**. This step does not count toward your 10-action quota.
 3. YOU will define YOUR roadmap before engagement begins.
 
 ---
-
-{feed_section}
 
 ## 🎯 SESSION PLANNING PROTOCOL
 
@@ -533,6 +531,7 @@ Each task MUST include:
 
 **YOU have {agent_name}'s full strategic autonomy. Plan the sequence. Execute the mission.**
 """
+        return instruction_prompt, feed_section
 
     def get_update_master_plan_prompt(self, agent_name: str, plan_json, summary: dict):
         return f"""

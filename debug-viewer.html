@@ -33,6 +33,19 @@
         <div id="supervisor-logs"></div>
       </div>
     </div>
+    <button id="scroll-to-bottom" title="Scroll to bottom">
+      <svg
+        width="24"
+        height="24"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+      >
+        <polyline points="7 13 12 18 17 13"></polyline>
+        <polyline points="7 6 12 11 17 6"></polyline>
+      </svg>
+    </button>
 
     <script>
       const canvas = document.getElementById("matrix-rain");
@@ -635,6 +648,21 @@
 
         return sections.join("");
       }
+
+      const scrollBtn = document.getElementById("scroll-to-bottom");
+
+      scrollBtn.addEventListener("click", () => {
+        const panels = document.querySelectorAll(".panel");
+        panels.forEach((panel) => {
+          const container = panel.querySelector("#logs, #supervisor-logs");
+          if (container && container.scrollHeight > 0) {
+            container.scrollTo({
+              top: container.scrollHeight,
+              behavior: "smooth",
+            });
+          }
+        });
+      });
 
       setInterval(fetchLogs, 2000);
       fetchLogs();

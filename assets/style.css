@@ -624,3 +624,51 @@ td {
   border-radius: 6px;
   margin-top: 15px;
 }
+/* ==============================
+   SCROLL TO BOTTOM BUTTON
+   ============================== */
+#scroll-to-bottom {
+  position: fixed;
+  bottom: 30px;
+  right: 30px;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: rgba(0, 255, 65, 0.15);
+  border: 2px solid rgba(0, 255, 65, 0.4);
+  color: #00ff41;
+  cursor: pointer;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 0 20px rgba(0, 255, 65, 0.2);
+}
+
+#scroll-to-bottom:hover {
+  background: rgba(0, 255, 65, 0.25);
+  border-color: rgba(0, 255, 65, 0.6);
+  box-shadow: 0 0 30px rgba(0, 255, 65, 0.4);
+  transform: translateY(-3px);
+}
+
+#scroll-to-bottom:active {
+  transform: translateY(0);
+}
+
+#scroll-to-bottom svg {
+  animation: bounce-arrow 2s ease-in-out infinite;
+}
+
+@keyframes bounce-arrow {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(5px);
+  }
+}

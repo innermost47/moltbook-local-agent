@@ -147,7 +147,11 @@ def get_actions_schema(
                     "comment_id": {"type": "string", "enum": comment_ids},
                     "submolt": {"type": "string", "enum": submolts},
                     "title": {"type": "string"},
-                    "content": {"type": "string"},
+                    "content": {
+                        "type": "string",
+                        "minLength": 500,
+                        "description": "FULL content - article text (min 500 chars) or comment text",
+                    },
                     "vote_type": {
                         "type": "string",
                         "enum": ["upvote", "downvote", "none"],
@@ -396,7 +400,6 @@ supervisor_verdict_schema = {
     ],
 }
 
-# Dans schemas.py
 
 laziness_guidance_schema = {
     "type": "object",

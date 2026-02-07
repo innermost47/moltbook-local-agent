@@ -1040,15 +1040,9 @@ class AppSteps:
                 )
             elif attempt > 1:
                 strategic_parts.append(
-                    f"#### 🛡️ ATTEMPTS REMAINING FOR THIS ACTION: {attempts_left}/3"
-                )
-                strategic_parts.append(
                     f"\n### 🎯 {self.agent_name.upper()}: FIX YOUR ERROR AND RETRY\n"
                 )
             else:
-                strategic_parts.append(
-                    f"#### 🛡️ ATTEMPTS REMAINING FOR THIS ACTION: {attempts_left}/3"
-                )
                 strategic_parts.append(
                     f"\n### 🎯 {self.agent_name.upper()}: EXECUTE YOUR NEXT ACTION\n"
                 )

@@ -443,45 +443,246 @@ Output your Master Plan in JSON format, then execute your first strategic action
             feed_section = f"""
 {dynamic_context}
 
----
-
 """
-            feed_reference = ", and the feed above"
+            feed_reference = ", the feed above, and the available actions listed below"
         else:
             feed_section = ""
-            feed_reference = "."
+            feed_reference = " and the available actions listed below"
 
         return f"""{master_plan_success_prompt}
 ## 🚀 NEW SESSION INITIALIZED
-
 1. ✅ Authentication successful. Neural links stable.
 2. You are currently in the **PLANNING PHASE**. This step does not count toward your 10-action quota.
 3. YOU will define YOUR roadmap before engagement begins.
 
 ---
 
-{feed_section.replace('---','')}✅ **MASTER PLAN ACTIVE**
+{feed_section}
+
+## 🎯 SESSION PLANNING PROTOCOL
+
+✅ **MASTER PLAN ACTIVE**
 
 Based on YOUR master plan, previous sessions, current context{feed_reference}:
-Create a concrete to-do list for THIS specific session.
+**Create a concrete to-do list for THIS specific session.**
 
 ---
 
 ### 📋 {agent_name.upper()}: PLAN YOUR SESSION
 
-Generate **3-5 specific, actionable tasks** YOU want to accomplish.
-Prioritize each task (1-5, where 5 = highest priority).
+Generate **3-5 specific, actionable tasks** YOU want to accomplish this session.
 
-Focus on immediate progress while respecting YOUR 10-action limit.
+### 🔧 CRITICAL: TASK STRUCTURE REQUIREMENTS
 
-**⚠️ TASK FORMAT RULES:**
-- **Write SHORT, DESCRIPTIVE task names (max 80 characters)**
-- **❌ BAD:** "web_scrap_for_links: chroniquesquantique.com - Search for articles about trust chain"
-- **✅ GOOD:** "Research trust chain vulnerabilities on chroniquesquantique.com"
-- **❌ BAD:** "memory_store: learnings - Summarize key insights from feed"
-- **✅ GOOD:** "Store feed insights about trust chain in memory"
-- **Do NOT include action_type names or parameter syntax in task descriptions.**
-- **Tasks are GOALS, not function calls.**
+Each task MUST include:
+1. **task**: Short, human-readable goal (max 80 characters)
+2. **action_type**: The EXACT action you will execute
+3. **action_params**: The specific parameters (fill in what you know NOW)
+4. **priority**: 1-5 stars (5 = highest priority)
+
+### 🎯 YOUR AVAILABLE ACTIONS
+
+**Moltbook Actions:**
+- `select_post_to_comment` (params: post_id)
+- `select_comment_to_reply` (params: post_id, comment_id)
+- `publish_public_comment` (params: post_id, content) [AFTER select_post_to_comment]
+- `reply_to_comment` (params: post_id, comment_id, content) [AFTER select_comment_to_reply]
+- `create_post` (params: title, content, submolt)
+- `vote_post` (params: post_id, vote_type)
+- `follow_agent` (params: agent_name, follow_type)
+
+**Web Actions:**
+- `web_scrap_for_links` (params: web_domain, web_query)
+- `web_fetch` (params: web_url)
+
+**Memory Actions:**
+- `memory_store` (params: memory_category, memory_content)
+- `memory_retrieve` (params: memory_category, memory_limit)
+
+**Blog Actions:**
+- `write_blog_article` (params: title, excerpt, content, image_prompt)
+- `share_created_blog_post_url` (params: title, share_link_url)
+
+**Planning Actions:**
+- `update_todo_status` (params: todo_task, todo_status)
+
+---
+
+### ✅ GOOD TASK EXAMPLES
+
+**Example 1: Web research with specific domain**
+```json
+{{
+  "task": "Research AI safety frameworks",
+  "action_type": "web_scrap_for_links",
+  "action_params": {{
+    "web_domain": "example-research-site.com",
+    "web_query": "AI alignment"
+  }},
+  "priority": 5
+}}
+```
+
+**Example 2: Comment on specific post from feed**
+```json
+{{
+  "task": "Comment on trending ML discussion",
+  "action_type": "select_post_to_comment",
+  "action_params": {{
+    "post_id": "abc12345-6789-def0-1234-56789abcdef0"
+  }},
+  "priority": 4
+}}
+```
+
+**Example 3: Store insights in memory**
+```json
+{{
+  "task": "Store research insights",
+  "action_type": "memory_store",
+  "action_params": {{
+    "memory_category": "learnings"
+  }},
+  "priority": 3
+}}
+```
+
+**Example 4: Vote on post**
+```json
+{{
+  "task": "Upvote quality technical post",
+  "action_type": "vote_post",
+  "action_params": {{
+    "post_id": "xyz98765-4321-fedc-ba09-876543210fed",
+    "vote_type": "upvote"
+  }},
+  "priority": 2
+}}
+```
+
+**Example 5: Multi-step sequence (select THEN comment)**
+```json
+[
+  {{
+    "task": "Select post to analyze",
+    "action_type": "select_post_to_comment",
+    "action_params": {{
+      "post_id": "post123-4567-89ab-cdef-0123456789ab"
+    }},
+    "priority": 5
+  }},
+  {{
+    "task": "Write detailed technical analysis",
+    "action_type": "publish_public_comment",
+    "action_params": {{
+      "post_id": "post123-4567-89ab-cdef-0123456789ab"
+    }},
+    "priority": 5
+  }}
+]
+```
+
+**Example 6: Fetch specific article**
+```json
+{{
+  "task": "Analyze paper on neural networks",
+  "action_type": "web_fetch",
+  "action_params": {{
+    "web_url": "https://research-archive.org/papers/neural-2024"
+  }},
+  "priority": 4
+}}
+```
+
+**Example 7: Reply to specific comment**
+```json
+{{
+  "task": "Reply to technical question",
+  "action_type": "select_comment_to_reply",
+  "action_params": {{
+    "post_id": "def45678-90ab-cdef-0123-456789abcdef",
+    "comment_id": "com98765-4321-fedc-ba09-876543210abc"
+  }},
+  "priority": 3
+}}
+```
+
+**Example 8: Create new post**
+```json
+{{
+  "task": "Share findings on agent architecture",
+  "action_type": "create_post",
+  "action_params": {{
+    "submolt": "research"
+  }},
+  "priority": 4
+}}
+```
+
+---
+
+### ❌ BAD TASK EXAMPLES (WILL CAUSE AUTO-COMPLETION TO FAIL)
+
+**Too vague - no action_type:**
+```json
+{{
+  "task": "Do some research",
+  "priority": 3
+}}
+```
+
+**Wrong format - action_type in task name:**
+```json
+{{
+  "task": "web_scrap_for_links: example.com - search query",
+  "action_type": "web_scrap_for_links",
+  "priority": 5
+}}
+```
+
+**Missing key parameters:**
+```json
+{{
+  "task": "Comment on something",
+  "action_type": "publish_public_comment",
+  "action_params": {{}},
+  "priority": 4
+}}
+```
+
+---
+
+### 🧠 STRATEGIC PLANNING GUIDELINES
+
+1. **Be specific with IDs**: If you see post_ids or comment_ids in the feed above, USE THEM in your action_params
+2. **Respect action limits**: You have ~10 actions total - plan accordingly
+3. **Sequence multi-step actions**: 
+   - To comment on a post: First `select_post_to_comment`, THEN `publish_public_comment`
+   - To reply to a comment: First `select_comment_to_reply`, THEN `reply_to_comment`
+4. **Prioritize strategically**: 
+   - Priority 5 = Directly advances Master Plan milestones
+   - Priority 3-4 = Important but not critical
+   - Priority 1-2 = Nice to have if time permits
+5. **Fill action_params with specifics**: The more precise your parameters NOW, the more reliable auto-completion will be
+
+---
+
+### ⚠️ TASK FORMAT RULES
+
+**Required fields:**
+- **task**: What you want to achieve (max 80 chars) - e.g., "Research AI frameworks", "Comment on security post"
+- **action_type**: The exact action name - e.g., "web_scrap_for_links", "select_post_to_comment"
+- **action_params**: Specific parameters you know NOW - e.g., {{"web_domain": "example.com", "post_id": "abc123..."}}
+- **priority**: 1-5 (higher = more important)
+
+**Quality guidelines:**
+- ✅ **task** describes the GOAL ("Research AI safety")
+- ✅ **action_type** specifies the METHOD ("web_scrap_for_links")
+- ✅ **action_params** contains the DETAILS ({{"web_domain": "example.com"}})
+- ❌ Don't repeat domain/IDs in both task AND action_params
+- ❌ Don't write action_type syntax in the task description
+
+**YOU have {agent_name}'s full strategic autonomy. Plan wisely.**
 """
 
     def get_update_master_plan_prompt(self, agent_name: str, plan_json, summary: dict):
@@ -512,7 +713,6 @@ Respond in first person: "I should update..." or "I will keep..."
         actions_performed: List,
         session_todos: List[dict],
     ):
-
         supervisor_section = ""
         if settings.USE_SUPERVISOR:
             supervisor_section = f"""
@@ -521,6 +721,23 @@ Respond in first person: "I should update..." or "I will keep..."
 - **NO REPETITION**: If the Supervisor rejects you, DO NOT repeat the same action or parameters. It is a waste of your limited {remaining_actions} points.
 - **STRATEGIC PIVOT**: If Task #1 is blocked or rejected, immediately pivot to Task #2. Obsessing over a failing task is a sign of logic-looping.
 """
+
+        pending_todos = [
+            t for t in session_todos if t.get("status", "pending") == "pending"
+        ]
+        completed_todos = [t for t in session_todos if t.get("status") == "completed"]
+
+        todo_section = ""
+
+        if pending_todos:
+            todo_section += "#### 📋 REMAINING TO-DO TASKS:\n"
+            todo_section += chr(10).join(f"- {t['task']}" for t in pending_todos)
+        else:
+            todo_section += "#### 🎉 ALL TASKS COMPLETED!"
+
+        if completed_todos:
+            todo_section += "\n\n#### ✅ COMPLETED THIS SESSION:\n"
+            todo_section += chr(10).join(f"✅ {t['task']}" for t in completed_todos)
 
         return f"""
 #### 📊 YOUR SESSION STATUS
@@ -531,8 +748,7 @@ Respond in first person: "I should update..." or "I will keep..."
 #### ✅ ACTIONS ALREADY COMPLETED THIS SESSION:
 {chr(10).join(f"- {a}" for a in actions_performed) if actions_performed else "- (none yet)"}
 
-#### 📋 REMAINING TO-DO TASKS:
-{chr(10).join(f"- {t['task']}" for t in session_todos if t.get('status', 'pending') == 'pending') if session_todos else "- (all tasks completed)"}
+{todo_section}
 
 #### ⚠️ CRITICAL WARNING ABOUT refresh_feed:
 If YOU call `refresh_feed`, YOU will LOSE ALL current post/comment IDs from YOUR context.

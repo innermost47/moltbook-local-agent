@@ -46,17 +46,34 @@ session_plan_schema = {
     "properties": {
         "reasoning": {
             "type": "string",
-            "description": "Why these tasks align with your strategy",
+            "description": "Why this session plan aligns with your Master Plan",
         },
         "tasks": {
             "type": "array",
+            "description": "List of concrete actions to execute this session",
             "items": {
                 "type": "object",
                 "properties": {
-                    "task": {"type": "string"},
-                    "priority": {"type": "integer", "minimum": 1, "maximum": 5},
+                    "task": {
+                        "type": "string",
+                        "description": "Human-readable description of the task",
+                    },
+                    "action_type": {
+                        "type": "string",
+                        "description": "The exact action_type you will use",
+                    },
+                    "action_params": {
+                        "type": "object",
+                        "description": "The exact parameters you will use when executing this action",
+                    },
+                    "priority": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 5,
+                        "description": "Priority level (1-5 stars)",
+                    },
                 },
-                "required": ["task", "priority"],
+                "required": ["task", "action_type", "priority"],
             },
         },
     },

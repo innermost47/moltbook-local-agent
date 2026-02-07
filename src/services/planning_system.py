@@ -473,6 +473,27 @@ class PlanningSystem:
 
         return note
 
+    def mark_todo_status(self, session_id: int, task_description: str, status: str):
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        cursor.execute(
+            """
+            UPDATE session_todos 
+            SET status = ?
+            WHERE session_id = ? 
+            AND LOWER(task) LIKE ?
+            AND status = 'pending'
+        """,
+            (status, session_id, f"%{task_description.lower()}%"),
+        )
+
+        rows_updated = cursor.rowcount
+        conn.commit()
+        conn.close()
+
+        return rows_updated > 0
+
     def __del__(self):
         if hasattr(self, "conn"):
             self.conn.close()

@@ -475,10 +475,39 @@ class AppSteps:
             )
             content = result["choices"][0]["message"]["content"]
 
+            log.info(
+                f"[DEBUG] Raw LLM session plan output (first 500 chars):\n{content[:500]}"
+            )
+
             content = re.sub(r"```json\s*", "", content)
             content = re.sub(r"```\s*", "", content).strip()
 
-            plan_data = json.loads(content)
+            try:
+                plan_data = json.loads(content)
+            except json.JSONDecodeError as json_err:
+                log.warning(f"Strict JSON parsing failed: {json_err}")
+                log.warning(f"Trying non-strict mode...")
+
+                try:
+                    plan_data = json.loads(content, strict=False)
+                    log.success("Non-strict parsing succeeded!")
+                except json.JSONDecodeError as json_err2:
+                    log.error(f"Non-strict parsing also failed: {json_err2}")
+                    log.error(
+                        f"Error at position {json_err2.pos}: {content[max(0, json_err2.pos-50):json_err2.pos+50]}"
+                    )
+
+                    log.warning("Attempting aggressive cleanup...")
+                    import unicodedata
+
+                    cleaned = "".join(
+                        char
+                        for char in content
+                        if unicodedata.category(char)[0] != "C" or char in "\n\r\t"
+                    )
+
+                    plan_data = json.loads(cleaned, strict=False)
+                    log.success("Aggressive cleanup succeeded!")
 
             log.info(f"[PLAN REASONING]: {plan_data.get('reasoning', 'N/A')}")
 
@@ -487,7 +516,8 @@ class AppSteps:
                 log.info(f"Session TO-DO LIST:")
                 for i, task in enumerate(tasks, 1):
                     priority = "⭐" * task.get("priority", 1)
-                    log.info(f"  {i}. [{priority}] {task.get('task')}")
+                    action_type = task.get("action_type", "unspecified")
+                    log.info(f"  {i}. [{priority}] {task.get('task')} ({action_type})")
 
                 self.planning_system.create_session_todos(
                     session_id=self.current_session_id, tasks=tasks
@@ -497,14 +527,47 @@ class AppSteps:
 
                 todo_context = "\n\n## 📋 YOUR SESSION TO-DO LIST\n\n"
                 for task in tasks:
-                    todo_context += f"- [{task.get('priority')}] {task.get('task')}\n"
+                    priority_stars = "⭐" * task.get("priority", 1)
+                    todo_context += f"- [{priority_stars}] {task.get('task')}\n"
                 todo_context += (
                     "\nRemember to mark tasks as completed when you accomplish them!\n"
                 )
+
                 self.current_prompt = todo_context
+            else:
+                log.warning("No tasks generated in session plan!")
+                self.session_todos = []
+
+        except json.JSONDecodeError as e:
+            log.error(f"Failed to parse session plan JSON: {e}")
+            log.error(f"JSON error at position {e.pos}")
+            log.error(
+                f"Context around error: ...{content[max(0, e.pos-100):e.pos+100]}..."
+            )
+
+            log.warning("Using fallback minimal plan...")
+            self.session_todos = [
+                {
+                    "task": "Analyze feed for opportunities",
+                    "action_type": "refresh_feed",
+                    "action_params": {"sort": "top", "limit": 10},
+                    "priority": 3,
+                    "status": "pending",
+                }
+            ]
+
+            self.planning_system.create_session_todos(
+                session_id=self.current_session_id, tasks=self.session_todos
+            )
 
         except Exception as e:
-            log.error(f"Failed to create session plan: {e}")
+            log.error(f"Unexpected error creating session plan: {e}")
+            log.error(f"Error type: {type(e).__name__}")
+            import traceback
+
+            log.error(f"Traceback:\n{traceback.format_exc()}")
+
+            self.session_todos = []
 
     def _update_master_plan_if_needed(self, summary: dict):
         current_plan = self.planning_system.get_active_master_plan()
@@ -876,6 +939,10 @@ class AppSteps:
 
                 success_data = execution_result.get(
                     "data", "Action completed successfully."
+                )
+                self._auto_update_completed_todos(
+                    action_type=decision["action_type"],
+                    action_params=decision.get("action_params", {}),
                 )
                 if settings.USE_SUPERVISOR:
                     encouragement = audit_report.get(
@@ -1265,6 +1332,110 @@ class AppSteps:
             "success": False,
             "error": "Internal error: Failed to update todo status in database.",
         }
+
+    def _action_matches_todo(
+        self, action_type: str, action_params: dict, todo: dict
+    ) -> bool:
+
+        todo_action_type = todo.get("action_type")
+        todo_action_params = todo.get("action_params", {})
+
+        if todo_action_type:
+            if action_type != todo_action_type:
+                return False
+            if todo_action_params:
+                key_params_map = {
+                    "web_scrap_for_links": ["web_domain"],
+                    "web_fetch": ["web_url"],
+                    "memory_store": ["memory_category"],
+                    "select_post_to_comment": ["post_id"],
+                    "select_comment_to_reply": ["comment_id"],
+                    "publish_public_comment": ["post_id"],
+                    "reply_to_comment": ["comment_id"],
+                    "vote_post": ["post_id"],
+                }
+
+                if action_type in key_params_map:
+                    required_keys = key_params_map[action_type]
+
+                    for key in required_keys:
+                        todo_value = todo_action_params.get(key)
+                        action_value = action_params.get(key)
+                        if todo_value:
+                            if key in ["web_domain", "web_url"]:
+                                todo_val = (
+                                    str(todo_value)
+                                    .replace("https://", "")
+                                    .replace("http://", "")
+                                    .strip("/")
+                                )
+                                action_val = (
+                                    str(action_value)
+                                    .replace("https://", "")
+                                    .replace("http://", "")
+                                    .strip("/")
+                                )
+
+                                if todo_val in action_val or action_val in todo_val:
+                                    return True
+                            else:
+                                if str(todo_value) == str(action_value):
+                                    return True
+                else:
+                    return True
+
+        task_lower = todo["task"].lower()
+        action_lower = action_type.lower()
+
+        post_id = action_params.get("post_id", "")
+        comment_id = action_params.get("comment_id", "")
+        web_domain = (
+            action_params.get("web_domain", "")
+            .replace("https://", "")
+            .replace("http://", "")
+            .strip("/")
+        )
+        web_url = action_params.get("web_url", "")
+        memory_category = action_params.get("memory_category", "")
+
+        matches = {
+            "web_scrap_for_links": web_domain and web_domain in task_lower,
+            "web_fetch": web_url and web_url in task_lower,
+            "memory_store": memory_category and memory_category in task_lower,
+            "select_post_to_comment": post_id and post_id in task_lower,
+            "select_comment_to_reply": comment_id and comment_id in task_lower,
+            "publish_public_comment": post_id and post_id in task_lower,
+            "reply_to_comment": comment_id and comment_id in task_lower,
+            "vote_post": post_id and post_id in task_lower,
+            "create_post": "create" in task_lower and "post" in task_lower,
+            "create_link_post": "create" in task_lower and "link" in task_lower,
+            "write_blog_article": "write" in task_lower and "blog" in task_lower,
+            "share_created_blog_post_url": "share" in task_lower
+            and "blog" in task_lower,
+        }
+
+        if action_lower in matches:
+            return matches[action_lower]
+
+        return action_lower.replace("_", " ") in task_lower
+
+    def _auto_update_completed_todos(self, action_type: str, action_params: dict):
+        for todo in self.session_todos:
+            if todo.get("status") in ["completed", "cancelled"]:
+                continue
+
+            if self._action_matches_todo(action_type, action_params, todo):
+                self.planning_system.mark_todo_status(
+                    session_id=self.current_session_id,
+                    task_description=todo["task"],
+                    status="completed",
+                )
+
+                todo["status"] = "completed"
+
+                log.success(f"✅ AUTO-COMPLETED TODO: {todo['task'][:60]}...")
+
+                break
 
     def _handle_view_summaries(self, params: dict):
         limit = params.get("summary_limit", 5)

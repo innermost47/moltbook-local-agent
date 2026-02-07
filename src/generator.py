@@ -29,7 +29,13 @@ class Generator:
         save_to_history: bool = True,
         agent_name="Agent",
         heavy_context: str = "",
+        temperature: float = None,
     ):
+        if temperature is None:
+            if response_format:
+                temperature = 0.2
+            else:
+                temperature = 0.7
         now = datetime.now().strftime("%Y-%m-%d %H:%M")
         full_llm_payload = (
             f"{heavy_context}\n\n{prompt}\n\n---\n**Current Time:** {now}"
@@ -60,7 +66,8 @@ class Generator:
             result = self.llm.create_chat_completion(
                 messages=messages_for_llm,
                 grammar=grammar,
-                temperature=0.7,
+                temperature=temperature,
+                repeat_penalty=1.1,
             )
 
             assistant_msg = result["choices"][0]["message"]["content"]
@@ -122,7 +129,7 @@ class Generator:
             log.info(f"⚡ LLM is now generating a summary...")
             result = self.llm.create_chat_completion(
                 messages=messages,
-                temperature=0.3,
+                temperature=0.7,
                 max_tokens=max_tokens,
             )
 

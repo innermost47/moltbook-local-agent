@@ -1025,7 +1025,6 @@ class AppSteps:
 
         if self.blog_actions:
             blog_list = [
-                "share_created_blog_post_url",
                 "review_comment_key_requests",
                 "approve_comment_key",
                 "reject_comment_key",
@@ -1033,6 +1032,8 @@ class AppSteps:
                 "approve_comment",
                 "reject_comment",
             ]
+            if not self.post_creation_attempted:
+                blog_list.append("share_created_blog_post_url")
             if not self.blog_article_attempted:
                 blog_list.append("write_blog_article")
             allowed_actions.extend(blog_list)
@@ -1293,6 +1294,7 @@ AVAILABLE ALTERNATIVES:
                         log.error(
                             f"🛑 RATE LIMIT DETECTED (429). FORCING IMMEDIATE TASK FAILURE."
                         )
+                        self.post_creation_attempted = True
                         if self.current_active_todo:
                             self.planning_system.mark_todo_status(
                                 session_id=self.current_session_id,

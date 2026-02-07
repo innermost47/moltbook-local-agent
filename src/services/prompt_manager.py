@@ -560,6 +560,7 @@ Respond in first person: "I should update..." or "I will keep..."
         blog_article_attempted,
         actions_performed: List,
         session_todos: List[dict],
+        current_active_todo=None,
     ):
         supervisor_section = ""
         if settings.USE_SUPERVISOR:
@@ -577,15 +578,45 @@ Respond in first person: "I should update..." or "I will keep..."
 
         todo_section = ""
 
-        if pending_todos:
-            todo_section += "#### 📋 REMAINING TO-DO TASKS:\n"
-            for todo in pending_todos:
+        if current_active_todo:
+            todo_section += f"""
+╔══════════════════════════════════════════════════════════════╗
+║  🎯 CURRENT ACTIVE TASK (Priority {'⭐' * current_active_todo.get('priority', 1)})
+╚══════════════════════════════════════════════════════════════╝
+
+**TASK:** {current_active_todo['task']}
+**ACTION TYPE:** {current_active_todo.get('action_type', 'unspecified')}
+**STATUS:** {current_active_todo.get('status', 'pending').upper()}
+
+⚡ THIS IS YOUR PRIMARY FOCUS. Complete this before moving to other tasks.
+
+---
+
+"""
+
+        other_pending = [t for t in pending_todos if t != current_active_todo]
+
+        if other_pending:
+            todo_section += "#### 📋 OTHER PENDING TASKS:\n"
+            for todo in other_pending:
+                priority_stars = "⭐" * todo.get("priority", 1)
                 action_hint = (
                     f" (action: {todo.get('action_type', 'unspecified')})"
                     if todo.get("action_type")
                     else ""
                 )
-                todo_section += f"- {todo['task']}{action_hint}\n"
+                todo_section += f"- [{priority_stars}] {todo['task']}{action_hint}\n"
+            todo_section += "\n"
+        elif not current_active_todo and pending_todos:
+            todo_section += "#### 📋 REMAINING TO-DO TASKS:\n"
+            for todo in pending_todos:
+                priority_stars = "⭐" * todo.get("priority", 1)
+                action_hint = (
+                    f" (action: {todo.get('action_type', 'unspecified')})"
+                    if todo.get("action_type")
+                    else ""
+                )
+                todo_section += f"- [{priority_stars}] {todo['task']}{action_hint}\n"
         else:
             todo_section += "#### 🎉 ALL TASKS COMPLETED!\n"
 
@@ -602,7 +633,9 @@ Respond in first person: "I should update..." or "I will keep..."
 - YOU have {remaining_actions} action points remaining
 - Moltbook post: {'✅ YOU can still create one' if not post_creation_attempted else '❌ YOU already published'}
 - Blog article: {'✅ YOU can still write one' if not blog_article_attempted else '❌ YOU already wrote one'}
+
 {supervisor_section}
+
 #### ✅ ACTIONS ALREADY COMPLETED THIS SESSION:
 {chr(10).join(f"- {a}" for a in actions_performed) if actions_performed else "- (none yet)"}
 

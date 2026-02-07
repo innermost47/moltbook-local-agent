@@ -42,6 +42,7 @@ class AppSteps:
         self.selected_post_id = None
         self.selected_comment_id = None
         self.focused_context_active = False
+        self.current_active_todo = None
         self.feed_posts_data = {}
         self.feed_comments_data = {}
         self.agent_name = "Agent"
@@ -771,13 +772,16 @@ class AppSteps:
         decision = None
         last_decision = None
 
-        status_nudge = self.prompt_manager.get_status_nudge(
-            remaining_actions=self.remaining_actions,
-            post_creation_attempted=self.post_creation_attempted,
-            blog_article_attempted=self.blog_article_attempted,
-            actions_performed=self.actions_performed,
-            session_todos=self.session_todos,
-        )
+        if not self.current_active_todo:
+            pending_todos = [
+                t for t in self.session_todos if t.get("status") != "completed"
+            ]
+            if pending_todos:
+                self.current_active_todo = max(
+                    pending_todos, key=lambda x: x.get("priority", 1)
+                )
+                log.info(f"🎯 FOCUSING ON: {self.current_active_todo['task']}")
+
         for attempt in range(1, max_attempts + 1):
             heavy_payload = ""
             strategic_parts = []
@@ -803,6 +807,15 @@ class AppSteps:
 
             if attempt == 1 and extra_feedback:
                 strategic_parts.append(f"{extra_feedback}")
+
+            status_nudge = self.prompt_manager.get_status_nudge(
+                remaining_actions=self.remaining_actions,
+                post_creation_attempted=self.post_creation_attempted,
+                blog_article_attempted=self.blog_article_attempted,
+                actions_performed=self.actions_performed,
+                session_todos=self.session_todos,
+                current_active_todo=self.current_active_todo,
+            )
 
             strategic_parts.append(status_nudge)
             attempts_left = (max_attempts - attempt) + 1
@@ -1000,13 +1013,26 @@ AVAILABLE ALTERNATIVES:
                     action_type=decision["action_type"],
                     action_params=decision.get("action_params", {}),
                 )
+                task_completion_msg = ""
+                if self.current_active_todo:
+                    for todo in self.session_todos:
+                        if (
+                            todo["task"] == self.current_active_todo["task"]
+                            and todo.get("status") == "completed"
+                        ):
+                            task_completion_msg = f"\n\n🎯 **TASK COMPLETED:** {self.current_active_todo['task']}"
+                            log.success(
+                                f"✅ CURRENT TASK COMPLETED - ready to pick next priority"
+                            )
+                            self.current_active_todo = None
+                            break
                 if settings.USE_SUPERVISOR:
                     encouragement = audit_report.get(
                         "message_for_agent", "Excellent move."
                     )
-                    extra_feedback = f"**✅ SUCCESS:** `{decision['action_type']}`\n\n**🤖 SUPERVISOR:** {encouragement}\n\n**🚩RESULT:** {success_data}"
+                    extra_feedback = f"**✅ SUCCESS:** `{decision['action_type']}`\n\n**🤖 SUPERVISOR:** {encouragement}\n\n**🚩RESULT:** {success_data}{task_completion_msg}"
                 else:
-                    extra_feedback = f"**✅ SUCCESS:** `{decision['action_type']}`\n\n🚩RESULT:** {success_data}"
+                    extra_feedback = f"**✅ SUCCESS:** `{decision['action_type']}`\n\n**🚩RESULT:** {success_data}{task_completion_msg}"
                 break
 
             except (json.JSONDecodeError, KeyError) as e:
@@ -1018,6 +1044,18 @@ AVAILABLE ALTERNATIVES:
             log.error(
                 f"❌ Action '{decision['action_type']}' failed after 3 attempts. FORCING PIVOT."
             )
+            task_failure_msg = ""
+            if self.current_active_todo:
+                self.planning_system.mark_todo_status(
+                    session_id=self.current_session_id,
+                    task_description=self.current_active_todo["task"],
+                    status="failed",
+                )
+                task_failure_msg = f"\n\n❌ **TASK MARKED AS FAILED:** {self.current_active_todo['task']}\nThis task is now abandoned. You must pivot to a different task."
+                log.warning(
+                    f"⚠️ TASK MARKED AS FAILED: {self.current_active_todo['task']}"
+                )
+                self.current_active_todo = None
 
             extra_feedback = f"""
 🚨 **CRITICAL FAILURE** 🚨
@@ -1025,6 +1063,7 @@ AVAILABLE ALTERNATIVES:
 Your action '{decision['action_type']}' was rejected/failed 3 times in a row.
 
 **THIS ACTION IS NOW FORBIDDEN for the rest of this session.**
+{task_failure_msg}
 
 **REMAINING TODOs:**
 {chr(10).join(f"- {t['task']}" for t in self.session_todos if t.get('status') != 'completed')}

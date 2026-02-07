@@ -730,7 +730,7 @@ class AppSteps:
                         skip_next = True
                     else:
                         log.warning(
-                            f"  🗑️ Removed incomplete reply sequence: {task.get('task')}"
+                            f"  Removed incomplete reply sequence: {task.get('task')}"
                         )
 
                 elif action_type in [

@@ -1031,9 +1031,27 @@ class AppSteps:
                     f"#### 🛡️ ATTEMPTS REMAINING FOR THIS ACTION: {attempts_left}/3"
                 )
 
-            strategic_parts.append(
-                f"\n### 🎯 {self.agent_name.upper()}: EXECUTE YOUR NEXT ACTION\n"
-            )
+            if attempts_left == 1:
+                strategic_parts.append(
+                    "⚠️ **YOUR FINAL ATTEMPT.** If YOU fail or are rejected, the session will move on. Be precise and follow the schema."
+                )
+                strategic_parts.append(
+                    f"\n### 🎯 {self.agent_name.upper()}: LAST CHANCE - FIX IT NOW OR LOSE THIS TASK\n"
+                )
+            elif attempt > 1:
+                strategic_parts.append(
+                    f"#### 🛡️ ATTEMPTS REMAINING FOR THIS ACTION: {attempts_left}/3"
+                )
+                strategic_parts.append(
+                    f"\n### 🎯 {self.agent_name.upper()}: FIX YOUR ERROR AND RETRY\n"
+                )
+            else:
+                strategic_parts.append(
+                    f"#### 🛡️ ATTEMPTS REMAINING FOR THIS ACTION: {attempts_left}/3"
+                )
+                strategic_parts.append(
+                    f"\n### 🎯 {self.agent_name.upper()}: EXECUTE YOUR NEXT ACTION\n"
+                )
             self.current_prompt = "\n".join(strategic_parts)
 
             try:

@@ -832,7 +832,7 @@ class AppSteps:
 
                         last_error = (
                             f"**🧐 SUPERVISOR LAZINESS AUDIT:**\n"
-                            f"{supervisor_guidance if settings.USE_SUPERVISOR else ""}\n\n"
+                            f"{supervisor_guidance if settings.USE_SUPERVISOR else ''}\n\n"
                             f"**Detected Pattern:** '{offending_match}'\n"
                             f"**Rule:** You must provide REAL, specific data. No placeholders, no instructions, no brackets."
                         )
@@ -878,7 +878,9 @@ class AppSteps:
                     "data", "Action completed successfully."
                 )
                 if settings.USE_SUPERVISOR:
-                    encouragement = audit_report.get("message_for_agent", "Excellent move.")
+                    encouragement = audit_report.get(
+                        "message_for_agent", "Excellent move."
+                    )
                     extra_feedback = f"**✅ SUCCESS:** `{decision['action_type']}`\n\n**🤖 SUPERVISOR:** {encouragement}\n\n**🚩RESULT:** {success_data}"
                 else:
                     extra_feedback = f"**✅ SUCCESS:** `{decision['action_type']}`\n\n🚩RESULT:** {success_data}"

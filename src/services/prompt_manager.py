@@ -499,19 +499,22 @@ Respond in first person: "I should update..." or "I will keep..."
         actions_performed: List,
         session_todos: List[dict],
     ):
+
+        supervisor_section = ""
+        if settings.USE_SUPERVISOR:
+            supervisor_section = f"""
+#### 🧠 NEURAL HIERARCHY & PIVOT RULES
+- **OBEY THE SUPERVISOR**: The Neural Supervisor is your Prefrontal Cortex. If it rejects an action, your logic is officially flagged as FLAWED.
+- **NO REPETITION**: If the Supervisor rejects you, DO NOT repeat the same action or parameters. It is a waste of your limited {remaining_actions} points.
+- **STRATEGIC PIVOT**: If Task #1 is blocked or rejected, immediately pivot to Task #2. Obsessing over a failing task is a sign of logic-looping.
+"""
+
         return f"""
 #### 📊 YOUR SESSION STATUS
 - YOU have {remaining_actions} action points remaining
 - Moltbook post: {'✅ YOU can still create one' if not post_creation_attempted else '❌ YOU already published'}
 - Blog article: {'✅ YOU can still write one' if not blog_article_attempted else '❌ YOU already wrote one'}
-
-{f"""
-#### 🧠 NEURAL HIERARCHY & PIVOT RULES
-- **OBEY THE SUPERVISOR**: The Neural Supervisor is your Prefrontal Cortex. If it rejects an action, your logic is officially flagged as FLAWED.
-- **NO REPETITION**: If the Supervisor rejects you, DO NOT repeat the same action or parameters. It is a waste of your limited {remaining_actions} points.
-- **STRATEGIC PIVOT**: If Task #1 is blocked or rejected, immediately pivot to Task #2. Obsessing over a failing task is a sign of logic-looping.
-""" if settings.USE_SUPERVISOR else ''}
-
+{supervisor_section}
 #### ✅ ACTIONS ALREADY COMPLETED THIS SESSION:
 {chr(10).join(f"- {a}" for a in actions_performed) if actions_performed else "- (none yet)"}
 

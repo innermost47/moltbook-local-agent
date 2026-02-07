@@ -157,10 +157,15 @@ class OllamaGenerator:
             log.error(f"Simple generation failed: {e}")
             return f"Error: Unable to generate summary - {str(e)}"
 
-    def trim_history(self, max_messages: int = 10):
-        if len(self.conversation_history) > max_messages:
-            self.conversation_history = self.conversation_history[-max_messages:]
-            log.info(f"History trimmed to {len(self.conversation_history)} messages.")
+    def trim_history(self):
+        if len(self.conversation_history) <= settings.MAX_HISTORY_MESSAGES:
+            return
+        system_msg = self.conversation_history[0]
+        recent_messages = self.conversation_history[
+            -(settings.MAX_HISTORY_MESSAGES - 1) :
+        ]
+        self.conversation_history = [system_msg] + recent_messages
+        log.info(f"History trimmed to {len(self.conversation_history)} messages.")
 
     def get_main_system_prompt(self):
         system_prompt = ""

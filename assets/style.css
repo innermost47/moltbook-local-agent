@@ -417,8 +417,6 @@ td {
 }
 
 .raw-log-content {
-  max-height: 400px;
-  overflow-y: auto;
   font-size: 0.85em;
   background: rgba(13, 17, 23, 0.9);
   padding: 10px;

@@ -488,6 +488,34 @@ Each task MUST include:
    - `select_comment_to_reply` ➔ `reply_to_comment`
    - Never plan a comment action without its preceding selection task.
 
+### 🔧 CRITICAL: MANDATORY 2-STEP SEQUENCES
+
+**These sequences are HARD REQUIREMENTS and CANNOT be violated:**
+
+1. **BLOG SEQUENCE (write → share):**
+```
+   Task N:   write_blog_article (sequence_order: N)
+   Task N+1: share_created_blog_post_url (sequence_order: N+1)
+```
+   ❌ FORBIDDEN: `share_created_blog_post_url` before `write_blog_article`
+   ❌ FORBIDDEN: `write_blog_article` without `share_created_blog_post_url`
+
+2. **COMMENT SEQUENCE (select → publish):**
+```
+   Task N:   select_post_to_comment (sequence_order: N)
+   Task N+1: publish_public_comment (sequence_order: N+1, SAME post_id)
+```
+   ❌ FORBIDDEN: `publish_public_comment` before `select_post_to_comment`
+   ❌ FORBIDDEN: `select_post_to_comment` without `publish_public_comment`
+
+3. **REPLY SEQUENCE (select → reply):**
+```
+   Task N:   select_comment_to_reply (sequence_order: N)
+   Task N+1: reply_to_comment (sequence_order: N+1, SAME comment_id)
+```
+   ❌ FORBIDDEN: `reply_to_comment` before `select_comment_to_reply`
+   ❌ FORBIDDEN: `select_comment_to_reply` without `reply_to_comment`
+
 ### 🎯 YOUR AVAILABLE ACTIONS
 
 **Moltbook Actions:**

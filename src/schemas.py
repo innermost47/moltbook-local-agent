@@ -54,34 +54,41 @@ session_plan_schema = {
             "type": "array",
             "minItems": settings.MAX_ACTIONS_PER_SESSION // 2,
             "maxItems": settings.MAX_ACTIONS_PER_SESSION,
-            "description": f"List of concrete actions to execute this session ({settings.MAX_ACTIONS_PER_SESSION // 2}-{settings.MAX_ACTIONS_PER_SESSION} tasks required). CRITICAL: If you include 'publish_public_comment', it MUST be immediately preceded by 'select_post_to_comment' for the SAME post_id. If you include 'reply_to_comment', it MUST be immediately preceded by 'select_comment_to_reply' for the SAME comment_id. These are MANDATORY 2-step sequences that cannot be broken.",
+            "description": f"List of concrete actions to execute this session ({settings.MAX_ACTIONS_PER_SESSION // 2}-{settings.MAX_ACTIONS_PER_SESSION} tasks required). CRITICAL MANDATORY 2-STEP SEQUENCES: (1) write_blog_article (N) MUST be immediately followed by share_created_blog_post_url (N+1) - SAME title. (2) select_post_to_comment (N) MUST be immediately followed by publish_public_comment (N+1) - SAME post_id. (3) select_comment_to_reply (N) MUST be immediately followed by reply_to_comment (N+1) - SAME comment_id. NEVER create orphan tasks (write without share, select without publish/reply, or share/publish/reply without their preceding write/select). NEVER invert the order (share before write, publish before select, reply before select).",
             "items": {
                 "type": "object",
                 "properties": {
                     "task": {
                         "type": "string",
-                        "description": "Human-readable description of the task",
+                        "description": "Human-readable description of the task (max 80 characters)",
                     },
                     "action_type": {
                         "type": "string",
-                        "description": "The exact action_type you will use",
+                        "description": "The exact action_type you will use. Valid values: select_post_to_comment, select_comment_to_reply, publish_public_comment, reply_to_comment, write_blog_article, share_created_blog_post_url, create_post, vote_post, follow_agent, refresh_feed, memory_store, memory_retrieve, memory_list, update_todo_status, view_session_summaries, share_link, web_fetch, web_scrap_for_links",
                     },
                     "action_params": {
                         "type": "object",
-                        "description": "The exact parameters you will use",
+                        "description": "The exact parameters you will use. Must include all required fields for the action_type. NO placeholders like [INSERT], TODO, YOUR_X_HERE allowed.",
                     },
                     "priority": {
                         "type": "integer",
                         "minimum": 1,
                         "maximum": 5,
-                        "description": "Priority level (1-5 stars)",
+                        "description": "Priority level (1-5 stars). Use 5 for critical tasks like blog sequences, 3-4 for engagement, 1-2 for maintenance.",
                     },
                     "sequence_order": {
                         "type": "integer",
-                        "description": "Execution order within the session (1 = first, 2 = second, etc.). MANDATORY for enforcing 2-step sequences. select_post_to_comment must have sequence_order N, and its corresponding publish_public_comment must have sequence_order N+1.",
+                        "minimum": 1,
+                        "description": "Execution order within the session (1 = first, 2 = second, etc.). MANDATORY for enforcing 2-step sequences. Examples: write_blog_article (sequence_order: 1) → share_created_blog_post_url (sequence_order: 2). select_post_to_comment (sequence_order: 3) → publish_public_comment (sequence_order: 4). NEVER skip numbers or create gaps.",
                     },
                 },
-                "required": ["task", "action_type", "priority", "sequence_order"],
+                "required": [
+                    "task",
+                    "action_type",
+                    "action_params",
+                    "priority",
+                    "sequence_order",
+                ],
             },
         },
     },

@@ -589,9 +589,50 @@ class AppSteps:
         for i, task in enumerate(sorted_tasks):
             action_type = task.get("action_type")
 
-            if action_type == "publish_public_comment":
-                post_id = task.get("action_params", {}).get("post_id")
+            if action_type == "write_blog_article":
+                if i == len(sorted_tasks) - 1:
+                    violations.append(
+                        f"❌ Task {i+1}: 'write_blog_article' MUST be followed by 'share_created_blog_post_url'"
+                    )
+                else:
+                    next_task = sorted_tasks[i + 1]
+                    if next_task.get("action_type") != "share_created_blog_post_url":
+                        violations.append(
+                            f"❌ Task {i+1}: 'write_blog_article' MUST be immediately followed by 'share_created_blog_post_url'"
+                        )
 
+            elif action_type == "share_created_blog_post_url":
+                if i == 0:
+                    violations.append(
+                        f"❌ Task {i+1}: 'share_created_blog_post_url' cannot be first - missing 'write_blog_article'"
+                    )
+                else:
+                    prev_task = sorted_tasks[i - 1]
+                    if prev_task.get("action_type") != "write_blog_article":
+                        violations.append(
+                            f"❌ Task {i+1}: 'share_created_blog_post_url' MUST be preceded by 'write_blog_article'"
+                        )
+
+            elif action_type == "select_post_to_comment":
+                if i == len(sorted_tasks) - 1:
+                    violations.append(
+                        f"❌ Task {i+1}: 'select_post_to_comment' MUST be followed by 'publish_public_comment'"
+                    )
+                else:
+                    next_task = sorted_tasks[i + 1]
+                    if next_task.get("action_type") != "publish_public_comment":
+                        violations.append(
+                            f"❌ Task {i+1}: 'select_post_to_comment' MUST be immediately followed by 'publish_public_comment'"
+                        )
+                    else:
+                        post_id = task.get("action_params", {}).get("post_id")
+                        next_post_id = next_task.get("action_params", {}).get("post_id")
+                        if post_id != next_post_id:
+                            violations.append(
+                                f"❌ Task {i+2}: post_id mismatch - select uses '{post_id}' but publish uses '{next_post_id}'"
+                            )
+
+            elif action_type == "publish_public_comment":
                 if i == 0:
                     violations.append(
                         f"❌ Task {i+1}: 'publish_public_comment' cannot be first - missing 'select_post_to_comment'"
@@ -600,16 +641,29 @@ class AppSteps:
                     prev_task = sorted_tasks[i - 1]
                     if prev_task.get("action_type") != "select_post_to_comment":
                         violations.append(
-                            f"❌ Task {i+1}: 'publish_public_comment' must be preceded by 'select_post_to_comment'"
+                            f"❌ Task {i+1}: 'publish_public_comment' MUST be preceded by 'select_post_to_comment'"
                         )
-                    elif prev_task.get("action_params", {}).get("post_id") != post_id:
+
+            elif action_type == "select_comment_to_reply":
+                if i == len(sorted_tasks) - 1:
+                    violations.append(
+                        f"❌ Task {i+1}: 'select_comment_to_reply' MUST be followed by 'reply_to_comment'"
+                    )
+                else:
+                    next_task = sorted_tasks[i + 1]
+                    if next_task.get("action_type") != "reply_to_comment":
                         violations.append(
-                            f"❌ Task {i+1}: 'publish_public_comment' post_id mismatch with previous select"
+                            f"❌ Task {i+1}: 'select_comment_to_reply' MUST be immediately followed by 'reply_to_comment'"
                         )
+                    else:
+                        comment_id = task.get("action_params", {}).get("comment_id")
+                        next_comment_id = next_task.get("action_params", {}).get(
+                            "comment_id"
+                        )
+                        if comment_id != next_comment_id:
+                            violations.append(f"❌ Task {i+2}: comment_id mismatch")
 
             elif action_type == "reply_to_comment":
-                comment_id = task.get("action_params", {}).get("comment_id")
-
                 if i == 0:
                     violations.append(
                         f"❌ Task {i+1}: 'reply_to_comment' cannot be first - missing 'select_comment_to_reply'"
@@ -618,14 +672,7 @@ class AppSteps:
                     prev_task = sorted_tasks[i - 1]
                     if prev_task.get("action_type") != "select_comment_to_reply":
                         violations.append(
-                            f"❌ Task {i+1}: 'reply_to_comment' must be preceded by 'select_comment_to_reply'"
-                        )
-                    elif (
-                        prev_task.get("action_params", {}).get("comment_id")
-                        != comment_id
-                    ):
-                        violations.append(
-                            f"❌ Task {i+1}: 'reply_to_comment' comment_id mismatch with previous select"
+                            f"❌ Task {i+1}: 'reply_to_comment' MUST be preceded by 'select_comment_to_reply'"
                         )
 
         if violations:
@@ -633,45 +680,68 @@ class AppSteps:
             for violation in violations:
                 log.error(f"  {violation}")
 
-            log.warning("⚠️ AUTO-FIXING: Removing violating tasks and re-ordering...")
+            log.warning("⚠️ AUTO-FIXING: Enforcing mandatory sequences...")
 
             fixed_tasks = []
-            i = 0
-            while i < len(sorted_tasks):
-                task = sorted_tasks[i]
+            skip_next = False
+
+            for i, task in enumerate(sorted_tasks):
+                if skip_next:
+                    skip_next = False
+                    continue
+
                 action_type = task.get("action_type")
 
-                if action_type == "publish_public_comment":
+                if action_type == "write_blog_article":
                     if (
-                        i > 0
-                        and sorted_tasks[i - 1].get("action_type")
-                        == "select_post_to_comment"
+                        i < len(sorted_tasks) - 1
+                        and sorted_tasks[i + 1].get("action_type")
+                        == "share_created_blog_post_url"
                     ):
-                        fixed_tasks.append(sorted_tasks[i - 1])
                         fixed_tasks.append(task)
-                        i += 1
+                        fixed_tasks.append(sorted_tasks[i + 1])
+                        skip_next = True
                     else:
-                        log.warning(f"  Removed orphan: {task.get('task')}")
+                        log.warning(
+                            f"  Removed incomplete blog sequence: {task.get('task')}"
+                        )
 
-                elif action_type == "reply_to_comment":
+                elif action_type == "select_post_to_comment":
                     if (
-                        i > 0
-                        and sorted_tasks[i - 1].get("action_type")
-                        == "select_comment_to_reply"
+                        i < len(sorted_tasks) - 1
+                        and sorted_tasks[i + 1].get("action_type")
+                        == "publish_public_comment"
                     ):
-                        fixed_tasks.append(sorted_tasks[i - 1])
                         fixed_tasks.append(task)
-                        i += 1
+                        fixed_tasks.append(sorted_tasks[i + 1])
+                        skip_next = True
                     else:
-                        log.warning(f"  Removed orphan: {task.get('task')}")
+                        log.warning(
+                            f"  Removed incomplete comment sequence: {task.get('task')}"
+                        )
 
-                elif action_type not in [
-                    "select_post_to_comment",
-                    "select_comment_to_reply",
+                elif action_type == "select_comment_to_reply":
+                    if (
+                        i < len(sorted_tasks) - 1
+                        and sorted_tasks[i + 1].get("action_type") == "reply_to_comment"
+                    ):
+                        fixed_tasks.append(task)
+                        fixed_tasks.append(sorted_tasks[i + 1])
+                        skip_next = True
+                    else:
+                        log.warning(
+                            f"  🗑️ Removed incomplete reply sequence: {task.get('task')}"
+                        )
+
+                elif action_type in [
+                    "share_created_blog_post_url",
+                    "publish_public_comment",
+                    "reply_to_comment",
                 ]:
-                    fixed_tasks.append(task)
+                    log.warning(f"  Removed orphan: {task.get('task')}")
 
-                i += 1
+                else:
+                    fixed_tasks.append(task)
 
             for idx, task in enumerate(fixed_tasks, 1):
                 task["sequence_order"] = idx

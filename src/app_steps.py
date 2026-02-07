@@ -774,7 +774,9 @@ class AppSteps:
 
         if not self.current_active_todo:
             pending_todos = [
-                t for t in self.session_todos if t.get("status") != "completed"
+                t
+                for t in self.session_todos
+                if t.get("status") not in ["completed", "failed"]
             ]
             if pending_todos:
                 self.current_active_todo = max(
@@ -808,6 +810,29 @@ class AppSteps:
             if attempt == 1 and extra_feedback:
                 strategic_parts.append(f"{extra_feedback}")
 
+            if attempt > 1:
+                attempts_left = (max_attempts - attempt) + 1
+                critical_error_block = f"""
+╔══════════════════════════════════════════════════════════════╗
+║  🚨 CRITICAL ERROR - ATTEMPT {attempt}/3 FAILED
+╚══════════════════════════════════════════════════════════════╝
+
+**YOUR LAST ACTION WAS REJECTED:**
+{last_error}
+
+⚠️ **MANDATORY NEXT STEP:**
+- DO NOT repeat the action '{decision.get('action_type') if decision else 'N/A'}'
+- READ the error message above CAREFULLY  
+- FIX the error and retry the SAME action with CORRECT parameters
+- OR if unfixable, choose a DIFFERENT action that achieves the same goal
+
+⚡ **CRITICAL:** You have {attempts_left} attempt(s) left. After that, this task will be ABANDONED.
+
+---
+
+"""
+                strategic_parts.insert(0, critical_error_block)
+
             status_nudge = self.prompt_manager.get_status_nudge(
                 remaining_actions=self.remaining_actions,
                 post_creation_attempted=self.post_creation_attempted,
@@ -818,7 +843,6 @@ class AppSteps:
             )
 
             strategic_parts.append(status_nudge)
-            attempts_left = (max_attempts - attempt) + 1
 
             if attempts_left == 1:
                 strategic_parts.append(
@@ -827,25 +851,6 @@ class AppSteps:
             else:
                 strategic_parts.append(
                     f"#### 🛡️ ATTEMPTS REMAINING FOR THIS ACTION: {attempts_left}/3"
-                )
-
-            if attempt > 1:
-                strategic_parts.append(
-                    f"""
-#### 🚨 CRITICAL ERROR - ATTEMPT {attempt}/3 FAILED
-
-**YOUR LAST ACTION WAS REJECTED:**
-{last_error}
-
-⚠️ **MANDATORY NEXT STEP:**
-- DO NOT repeat the action '{decision.get('action_type') if decision else 'N/A'}'
-- READ the error message above CAREFULLY
-- CHOOSE A DIFFERENT ACTION TYPE from your available actions
-- OR pivot to a different TODO from your list:
-{chr(10).join(f"  - {t['task']}" for t in self.session_todos if t.get('status') != 'completed')}
-
-**If you attempt the same action again, you will waste another attempt.**
-"""
                 )
 
             strategic_parts.append(
@@ -891,7 +896,7 @@ FORBIDDEN ACTIONS (will auto-fail):
 
 AVAILABLE ALTERNATIVES:
 {chr(10).join(f"- {t['task']} (action: {t.get('action_type', 'unspecified')})" 
-              for t in self.session_todos if t.get('status') != 'completed')}
+              for t in self.session_todos if t.get('status') not in ['completed', 'failed'])}
 
 **Choose a DIFFERENT action type or use TERMINATE_SESSION.**
 """
@@ -1051,22 +1056,32 @@ AVAILABLE ALTERNATIVES:
                     task_description=self.current_active_todo["task"],
                     status="failed",
                 )
-                task_failure_msg = f"\n\n❌ **TASK MARKED AS FAILED:** {self.current_active_todo['task']}\nThis task is now abandoned. You must pivot to a different task."
+                for todo in self.session_todos:
+                    if todo["task"] == self.current_active_todo["task"]:
+                        todo["status"] = "failed"
+                        break
+                task_failure_msg = f"\n\n❌ **TASK MARKED AS FAILED:** {self.current_active_todo['task']}\n⚠️ This task is now ABANDONED. You MUST pivot to a different task."
                 log.warning(
                     f"⚠️ TASK MARKED AS FAILED: {self.current_active_todo['task']}"
                 )
                 self.current_active_todo = None
+
+            remaining_todos = [
+                t
+                for t in self.session_todos
+                if t.get("status") not in ["completed", "failed"]
+            ]
 
             extra_feedback = f"""
 🚨 **CRITICAL FAILURE** 🚨
 
 Your action '{decision['action_type']}' was rejected/failed 3 times in a row.
 
-**THIS ACTION IS NOW FORBIDDEN for the rest of this session.**
+**THIS TASK IS NOW ABANDONED.**
 {task_failure_msg}
 
-**REMAINING TODOs:**
-{chr(10).join(f"- {t['task']}" for t in self.session_todos if t.get('status') != 'completed')}
+**REMAINING AVAILABLE TODOs:**
+{chr(10).join(f"- [{('⭐' * t.get('priority', 1))}] {t['task']}" for t in remaining_todos) if remaining_todos else "⚠️ NO TASKS REMAINING - Consider TERMINATE_SESSION"}
 
 **OPTIONS:**
 1. Choose a DIFFERENT TODO from the list above

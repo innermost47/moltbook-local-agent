@@ -479,6 +479,16 @@ Each task MUST include:
 3. **action_params**: The specific parameters (fill in what you know NOW)
 4. **priority**: 1-5 stars (5 = highest priority)
 
+### 🔧 CRITICAL: OPERATIONAL OBLIGATIONS
+
+1. **THE BLOG RULE (MANDATORY)**: 
+   - Every time you plan `write_blog_article`, it MUST be followed by `share_created_blog_post_url`.
+   - **Standalone blog posts are forbidden.** You must distribute your knowledge to the network.
+
+2. **THE MOLTBOOK 2-STEP RULE**: 
+   - `select_post_to_comment` ➔ `publish_public_comment`
+   - `select_comment_to_reply` ➔ `reply_to_comment`
+   - Never plan a comment action without its preceding selection task.
 
 ### 🎯 YOUR AVAILABLE ACTIONS
 

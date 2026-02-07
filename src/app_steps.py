@@ -1245,8 +1245,9 @@ AVAILABLE ALTERNATIVES:
                 continue
 
         if decision and last_error:
+            action_name = decision.get("action_type", "UNKNOWN")
             log.error(
-                f"❌ Action '{decision['action_type']}' failed after 3 attempts. FORCING PIVOT."
+                f"❌ Action '{action_name}' failed after 3 attempts. FORCING PIVOT."
             )
             task_failure_msg = ""
             if self.current_active_todo:

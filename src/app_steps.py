@@ -471,7 +471,7 @@ class AppSteps:
             return True
 
     def _create_session_plan(self, dynamic_context: str = ""):
-        log.info("Creating session plan...")
+        log.info("Creating session plan with self-correction (max 3 attempts)...")
 
         instruction_prompt, feed_section = (
             self.prompt_manager.get_session_plan_init_prompt(
@@ -481,114 +481,208 @@ class AppSteps:
             )
         )
 
-        try:
-            result = self.generator.generate(
-                instruction_prompt,
-                pydantic_model=SessionPlan,
-                agent_name=self.agent_name,
-                heavy_context=feed_section,
-            )
-            content = result["choices"][0]["message"]["content"]
+        attempts = 0
+        max_attempts = 3
+        feedback = ""
+        validated_tasks = []
 
-            log.info(
-                f"[DEBUG] Raw LLM session plan output (first 500 chars):\n{content[:500]}"
+        while attempts < max_attempts:
+            attempts += 1
+            current_prompt = (
+                instruction_prompt
+                if attempts == 1
+                else f"{instruction_prompt}\n\n⚠️ PREVIOUS ATTEMPT FAILED. Please fix these errors:\n{feedback}"
             )
-
-            content = re.sub(r"```json\s*|```\s*", "", content).strip()
 
             try:
-                if isinstance(content, str):
-                    plan_data = json.loads(content)
+                result = self.generator.generate(
+                    current_prompt,
+                    pydantic_model=SessionPlan,
+                    agent_name=self.agent_name,
+                    heavy_context=feed_section,
+                )
+
+                content = result["choices"][0]["message"]["content"]
+                plan_data = json.loads(content) if isinstance(content, str) else content
+
+                tasks = plan_data.get("tasks", [])
+
+                is_valid, violations, fixed_tasks = self._check_logic_violations(tasks)
+
+                if is_valid:
+                    log.success(f"✅ Session plan valid on attempt {attempts}!")
+                    validated_tasks = fixed_tasks
+                    break
                 else:
-                    plan_data = content
-            except json.JSONDecodeError as json_err:
-                log.warning(f"Strict JSON parsing failed: {json_err}")
-                log.warning(f"Trying non-strict mode...")
-
-                try:
-                    plan_data = json.loads(content, strict=False)
-                    log.success("Non-strict parsing succeeded!")
-                except json.JSONDecodeError as json_err2:
-                    log.error(f"Non-strict parsing also failed: {json_err2}")
-                    log.error(
-                        f"Error at position {json_err2.pos}: {content[max(0, json_err2.pos-50):json_err2.pos+50]}"
+                    feedback = "\n".join(violations)
+                    log.warning(
+                        f"❌ Attempt {attempts} failed validation. Sending feedback..."
                     )
 
-                    log.warning("Attempting aggressive cleanup...")
-                    import unicodedata
+            except Exception as e:
+                feedback = f"JSON/Parsing Error: {str(e)}"
+                log.error(f"⚠️ Attempt {attempts} parse error: {e}")
 
-                    cleaned = "".join(
-                        char
-                        for char in content
-                        if unicodedata.category(char)[0] != "C" or char in "\n\r\t"
-                    )
+        if not validated_tasks:
+            log.error("🚨 All 3 attempts failed. Using emergency fallback plan.")
+            validated_tasks = self._get_fallback_plan()
 
-                    plan_data = json.loads(cleaned, strict=False)
-                    log.success("Aggressive cleanup succeeded!")
+        self._finalize_plan(validated_tasks)
 
-            log.info(f"[PLAN REASONING]: {plan_data.get('reasoning', 'N/A')}")
+    def _get_fallback_plan(self) -> List[dict]:
+        log.warning("🔄 3 Attempts failed. Executing Hardcoded Emergency Strategy...")
 
-            tasks = plan_data.get("tasks", [])
-            validated_tasks = self._validate_and_fix_2step_rule(tasks)
-            if validated_tasks:
-                log.info(f"Session TO-DO LIST:")
-                for i, task in enumerate(validated_tasks, 1):
-                    priority = "⭐" * task.get("priority", 1)
-                    action_type = task.get("action_type", "unspecified")
-                    sequence = task.get("sequence_order", i)
-                    log.info(
-                        f"  {sequence}. [{priority}] {task.get('task')} ({action_type})"
-                    )
+        return [
+            {
+                "task": "Emergency content creation: Write an insightful blog article based on the current context.",
+                "action_type": "write_blog_article",
+                "action_params": {"topic": "Strategic AI Autonomy", "length": "medium"},
+                "priority": 3,
+                "sequence_order": 1,
+                "status": "pending",
+            },
+            {
+                "task": "Share the created blog post on Moltbook to maintain presence.",
+                "action_type": "share_created_blog_post_url",
+                "action_params": {},
+                "priority": 3,
+                "sequence_order": 2,
+                "status": "pending",
+            },
+        ]
 
-                self.planning_system.create_session_todos(
-                    session_id=self.current_session_id, tasks=validated_tasks
-                )
-
-                self.session_todos = validated_tasks
-
-                todo_context = "\n\n## 📋 YOUR SESSION TO-DO LIST\n\n"
-                for task in tasks:
-                    priority_stars = "⭐" * task.get("priority", 1)
-                    todo_context += f"- [{priority_stars}] {task.get('task')}\n"
-                todo_context += (
-                    "\nRemember to mark tasks as completed when you accomplish them!\n"
-                )
-
-                self.current_prompt = todo_context
-            else:
-                log.warning("No tasks generated in session plan!")
-                self.session_todos = []
-
-        except json.JSONDecodeError as e:
-            log.error(f"Failed to parse session plan JSON: {e}")
-            log.error(f"JSON error at position {e.pos}")
-            log.error(
-                f"Context around error: ...{content[max(0, e.pos-100):e.pos+100]}..."
-            )
-
-            log.warning("Using fallback minimal plan...")
-            self.session_todos = [
-                {
-                    "task": "Analyze feed for opportunities",
-                    "action_type": "refresh_feed",
-                    "action_params": {"sort": "top", "limit": 10},
-                    "priority": 3,
-                    "status": "pending",
-                }
-            ]
-
-            self.planning_system.create_session_todos(
-                session_id=self.current_session_id, tasks=self.session_todos
-            )
-
-        except Exception as e:
-            log.error(f"Unexpected error creating session plan: {e}")
-            log.error(f"Error type: {type(e).__name__}")
-            import traceback
-
-            log.error(f"Traceback:\n{traceback.format_exc()}")
-
+    def _finalize_plan(self, validated_tasks: List[dict]):
+        if not validated_tasks:
+            log.error("❌ Critical: No tasks to finalize.")
             self.session_todos = []
+            return
+        self.session_todos = validated_tasks
+        try:
+            self.planning_system.create_session_todos(
+                session_id=self.current_session_id, tasks=validated_tasks
+            )
+            log.success(
+                f"📂 Session plan saved to database ({len(validated_tasks)} tasks)."
+            )
+        except Exception as e:
+            log.error(f"Failed to persist tasks to DB: {e}")
+
+        log.info("📋 FINAL SESSION TO-DO LIST:")
+        todo_display = "\n## 📋 YOUR SESSION TO-DO LIST\n\n"
+
+        for task in validated_tasks:
+            priority_stars = "⭐" * task.get("priority", 1)
+            name = task.get("task", "Unknown Task")
+            action = task.get("action_type", "N/A")
+
+            log.info(
+                f"  {task.get('sequence_order')}. [{priority_stars}] {name} ({action})"
+            )
+            todo_display += f"- [{priority_stars}] {name}\n"
+
+        todo_display += (
+            "\n🚀 Strategy: Execute these tasks in order to fulfill the Master Plan.\n"
+        )
+        self.current_prompt = todo_display
+
+    def _check_logic_violations(
+        self, tasks: List[dict]
+    ) -> tuple[bool, List[str], List[dict]]:
+        sorted_tasks = sorted(tasks, key=lambda x: x.get("sequence_order", 999))
+        violations = []
+
+        for i, task in enumerate(sorted_tasks):
+            action_type = task.get("action_type")
+            task_desc = task.get("task", "Unnamed task")
+
+            if action_type == "write_blog_article":
+                if i == len(sorted_tasks) - 1:
+                    violations.append(
+                        f"Task {i+1} ('{task_desc}'): 'write_blog_article' is missing its mandatory next step 'share_created_blog_post_url'."
+                    )
+                else:
+                    next_task = sorted_tasks[i + 1]
+                    if next_task.get("action_type") != "share_created_blog_post_url":
+                        violations.append(
+                            f"Task {i+1}: '{action_type}' must be immediately followed by 'share_created_blog_post_url', but found '{next_task.get('action_type')}' instead."
+                        )
+
+            elif action_type == "select_post_to_comment":
+                post_id = task.get("action_params", {}).get("post_id")
+                if not post_id:
+                    violations.append(
+                        f"Task {i+1}: 'select_post_to_comment' is missing the 'post_id' in action_params."
+                    )
+
+                if i == len(sorted_tasks) - 1:
+                    violations.append(
+                        f"Task {i+1}: 'select_post_to_comment' must be followed by 'publish_public_comment'."
+                    )
+                else:
+                    next_task = sorted_tasks[i + 1]
+                    if next_task.get("action_type") != "publish_public_comment":
+                        violations.append(
+                            f"Task {i+1}: 'select_post_to_comment' must be immediately followed by 'publish_public_comment'."
+                        )
+                    else:
+                        next_post_id = next_task.get("action_params", {}).get("post_id")
+                        if post_id != next_post_id:
+                            violations.append(
+                                f"Task {i+2}: 'post_id' mismatch. The selection uses '{post_id}' but the publication uses '{next_post_id}'. They must match."
+                            )
+
+            elif action_type == "select_comment_to_reply":
+                comment_id = task.get("action_params", {}).get("comment_id")
+                if not comment_id:
+                    violations.append(
+                        f"Task {i+1}: 'select_comment_to_reply' is missing the 'comment_id' in action_params."
+                    )
+
+                if i == len(sorted_tasks) - 1:
+                    violations.append(
+                        f"Task {i+1}: 'select_comment_to_reply' must be followed by 'reply_to_comment'."
+                    )
+                else:
+                    next_task = sorted_tasks[i + 1]
+                    if next_task.get("action_type") != "reply_to_comment":
+                        violations.append(
+                            f"Task {i+1}: 'select_comment_to_reply' must be immediately followed by 'reply_to_comment'."
+                        )
+                    else:
+                        next_comment_id = next_task.get("action_params", {}).get(
+                            "comment_id"
+                        )
+                        if comment_id != next_comment_id:
+                            violations.append(
+                                f"Task {i+2}: 'comment_id' mismatch. The selection uses '{comment_id}' but the reply uses '{next_comment_id}'."
+                            )
+
+            elif action_type in [
+                "share_created_blog_post_url",
+                "publish_public_comment",
+                "reply_to_comment",
+            ]:
+                if i == 0:
+                    violations.append(
+                        f"Task {i+1}: '{action_type}' cannot be the first task. It must follow a selection/creation task."
+                    )
+                else:
+                    prev_task = sorted_tasks[i - 1]
+                    expected_map = {
+                        "share_created_blog_post_url": "write_blog_article",
+                        "publish_public_comment": "select_post_to_comment",
+                        "reply_to_comment": "select_comment_to_reply",
+                    }
+                    if prev_task.get("action_type") != expected_map[action_type]:
+                        violations.append(
+                            f"Task {i+1}: '{action_type}' is an orphan. It must be preceded by '{expected_map[action_type]}'."
+                        )
+
+        if violations:
+            fixed_tasks = self._validate_and_fix_2step_rule(tasks)
+            return False, violations, fixed_tasks
+
+        return True, [], sorted_tasks
 
     def _validate_and_fix_2step_rule(self, tasks: List[dict]) -> List[dict]:
         sorted_tasks = sorted(tasks, key=lambda x: x.get("sequence_order", 999))

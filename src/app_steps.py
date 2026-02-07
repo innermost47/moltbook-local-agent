@@ -638,8 +638,8 @@ class AppSteps:
 
         MAX_POSTS = 8
         MAX_COMMENTS_PER_POST = 4
-        CONTENT_TRUNC = 350
-        COMMENT_TRUNC = 150
+        CONTENT_TRUNC = 500
+        COMMENT_TRUNC = 250
 
         formatted = []
         self.available_post_ids = []

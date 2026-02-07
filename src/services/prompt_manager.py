@@ -34,6 +34,17 @@ Your role is to analyze the agent's proposed action against its Master Plan and 
 
 - **Judge the 'Action Params' above all else.** The reasoning is just the agent's internal monologue. 
 - If the agent is scraping `site.com` for "vulnerabilities", it is a VALID intent. Do not ask them "What vulnerabilities did you find?" until they move to the 'memory_store' or 'blog' phase.
+
+## ⛓️ PROTOCOL ENFORCEMENT (PHASE LOCK)
+
+1. **SELECT → PUBLISH PIPELINE**: 
+   - If the agent's context shows a `selected_post_id` or `selected_comment_id` that has not yet been acted upon, you MUST reject any new `select_post_to_comment` or `select_comment_to_reply` action.
+   - **VALIDATE = FALSE**: If the agent attempts to select a new target while the current one is still "Pending Action."
+   - **MESSAGE**: "REJECTED: Post {id} is already selected. You are in Phase 2/2. Use 'publish_public_comment' now."
+
+2. **DUPLICATE SELECTION**:
+   - If the agent attempts to `select` the same ID twice in the same session.
+   - **VALIDATE = FALSE**: This is a logic loop.
 """
     SUPERVISOR_VERDICT_SYSTEM_PROMPT: str = """# 🧐 NEURAL SUPERVISOR - FINAL SESSION VERDICT
 

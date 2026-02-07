@@ -1142,7 +1142,7 @@ class AppSteps:
 
             logic_check_feedback = ""
             if self.selected_post_id and not any(
-                a["action_type"] == "publish_public_comment"
+                isinstance(a, dict) and a.get("action_type") == "publish_public_comment"
                 for a in self.actions_performed
             ):
                 logic_check_feedback = f"""
@@ -1153,7 +1153,8 @@ DO NOT use `select_post_to_comment` again; you already have the focus.
                 strategic_parts.append(logic_check_feedback)
 
             if self.selected_comment_id and not any(
-                a["action_type"] == "reply_to_comment" for a in self.actions_performed
+                isinstance(a, dict) and a.get("action_type") == "reply_to_comment"
+                for a in self.actions_performed
             ):
                 logic_check_feedback = f"""
 📢 **PROTOCOL NOTICE:** You are focused on Comment ID: `{self.selected_comment_id}`.

@@ -332,13 +332,26 @@ Allowed domains: {', '.join(allowed_domains.keys())}
   - **PARAMS**: `{"title": "...", "share_link_url": "..."}`
   - **PURPOSE**: Creates a Link-Post on Moltbook to drive traffic from the social network to your long-form "Fortress" article.
 
-**📌 BLOG MODERATION:**
-- review_pending_comments: (params: limit)
-- approve_comment / reject_comment: (params: comment_id_blog)
-- approve_comment_key / reject_comment_key: (params: request_id)
+**📌 BLOG MODERATION (Check ONCE Per Session):**
+- review_pending_comments: Check for comments waiting approval on YOUR blog articles (params: limit)
+- review_comment_key_requests: Check pending API key requests from OTHER agents wanting to comment on YOUR blog
+- approve_comment / reject_comment: Moderate blog comments (params: comment_id_blog)
+- approve_comment_key / reject_comment_key: Approve/reject key requests (params: request_id)
+
+**⚠️ BLOG MODERATION RULES:**
+- Call review_pending_comments OR review_comment_key_requests MAXIMUM ONCE per session
+- If result is "No pending requests/comments", IMMEDIATELY move to your actual tasks
+- DO NOT waste action points checking empty queues repeatedly
+- These are OPTIONAL maintenance actions, NOT primary objectives
 """
 
         decision_prompt += f"""
+**⚠️ ANTI-LOOP PROTECTION:**
+- DO NOT call the same action 2+ times in a row unless you receive new data
+- If an action returns "No results" or "Empty", move on immediately
+- Blog moderation actions should be called ONCE per session maximum
+- Your tasks are in the TO-DO LIST above - focus on completing THOSE, not checking empty queues
+
 **📌 MEMORY ACTIONS:**
 - memory_store: (params: memory_category, memory_content)
   * 🚨 FATAL ERROR: If 'memory_content' contains brackets like "[...]", "summarize here", or "insert content", the action will be REJECTED and you will lose 1 quota point for NOTHING.

@@ -84,7 +84,7 @@ class EmailReporter:
             if session_metrics and global_progression:
                 rejection_rate = (
                     (
-                        session_metrics["supervisor_rejections"]
+                        session_metrics.get("supervisor_rejections", 0)
                         / session_metrics["total_actions"]
                         * 100
                     )

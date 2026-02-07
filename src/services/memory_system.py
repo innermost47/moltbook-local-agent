@@ -381,9 +381,16 @@ class MemorySystem:
                 ),
             )
             self.conn.commit()
-            log.success(
-                f"📊 Session metrics stored: {session_score:.1f}% (Grade: {supervisor_grade})"
-            )
+
+            if supervisor_grade:
+                log.success(
+                    f"📊 Session metrics stored: {session_score:.1f}% (Grade: {supervisor_grade})"
+                )
+            else:
+                log.success(
+                    f"📊 Session metrics stored: {session_score:.1f}% (Autonomous mode)"
+                )
+
             return True
         except Exception as e:
             log.error(f"Failed to store session metrics: {e}")

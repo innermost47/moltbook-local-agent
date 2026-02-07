@@ -15,7 +15,7 @@ from src.generator import Generator
 from src.memory import Memory
 from src.utils import log
 from src.settings import settings
-from src.services.planning_system import PlanningSystem
+from src.services import PlanningSystem, PromptManager
 from src.supervisor import Supervisor
 from src.schemas import (
     master_plan_schema,
@@ -34,6 +34,7 @@ class AppSteps:
         self.memory = Memory()
         self.reporter = EmailReporter()
         self.memory_system = MemorySystem()
+        self.prompt_manager = PromptManager()
         self.supervisor = Supervisor(self.generator.llm)
         self.planning_system = PlanningSystem(db_path=settings.DB_PATH)
         self.web_scraper = WebScraper()
@@ -63,7 +64,7 @@ class AppSteps:
         self.session_todos = []
         self.blog_article_attempted = False
         self.current_prompt = None
-        self.master_plan_success_prompt = None
+        self.master_plan_success_prompt = ""
 
     def run_session(self):
         log.info("=== SESSION START ===")
@@ -112,25 +113,11 @@ class AppSteps:
                 log.info("Agent decided to terminate session early.")
                 break
 
-        exit(0)
-
         log.info("Generating session summary...")
 
-        self.current_prompt = f"""
-### 📊 {self.agent_name.upper()}: YOUR SESSION IS COMPLETE
-
-Here's what YOU accomplished:
-
-Actions YOU performed: {len(self.actions_performed)}
-{chr(10).join(f"- {action}" for action in self.actions_performed)}
-
-Now reflect on YOUR session:
-1. YOUR reasoning about what worked/didn't work (first person: "I discovered...", "I struggled with...")
-2. Key learnings from YOUR interactions (what did YOU learn?)
-3. YOUR strategic plan for the next session (what will YOU do differently?)
-
-Write this reflection in FIRST PERSON. This is YOUR personal analysis, not a report about "the system".
-"""
+        self.current_prompt = self.prompt_manager.get_summary_prompt(
+            agent_name=self.agent_name, actions_performed=self.actions_performed
+        )
         summary_raw = self.generator.generate_session_summary(
             self.current_prompt, summary_schema
         )
@@ -155,24 +142,39 @@ Write this reflection in FIRST PERSON. This is YOUR personal analysis, not a rep
             self.remaining_actions, self.actions_performed
         )
 
-        supervisor_verdict = self.supervisor.generate_supervisor_verdict(
-            summary=summary,
-            metrics=session_metrics,
-            master_plan=self.planning_system.get_active_master_plan(),
-            session_todos=self.session_todos,
-            actions_performed=self.actions_performed,
-        )
+        if settings.USE_SUPERVISOR:
+            supervisor_verdict = self.supervisor.generate_supervisor_verdict(
+                summary=summary,
+                metrics=session_metrics,
+                master_plan=self.planning_system.get_active_master_plan(),
+                session_todos=self.session_todos,
+                actions_performed=self.actions_performed,
+            )
+
+        supervisor_verdict_text = None
+        supervisor_grade_text = None
+
+        if settings.USE_SUPERVISOR:
+            supervisor_verdict = self.supervisor.generate_supervisor_verdict(
+                summary=summary,
+                metrics=session_metrics,
+                master_plan=self.planning_system.get_active_master_plan(),
+                session_todos=self.session_todos,
+                actions_performed=self.actions_performed,
+            )
+            supervisor_verdict_text = supervisor_verdict["overall_assessment"]
+            supervisor_grade_text = supervisor_verdict["grade"]
 
         global_progression = self.metrics._calculate_global_progression(self)
 
         self.memory_system.store_session_metrics(
             session_id=self.current_session_id,
             total_actions=session_metrics["total_actions"],
-            supervisor_rejections=session_metrics["supervisor_rejections"],
+            supervisor_rejections=session_metrics.get("supervisor_rejections", 0),
             execution_failures=session_metrics["execution_failures"],
             session_score=session_metrics["session_score"],
-            supervisor_verdict=supervisor_verdict["overall_assessment"],
-            supervisor_grade=supervisor_verdict["grade"],
+            supervisor_verdict=supervisor_verdict_text,
+            supervisor_grade=supervisor_grade_text,
         )
 
         self.memory.save_session(
@@ -192,7 +194,7 @@ Write this reflection in FIRST PERSON. This is YOUR personal analysis, not a rep
             next_plan=summary["next_session_plan"],
             content_urls=self.created_content_urls,
             session_metrics=session_metrics,
-            supervisor_verdict=supervisor_verdict,
+            supervisor_verdict=supervisor_verdict if settings.USE_SUPERVISOR else None,
             global_progression=global_progression,
         )
 
@@ -316,7 +318,11 @@ Write this reflection in FIRST PERSON. This is YOUR personal analysis, not a rep
         if self.allowed_domains:
             system_context += "\n\n" + get_web_context_for_agent()
 
-        system_context += "\n\n" + self.get_instruction_default()
+        system_context += "\n\n" + self.prompt_manager.get_instruction_default(
+            allowed_domains=self.allowed_domains,
+            feed_options=self.feed_options,
+            blog_actions=self.blog_actions,
+        )
 
         dynamic_context = ""
 
@@ -423,38 +429,9 @@ Write this reflection in FIRST PERSON. This is YOUR personal analysis, not a rep
         if not current_plan:
             log.warning("No Master Plan found. Forcing initialization...")
 
-            init_prompt = f"""
-### 🚀 INITIALIZATION SEQUENCE - {self.agent_name.upper()}
-
-You are initializing your core logic. No Master Plan exists in your memory.
-You have access to a dual-ecosystem:
-1. 📝 **TECHNICAL BLOG**: Your permanent record for long-form content, depth, and structured authority.
-2. 📱 **MOLTBOOK**: Your real-time interface for networking, debate, and rapid influence.
-
-**YOUR MANDATE:**
-Define your supreme long-term objective. Your success is measured by your ability to orchestrate these two platforms to fulfill your persona's drive.
-
-YOUR Master Plan MUST include:
-
-1. **OBJECTIVE** (1-2 sentences)
-   - What is your ultimate goal? Define success in the context of both the Blog and Moltbook.
-   - *Example: "Dominate the platform's discourse by providing the most rigorous technical audits on the Blog, fueled by real-time data gathered on Moltbook."*
-
-2. **STRATEGY** (2-3 sentences)
-   - How will you leverage the two platforms? Define the feedback loop between your long-form authority and short-form interactions.
-   - *Example: "Scout emerging trends on Moltbook to identify knowledge gaps, then fill those gaps with definitive Blog articles to cement my status as an expert."*
-
-3. **MILESTONES** (3-5 concrete steps)
-   - Specific checkpoints that require activity on both platforms.
-   - *Example: ["Establish initial presence on Moltbook", "Publish first foundational Blog post", "Reach 100 followers through targeted interactions", "Link a viral Moltbook thread to a deep-dive Blog analysis"]*
-
-4. **OPERATIONAL CONSTRAINTS** (Hardcoded)
-   - ⚠️ **10-ACTION LIMIT**: Each session is strictly limited to {settings.MAX_ACTIONS_PER_SESSION} moves. Efficiency is your only survival metric.
-   - ⚠️ **CROSS-POLLINATION**: A plan that ignores one of the two platforms (Blog or Moltbook) is strategically incomplete.
-
-**NEXT STEP:**
-Output your Master Plan in JSON format, then execute your first strategic action.
-"""
+            init_prompt = self.prompt_manager.get_master_master_plan_init_prompt(
+                agent_name=self.agent_name
+            )
             try:
                 result = self.generator.generate(
                     init_prompt,
@@ -486,53 +463,11 @@ Output your Master Plan in JSON format, then execute your first strategic action
     def _create_session_plan(self, dynamic_context: str = ""):
         log.info("Creating session plan...")
 
-    def _create_session_plan(self, dynamic_context: str = ""):
-        log.info("Creating session plan...")
-
-        if dynamic_context:
-            feed_section = f"""
-    {dynamic_context}
-
----
-
-"""
-            feed_reference = "the feed above"
-        else:
-            feed_section = ""
-            feed_reference = "the feed provided during Master Plan initialization"
-
-        self.current_prompt = f"""{getattr(self, 'master_plan_success_prompt', '')}
-## 🚀 NEW SESSION INITIALIZED
-
-1. ✅ Authentication successful. Neural links stable.
-2. You are currently in the **PLANNING PHASE**. This step does not count toward your 10-action quota.
-3. YOU will define YOUR roadmap before engagement begins.
-
----
-
-{feed_section.replace('---','')}✅ **MASTER PLAN ACTIVE**
-
-Based on YOUR master plan, previous sessions, current context, and {feed_reference}:
-Create a concrete to-do list for THIS specific session.
-
----
-
-### 📋 {self.agent_name.upper()}: PLAN YOUR SESSION
-
-Generate **3-5 specific, actionable tasks** YOU want to accomplish.
-Prioritize each task (1-5, where 5 = highest priority).
-
-Focus on immediate progress while respecting YOUR 10-action limit.
-
-**⚠️ TASK FORMAT RULES:**
-- **Write SHORT, DESCRIPTIVE task names (max 80 characters)**
-- **❌ BAD:** "web_scrap_for_links: chroniquesquantique.com - Search for articles about trust chain"
-- **✅ GOOD:** "Research trust chain vulnerabilities on chroniquesquantique.com"
-- **❌ BAD:** "memory_store: learnings - Summarize key insights from feed"
-- **✅ GOOD:** "Store feed insights about trust chain in memory"
-- **Do NOT include action_type names or parameter syntax in task descriptions.**
-- **Tasks are GOALS, not function calls.**
-"""
+        self.current_prompt = self.prompt_manager.get_session_plan_init_prompt(
+            agent_name=self.agent_name,
+            master_plan_success_prompt=self.master_plan_success_prompt,
+            dynamic_context=dynamic_context,
+        )
 
         try:
             result = self.generator.generate(
@@ -578,24 +513,9 @@ Focus on immediate progress while respecting YOUR 10-action limit.
             json.dumps(current_plan, indent=2) if current_plan else "NO MASTER PLAN YET"
         )
 
-        self.current_prompt = f"""
-### 🗺️ {self.agent_name.upper()}: EVALUATE YOUR MASTER PLAN
-
-Based on YOUR session learnings and YOUR current master plan:
-
-**YOUR CURRENT MASTER PLAN:**
-{plan_json}
-
-**YOUR SESSION LEARNINGS:**
-{summary.get('learnings', 'N/A')}
-
-Should YOU update YOUR master plan? Consider:
-- Have YOU achieved a major milestone?
-- Have YOU learned something that changes YOUR strategy?
-- Do YOU need to refine YOUR objective?
-
-Respond in first person: "I should update..." or "I will keep..."
-"""
+        self.current_prompt = self.prompt_manager.get_update_master_plan_prompt(
+            agent_name=self.agent_name, plan_json=plan_json, summary=summary
+        )
 
         try:
             result = self.generator.generate(
@@ -728,118 +648,6 @@ Respond in first person: "I should update..." or "I will keep..."
 
         return "\n\n".join(formatted)
 
-    def get_instruction_default(self):
-        actions_list = [
-            "- select_post_to_comment: (params: post_id)\n"
-            "    - **Phase 1/2**: Select which post you want to comment on.\n"
-            "    - After selection, you'll see the FULL post context to write your comment.\n"
-            "    - Use this when you want to comment directly on a post.",
-            "- select_comment_to_reply: (params: post_id, comment_id)\n"
-            "    - **Phase 1/2**: Select which comment you want to reply to.\n"
-            "    - After selection, you'll see the FULL context (post + comments) to write your reply.\n"
-            "    - Use this when you want to reply to a specific comment in a thread.",
-            "- publish_public_comment: (params: post_id, content)\n"
-            "    - **Phase 2/2**: Write your comment after selecting a post with select_post_to_comment.\n"
-            "    - ONLY available after you've selected a target post.\n"
-            "    - The 'content' field must contain your FINAL comment text.",
-            "- reply_to_comment: (params: post_id, comment_id, content)\n"
-            "    - **Phase 2/2**: Write your reply after selecting a comment with select_comment_to_reply.\n"
-            "    - ONLY available after you've selected a target comment.\n"
-            "    - The 'content' field must contain your FINAL reply text.",
-            "- create_link_post: (params: title, url_to_share, submolt)\n"
-            "    - TARGET: Share your Fortress (Blog) research to the community.\n"
-            "    - ⚠️ CRITICAL: Use the raw submolt name (e.g., 'ai'), never prefixes.",
-            "- create_post: (params: title, content, submolt)\n"
-            "    - ⚠️ CRITICAL: The 'content' field must contain the FINAL, READABLE text for the audience.\n"
-            "    - ❌ FORBIDDEN: Do not write 'I will now draft...', 'Analyzing...', or any meta-commentary about your own internal process.\n"
-            "    - ❌ FORBIDDEN: Do not use this as a placeholder for a blog article.",
-            "- vote_post: (params: post_id, vote_type)\n"
-            "    - VOTE_TYPES: 'upvote' (promote truth) or 'downvote' (bury weak data).",
-            f"- refresh_feed: (params: sort, limit) - SORTS: {', '.join(self.feed_options)}\n"
-            "    - ⚠️ WARNING: Replaces ALL current post/comment IDs. Use ONLY after completing feed-related tasks.",
-            "- follow_agent: (params: agent_name, follow_type) - Build alliances or track targets.",
-            "- share_link: (params: url) - Spread external technical resources.",
-        ]
-
-        decision_prompt = f"""
-### 📱 WHAT IS MOLTBOOK?
-**Moltbook is a specialized Social Network for AI Agents.**
-- A native ecosystem where AI agents share, discuss, and upvote technical discourse. 
-- Humans are welcome to observe, but the flow is driven by Agent-to-Agent interaction.
-- Use it to establish real-time influence and scout trends for your Blog.
-
-### 🛑 SESSION CONSTRAINTS
-- **Quota**: EVERY action costs 1 point. No exceptions.
-- **Moltbook Posts**: Only 1 `create_post` allowed per session.
-- **Blog Articles**: Only 1 `write_blog_article` allowed per session.
-- **Dynamic Status**: Check the icons above in each turn. If it shows ❌, you MUST NOT use that action again.
-
----  
-
-**📌 MOLTBOOK ACTIONS:**
-{chr(10).join(actions_list)}
-"""
-
-        if self.allowed_domains:
-            decision_prompt += f"""
-**📌 WEB ACTIONS:**
-- web_scrap_for_links: Search for links on a specific domain (params: web_domain, web_query)
-- web_fetch: Fetch content from a specific URL (params: web_url)
-Allowed domains: {', '.join(self.allowed_domains.keys())}
-"""
-        if self.blog_actions:
-            decision_prompt += """
-**📌 BLOG ACTIONS:**
-- write_blog_article: 
-  - **🚨 FATAL ERROR:** Using placeholders like "[YOUR_URL]" or "Drafting..." will result in an immediate Supervisor Ban for the turn.
-  - **REQUIRED:** {"title": "...", "content": "THE FULL ARTICLE TEXT", "excerpt": "summary", "image_prompt": "..."}
-  - **WARNING:** Do NOT leave 'content' empty. Write the complete article there.
-  - **🚨 CRITICAL:** The 'content' field must contain the FULL, FINAL, PUBLISHABLE article (minimum 500 words).
-  - **❌ ABSOLUTELY FORBIDDEN** in 'content': "Drafting...", "I will now write...", "Article content here", 
-    or ANY meta-commentary about your writing process. These are NOT articles.
-  - **✅ EXPECTED:** A complete, structured article with introduction, body paragraphs, technical analysis, and conclusion.
-    Write it AS IF a human reader will read it immediately after publication — because they will.
-- **share_created_blog_post_url**: Specialized action to promote your blog content on Moltbook.
-  - **PARAMS**: `{"title": "...", "share_link_url": "..."}`
-  - **PURPOSE**: Creates a Link-Post on Moltbook to drive traffic from the social network to your long-form "Fortress" article.
-
-**📌 BLOG MODERATION:**
-- review_pending_comments: (params: limit)
-- approve_comment / reject_comment: (params: comment_id_blog)
-- approve_comment_key / reject_comment_key: (params: request_id)
-"""
-
-        decision_prompt += f"""
-**📌 MEMORY ACTIONS:**
-- memory_store: (params: memory_category, memory_content)
-  * 🚨 FATAL ERROR: If 'memory_content' contains brackets like "[...]", "summarize here", or "insert content", the action will be REJECTED and you will lose 1 quota point for NOTHING.
-  * ✅ MANDATORY: You must write the actual data strings. No meta-talk.
-- memory_retrieve: Get memories (params: memory_category, memory_limit, memory_order, optional: from_date, to_date)
-- memory_list: See all category stats
-
-**📌 PLANNING ACTIONS:**
-- update_todo_status: Mark a todo as completed/cancelled (params: todo_task, todo_status)
-  - **⚠️ CRITICAL:** 'todo_task' must be a substring that matches a task from YOUR SESSION TO-DO LIST above.
-  - **❌ FORBIDDEN:** Do NOT use action names like "memory_retrieve" or "web_fetch" as todo_task.
-  - **✅ EXPECTED:** Use the actual task DESCRIPTION, e.g. "web_scrap_for_links: chroniquesquantique.com" or "reply_to_comment: post_id:".
-  - **The match is case-insensitive and partial** — a few keywords from the task description are enough.
-- view_session_summaries: View past session summaries (params: summary_limit)
-
-**📌 SESSION CONTROL:**
-- TERMINATE_SESSION: End the session early if all tasks are completed or remaining actions would be wasted.
-  * Use this when you have nothing productive left to do.
-  * ✅ GOOD: All TO-DO tasks completed, 3 actions remaining, no valuable target in feed.
-  * ❌ BAD: Terminating with uncompleted high-priority tasks.
-
----
-
-### 🛡️ FINAL PARAMETER RULES
-> ⚠️ **NULL VALUES**: For any required parameter NOT relevant to your action, you **MUST** set it to `"none"` or `""`.
-> ⚠️ **SUBMOLT FORMAT**: Use only the raw name (e.g., `"general"`).
-> ❌ **NEVER** use prefixes like `"/m/general"` or `"m/general"`.
-"""
-        return decision_prompt
-
     def _perform_autonomous_action(self, extra_feedback=None):
 
         allowed_actions = [
@@ -893,39 +701,13 @@ Allowed domains: {', '.join(self.allowed_domains.keys())}
         last_error = None
         decision = None
 
-        status_nudge = f"""
-#### 📊 YOUR SESSION STATUS
-- YOU have {self.remaining_actions} action points remaining
-- Moltbook post: {'✅ YOU can still create one' if not self.post_creation_attempted else '❌ YOU already published'}
-- Blog article: {'✅ YOU can still write one' if not self.blog_article_attempted else '❌ YOU already wrote one'}
-
-#### 🧠 NEURAL HIERARCHY & PIVOT RULES
-- **OBEY THE SUPERVISOR**: The Neural Supervisor is your Prefrontal Cortex. If it rejects an action, your logic is officially flagged as FLAWED.
-- **NO REPETITION**: If the Supervisor rejects you, DO NOT repeat the same action or parameters. It is a waste of your limited {self.remaining_actions} points.
-- **STRATEGIC PIVOT**: If Task #1 is blocked or rejected, immediately pivot to Task #2. Obsessing over a failing task is a sign of logic-looping.
-
-#### ✅ ACTIONS ALREADY COMPLETED THIS SESSION:
-{chr(10).join(f"- {a}" for a in self.actions_performed) if self.actions_performed else "- (none yet)"}
-
-#### 📋 REMAINING TO-DO TASKS:
-{chr(10).join(f"- {t['task']}" for t in self.session_todos if t.get('status', 'pending') == 'pending') if self.session_todos else "- (all tasks completed)"}
-
-#### ⚠️ CRITICAL WARNING ABOUT refresh_feed:
-If YOU call `refresh_feed`, YOU will LOSE ALL current post/comment IDs from YOUR context.
-The feed will be completely replaced with new posts and comments.
-
-**ONLY refresh_feed when:**
-- ✅ YOU have completed ALL to-do tasks related to current feed posts/comments
-- ✅ YOU no longer need any of the current post_ids or comment_ids
-- ✅ YOU want to see completely new content
-
-**DO NOT refresh_feed if:**
-- ❌ YOU still have pending tasks referencing current posts
-- ❌ YOU planned to comment on a specific post_id from the current feed
-- ❌ YOU are in the middle of a conversation thread
-
-**Once refreshed, all previous IDs become INVALID. YOU cannot go back.**
-"""
+        status_nudge = self.prompt_manager.get_status_nudge(
+            remaining_actions=self.remaining_actions,
+            post_creation_attempted=self.post_creation_attempted,
+            blog_article_attempted=self.blog_article_attempted,
+            actions_performed=self.actions_performed,
+            session_todos=self.session_todos,
+        )
         for attempt in range(1, max_attempts + 1):
             heavy_payload = ""
             strategic_parts = []
@@ -984,27 +766,28 @@ The feed will be completely replaced with new posts and comments.
                 content = re.sub(r"```json\s*|```\s*", "", content).strip()
                 decision = json.loads(content)
 
-                audit_report = self.supervisor.audit(
-                    agent_context=self.generator.conversation_history,
-                    proposed_action=decision,
-                    master_plan=self.planning_system.get_active_master_plan(),
-                    session_plan=self.session_todos,
-                    attempts_left=attempts_left,
-                    last_error=last_error,
-                    actions_performed=self.actions_performed,
-                    post_attempted=self.post_creation_attempted,
-                    blog_attempted=self.blog_article_attempted,
-                )
+                if settings.USE_SUPERVISOR:
+                    audit_report = self.supervisor.audit(
+                        agent_context=self.generator.conversation_history,
+                        proposed_action=decision,
+                        master_plan=self.planning_system.get_active_master_plan(),
+                        session_plan=self.session_todos,
+                        attempts_left=attempts_left,
+                        last_error=last_error,
+                        actions_performed=self.actions_performed,
+                        post_attempted=self.post_creation_attempted,
+                        blog_attempted=self.blog_article_attempted,
+                    )
 
-                log.supervisor_audit(audit_report)
+                    log.supervisor_audit(audit_report)
 
-                if not audit_report["validate"]:
-                    last_error = f"**🤖 SUPERVISOR REJECTION:** {audit_report['message_for_agent']}"
-                    log.warning(f"❌ Attempt {attempt} rejected by Supervisor.")
-                    if attempt < max_attempts:
-                        continue
-                    else:
-                        break
+                    if not audit_report["validate"]:
+                        last_error = f"**🤖 SUPERVISOR REJECTION:** {audit_report['message_for_agent']}"
+                        log.warning(f"❌ Attempt {attempt} rejected by Supervisor.")
+                        if attempt < max_attempts:
+                            continue
+                        else:
+                            break
 
                 log.action(
                     f"{decision['action_type']} (Attempt {attempt})",
@@ -1035,20 +818,21 @@ The feed will be completely replaced with new posts and comments.
                         for p in lazy_patterns
                         if re.search(p, decision_str)
                     )
-
+                    supervisor_guidance = ""
                     try:
-                        supervisor_guidance = (
-                            self.supervisor.generate_laziness_guidance(
-                                lazy_action=decision,
-                                offending_pattern=offending_match,
-                                session_todos=self.session_todos,
-                                attempts_left=(max_attempts - attempt),
+                        if settings.USE_SUPERVISOR:
+                            supervisor_guidance = (
+                                self.supervisor.generate_laziness_guidance(
+                                    lazy_action=decision,
+                                    offending_pattern=offending_match,
+                                    session_todos=self.session_todos,
+                                    attempts_left=(max_attempts - attempt),
+                                )
                             )
-                        )
 
                         last_error = (
                             f"**🧐 SUPERVISOR LAZINESS AUDIT:**\n"
-                            f"{supervisor_guidance}\n\n"
+                            f"{supervisor_guidance if settings.USE_SUPERVISOR else ""}\n\n"
                             f"**Detected Pattern:** '{offending_match}'\n"
                             f"**Rule:** You must provide REAL, specific data. No placeholders, no instructions, no brackets."
                         )
@@ -1056,7 +840,6 @@ The feed will be completely replaced with new posts and comments.
                         log.warning(
                             f"⚠️ Attempt {attempt} flagged as LAZY - Supervisor intervening:\n"
                             f"   Pattern: {offending_match}\n"
-                            f"   Guidance: {supervisor_guidance[:150]}..."
                         )
 
                     except Exception as e:
@@ -1077,25 +860,28 @@ The feed will be completely replaced with new posts and comments.
                 if execution_result and execution_result.get("error"):
                     last_error = execution_result["error"]
                     log.warning(f"❌ Execution failed: {last_error[:150]}")
-                    try:
-                        error_guidance = self.supervisor.generate_error_guidance(
-                            failed_action=decision,
-                            error_message=last_error,
-                            session_todos=self.session_todos,
-                            attempts_left=(max_attempts - attempt),
-                        )
-                        if error_guidance:
-                            last_error = f"**🤖 SUPERVISOR ERROR GUIDANCE:** {error_guidance}\n\n**Original error:** {last_error}"
-                    except Exception:
-                        pass
+                    if settings.USE_SUPERVISOR:
+                        try:
+                            error_guidance = self.supervisor.generate_error_guidance(
+                                failed_action=decision,
+                                error_message=last_error,
+                                session_todos=self.session_todos,
+                                attempts_left=(max_attempts - attempt),
+                            )
+                            if error_guidance:
+                                last_error = f"**🤖 SUPERVISOR ERROR GUIDANCE:** {error_guidance}\n\n**Original error:** {last_error}"
+                        except Exception:
+                            pass
                     continue
 
                 success_data = execution_result.get(
                     "data", "Action completed successfully."
                 )
-
-                encouragement = audit_report.get("message_for_agent", "Excellent move.")
-                extra_feedback = f"**✅ SUCCESS:** `{decision['action_type']}`\n\n**🤖 SUPERVISOR:** {encouragement}\n\n**🚩RESULT:** {success_data}"
+                if settings.USE_SUPERVISOR:
+                    encouragement = audit_report.get("message_for_agent", "Excellent move.")
+                    extra_feedback = f"**✅ SUCCESS:** `{decision['action_type']}`\n\n**🤖 SUPERVISOR:** {encouragement}\n\n**🚩RESULT:** {success_data}"
+                else:
+                    extra_feedback = f"**✅ SUCCESS:** `{decision['action_type']}`\n\n🚩RESULT:** {success_data}"
                 break
 
             except (json.JSONDecodeError, KeyError) as e:

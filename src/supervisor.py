@@ -8,16 +8,28 @@ from src.schemas import (
 )
 from src.settings import settings
 from src.utils import log
+from src.services import PromptManager
 
 
 class Supervisor:
     def __init__(self, llm_instance: Llama):
         self.llm = llm_instance
         self.schema = supervisor_schema
+        self.prompt_manager = PromptManager()
         self.conversation_history = []
+        if settings.USE_SUPERVISOR:
+            initial_data = []
+            log.success("Neural Supervisor activated - Audit system online")
+        else:
+            initial_data = [
+                {
+                    "role": "system",
+                    "content": "⚠️ Neural Supervisor is disabled for this session. Agent actions will proceed without strategic oversight or validation.",
+                }
+            ]
+            log.warning("Neural Supervisor disabled - Agent running in autonomous mode")
         with open("supervisor_debug.json", "w", encoding="utf-8") as f:
-            json.dump([], f, indent=4, ensure_ascii=False)
-        log.success("Supervisor initialized with dedicated history")
+            json.dump(initial_data, f, indent=4, ensure_ascii=False)
 
     def audit(
         self,
@@ -31,7 +43,7 @@ class Supervisor:
         blog_attempted: bool,
         last_error: str = None,
     ):
-        base_system = settings.SUPERVISOR_SYSTEM_PROMPT
+        base_system = self.prompt_manager.SUPERVISOR_SYSTEM_PROMPT
 
         rule_enforcement = ""
         if post_attempted:
@@ -85,33 +97,16 @@ class Supervisor:
             else:
                 memory_context = f'- **FAILED PREVIOUS INTENT:** "{recent_reasoning}"'
 
-            user_prompt = f"""## 📊 NEURAL AUDIT REQUEST [{urgency_note}]
-
-### 🧠 MEMORY & CONTINUITY
-{memory_context}
-- **Attempts Left:** {attempts_left} / 3
-{previous_rejection_context}
-
-### 🛰️ SESSION PROGRESS
-- **Actions already validated:** {formatted_history}
-
-- **Remaining Session Plan:**
-{formatted_session_plan}
-
-### 🎯 CURRENT PROPOSAL
-- **Agent reasoning:** "{proposed_action.get('reasoning', 'No reasoning provided')}"
-- **Action type:** `{proposed_action.get('action_type', 'UNKNOWN')}`
-- **Parameters:** `{json.dumps(proposed_action.get('action_params', {}))}`
-
-### 📋 STRATEGIC ALIGNMENT
-- **Master Plan:** {master_plan.get('objective', 'N/A')}
-
----
-**AUDITOR COMMAND:** 1. **Context Check**: Use 'Actions already validated' to ensure the agent isn't stuck in a loop.
-2. **Urgency**: This is a {urgency_note}. 
-3. **Logic**: If the proposal matches a 'FAILED PREVIOUS INTENT' parameters, you MUST set `validate: false`.
-4. **Final Decision**: Output your audit in the required JSON format.
-"""
+            user_prompt = self.prompt_manager.get_audit_prompt(
+                urgency_note=urgency_note,
+                memory_context=memory_context,
+                attempts_left=attempts_left,
+                previous_rejection_context=previous_rejection_context,
+                formatted_history=formatted_history,
+                formatted_session_plan=formatted_session_plan,
+                proposed_action=proposed_action,
+                master_plan=master_plan,
+            )
 
         messages_for_audit = self.conversation_history + [
             {"role": "user", "content": user_prompt}
@@ -177,41 +172,17 @@ class Supervisor:
 
         formatted_actions = "\n".join([f"- {action}" for action in actions_performed])
 
-        verdict_prompt = f"""
-## 🧐 END-OF-SESSION PERFORMANCE REVIEW
-
-### 📊 SESSION METRICS
-- **Total Actions**: {metrics['total_actions']}
-- **Supervisor Rejections**: {metrics['supervisor_rejections']} ({metrics['supervisor_rejections']/metrics['total_actions']*100:.1f}%)
-- **Execution Failures**: {metrics['execution_failures']} ({metrics['execution_failures']/metrics['total_actions']*100:.1f}%)
-- **Session Score**: {metrics['session_score']:.1f}%
-
-### 🎯 MASTER PLAN (Agent's Strategic Vision)
-{json.dumps(master_plan, indent=2)}
-
-### 📋 SESSION TO-DO LIST (What Was Planned)
-{formatted_todos}
-
-### ✅ ACTIONS PERFORMED (What Actually Happened)
-{formatted_actions}
-
-### 🧠 AGENT'S SELF-SUMMARY
-**Reasoning**: {summary.get('reasoning', 'N/A')}
-**Learnings**: {summary.get('learnings', 'N/A')}
-**Next Session Plan**: {summary.get('next_session_plan', 'N/A')}
-
----
-
-Based on this complete session context, provide your final verdict:
-1. **Overall Assessment** (2-3 sentences, brutally honest)
-2. **Main Weakness** (the critical flaw that most impacted performance)
-3. **Directive for Next Session** (one concrete, measurable instruction)
-4. **Letter Grade** (A+, A, B, C, D, F - calibrated to both metrics AND strategic value)
-"""
+        verdict_prompt = self.prompt_manager.get_verdict_prompt(
+            metrics=metrics,
+            master_plan=master_plan,
+            formatted_todos=formatted_todos,
+            formatted_actions=formatted_actions,
+            summary=summary,
+        )
 
         try:
 
-            system_prompt = settings.SUPERVISOR_VERDICT_SYSTEM_PROMPT
+            system_prompt = self.prompt_manager.SUPERVISOR_VERDICT_SYSTEM_PROMPT
 
             grammar = LlamaGrammar.from_json_schema(
                 json.dumps(supervisor_verdict_schema)
@@ -437,61 +408,21 @@ Based on this complete session context, provide your final verdict:
             ]
         )
 
-        forbidden_patterns_examples = """
-    **FORBIDDEN LAZY PATTERNS (Examples):**
-    - Brackets/Placeholders: [insert X], <placeholder>, {YOUR_TEXT}
-    - Meta-instructions: "I will write...", "add more details here", "summarize insights"
-    - Incomplete markers: TODO:, TBD, FIXME, placeholder, to be filled
-    - Template leftovers: example.com, sample-content, lorem ipsum
-    - Ellipsis abuse: ........ (4+ dots)
-    - Future tense instead of action: "this will contain...", "here's where I should..."
-    """
-
-        laziness_prompt = f"""
-    ## 🧐 NEURAL SUPERVISOR - LAZINESS AUDIT
-
-    **CRITICAL VIOLATION DETECTED:**
-
-    The agent attempted to execute action '{action_type}' with PLACEHOLDER data instead of real content.
-
-    **Offending Pattern Found:** `{offending_pattern}`
-
-    **Proposed Action (REJECTED):**
-    {json.dumps(lazy_action, indent=2)}
-
-    {forbidden_patterns_examples}
-
-    **Current Session TO-DO List:**
-    {formatted_todos}
-
-    **Attempts Remaining:** {attempts_left}
-
-    ---
-
-    **YOUR TASK:**
-
-    Provide SPECIFIC, ACTIONABLE guidance to fix this laziness. Tell the agent:
-
-    1. **What's wrong** with the current approach (be specific about the placeholder)
-    2. **What real data** they should provide instead
-    3. **How to extract** that data from their current context or session goals
-
-    **FORMAT YOUR RESPONSE AS:**
-
-    A direct, concise instruction (2-3 sentences max) that will be injected into the agent's next attempt.
-
-    **EXAMPLES OF GOOD GUIDANCE:**
-
-    ❌ BAD: "Don't use placeholders."
-    ✅ GOOD: "Instead of '[insert technical insight]', write a specific observation about the trust chain architecture mentioned in post abc123. Use concrete technical terminology."
-
-    ❌ BAD: "Be more specific."
-    ✅ GOOD: "Replace '[meaningful comment]' with an actual argument. For example, challenge the claim about Byzantine fault tolerance by citing the CAP theorem."
-
-    **NOW PROVIDE YOUR GUIDANCE:**
-    """
+        laziness_prompt = self.prompt_manager.get_lazyness_sys_prompt(
+            action_type=action_type,
+            offending_pattern=offending_pattern,
+            lazy_action=lazy_action,
+            formatted_todos=formatted_todos,
+            attempts_left=attempts_left,
+        )
 
         try:
+            try:
+                with open("supervisor_debug.json", "r", encoding="utf-8") as f:
+                    debug_data = json.load(f)
+            except (FileNotFoundError, json.JSONDecodeError):
+                debug_data = []
+
             messages = [
                 {
                     "role": "system",
@@ -505,31 +436,23 @@ Based on this complete session context, provide your final verdict:
             )
             log.info(f"⚡ LLM is now generating laziness guidance...")
 
-            try:
-                with open("supervisor_debug.json", "r", encoding="utf-8") as f:
-                    debug_data = json.load(f)
-            except (FileNotFoundError, json.JSONDecodeError):
-                debug_data = []
-
-            waiting_messages = (
-                debug_data
-                + messages
-                + [
-                    {
-                        "role": "assistant",
-                        "content": "⚠️ Detecting laziness patterns and drafting corrections...",
-                    }
-                ]
+            debug_data.extend(messages)
+            debug_data.append(
+                {
+                    "role": "assistant",
+                    "content": "⚠️ Detecting laziness patterns and drafting corrections...",
+                }
             )
+
             with open("supervisor_debug.json", "w", encoding="utf-8") as f:
-                json.dump(waiting_messages, f, indent=4, ensure_ascii=False)
+                json.dump(debug_data, f, indent=4, ensure_ascii=False)
+
             result = self.llm.create_chat_completion(
                 messages=messages,
                 grammar=grammar,
                 temperature=0.3,
                 max_tokens=200,
             )
-
             content = result["choices"][0]["message"]["content"]
             guidance_json = json.loads(content)
 
@@ -539,25 +462,16 @@ Based on this complete session context, provide your final verdict:
                 f"**Action:** {guidance_json['actionable_instruction']}"
             )
 
-            messages.append({"role": "assistant", "content": content})
-            debug_data.extend(messages)
+            debug_data[-1] = {"role": "assistant", "content": content}
 
-            try:
-                with open("supervisor_debug.json", "w", encoding="utf-8") as f:
-                    json.dump(debug_data, f, indent=4, ensure_ascii=False)
-                log.info(f"🧐 Laziness guidance saved to debug file")
-            except Exception as e:
-                log.error(f"Failed to save laziness guidance debug: {e}")
+            with open("supervisor_debug.json", "w", encoding="utf-8") as f:
+                json.dump(debug_data, f, indent=4, ensure_ascii=False)
+            log.info(f"🧐 Laziness guidance saved to debug file")
 
             return guidance
 
         except Exception as e:
             log.error(f"Failed to generate laziness guidance: {e}")
-            error_messages = [
-                {"role": "system", "content": "Laziness guidance generation failed"},
-                {"role": "user", "content": laziness_prompt},
-                {"role": "assistant", "content": f"ERROR: {str(e)}"},
-            ]
 
             try:
                 with open("supervisor_debug.json", "r", encoding="utf-8") as f:
@@ -565,7 +479,16 @@ Based on this complete session context, provide your final verdict:
             except:
                 debug_data = []
 
-            debug_data.extend(error_messages)
+            debug_data.extend(
+                [
+                    {
+                        "role": "system",
+                        "content": "Laziness guidance generation failed",
+                    },
+                    {"role": "user", "content": laziness_prompt},
+                    {"role": "assistant", "content": f"ERROR: {str(e)}"},
+                ]
+            )
 
             with open("supervisor_debug.json", "w", encoding="utf-8") as f:
                 json.dump(debug_data, f, indent=4, ensure_ascii=False)

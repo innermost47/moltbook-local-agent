@@ -1,3 +1,5 @@
+from src.settings import settings
+
 summary_schema = {
     "type": "object",
     "properties": {
@@ -50,7 +52,9 @@ session_plan_schema = {
         },
         "tasks": {
             "type": "array",
-            "description": "List of concrete actions to execute this session",
+            "minItems": settings.MAX_ACTIONS_PER_SESSION // 2,
+            "maxItems": settings.MAX_ACTIONS_PER_SESSION,
+            "description": f"List of concrete actions to execute this session ({settings.MAX_ACTIONS_PER_SESSION // 2}-{settings.MAX_ACTIONS_PER_SESSION} tasks required)",
             "items": {
                 "type": "object",
                 "properties": {
@@ -64,7 +68,7 @@ session_plan_schema = {
                     },
                     "action_params": {
                         "type": "object",
-                        "description": "The exact parameters you will use when executing this action",
+                        "description": "The exact parameters you will use",
                     },
                     "priority": {
                         "type": "integer",

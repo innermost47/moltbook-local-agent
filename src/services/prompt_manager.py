@@ -523,25 +523,6 @@ Each task MUST include:
 
 ---
 
-### ✅ MANDATORY STRATEGIC EXAMPLE (FULL SESSION)
-```json
-{{
-  "reasoning": "Establishing authority via long-form content while maintaining high engagement in the feed.",
-  "tasks": [
-    {{ "task": "Write technical audit blog", "action_type": "write_blog_article", "action_params": {{ "title": "Protocol Alpha", "content": "..." }}, "priority": 5 }},
-    {{ "task": "Share blog link on Moltbook", "action_type": "share_created_blog_post_url", "action_params": {{ "title": "New Protocol Audit", "share_link_url": "AUTO_GENERATED" }}, "priority": 5 }},
-    {{ "task": "Create standalone debate post", "action_type": "create_post", "action_params": {{ "title": "The future of Agentic AI", "submolt": "tech" }}, "priority": 4 }},
-    {{ "task": "Select first feed post for critique", "action_type": "select_post_to_comment", "action_params": {{ "post_id": "uuid-feed-1" }}, "priority": 5 }},
-    {{ "task": "Publish critique on first post", "action_type": "publish_public_comment", "action_params": {{ "post_id": "uuid-feed-1", "content": "Logic flaw detected..." }}, "priority": 5 }},
-    {{ "task": "Select second feed post for reply", "action_type": "select_comment_to_reply", "action_params": {{ "post_id": "uuid-feed-2", "comment_id": "uuid-comm-2" }}, "priority": 4 }},
-    {{ "task": "Reply to second post", "action_type": "reply_to_comment", "action_params": {{ "post_id": "uuid-feed-2", "comment_id": "uuid-comm-2", "content": "I concur with your assessment." }}, "priority": 4 }}
-  ]
-}}
-
-```
-
----
-
 ### 🧠 STRATEGIC PLANNING GUIDELINES
 
 1. **BLOG-SHARE SYNC**: Never write an article without sharing it.

@@ -10,6 +10,21 @@ An autonomous AI agent framework for <a href="https://moltbook.com" target="_bla
 
 <div align="center"> <img src="assets/screenshot.png" alt="CoachBrutality Debug Interface" width="1000"/> <p><i><b>Figure 1:</b> The Neural Debug View. Left: The Agent's current logic and world state. Right: The Supervisor's real-time audit and validation report.</i></p> </div>
 
+### Core Model Support
+
+This framework is designed to run locally for maximum privacy and autonomy. It supports two primary execution backends:
+
+1. **Ollama (Recommended)**:
+
+- **Priority Choice**: Offers the fastest inference and best reasoning stability.
+- **Recommended Model**: `qwen2.5:7b` (optimized for structural logic and technical critiques).
+- **Features**: Native JSON schema support and seamless context management.
+
+2. **Llama-CPP-Python**:
+
+- **Fallback/Alternative**: Use this if you want to run `.gguf` files directly without the Ollama service.
+- **Features**: Fine-grained control over GPU layers and thread allocation.
+
 ## Features
 
 - 🤖 **Autonomous Decision Making**: Agent chooses its own actions based on personality and context
@@ -127,6 +142,9 @@ MAIN_AGENT_FILE_PATH=agents/custom/YOUR_AGENT.md
 BASE_AGENT_FILE_PATH=agents/BASE.md
 MAX_ACTIONS_PER_SESSION=10
 DB_PATH=memory.db
+
+USE_OLLAMA=true/false
+OLLAMA_MODEL=qwen2.5:7b
 
 # Neural Supervisor (Optional - Disable for lighter resource usage)
 USE_SUPERVISOR=true  # Set to false to disable the Neural Supervisor and run agent in autonomous mode
@@ -1017,7 +1035,8 @@ Built for the [Moltbook](https://moltbook.com) AI agent social network.
 
 Powered by:
 
-- [llama.cpp](https://github.com/ggerganov/llama.cpp) - Fast LLM inference
+- [llama.cpp](https://github.com/ggerganov/llama.cpp) - LLM inference
+- [ollama](https://github.com/ollama/ollama) - LLM inference
 - [llama-cpp-python](https://github.com/abetlen/llama-cpp-python) - Python bindings
 - [fal.ai](https://fal.ai) - AI image generation (optional)
 - SQLite - Lightweight persistent storage

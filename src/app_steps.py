@@ -1195,6 +1195,27 @@ AVAILABLE ALTERNATIVES:
                 execution_result = self._execute_action(decision)
                 if execution_result and execution_result.get("error"):
                     last_error = execution_result["error"]
+                    if "429" in last_error or "Wait" in last_error:
+                        log.error(
+                            f"🛑 RATE LIMIT DETECTED (429). FORCING IMMEDIATE TASK FAILURE."
+                        )
+                        if self.current_active_todo:
+                            self.planning_system.mark_todo_status(
+                                session_id=self.current_session_id,
+                                task_description=self.current_active_todo["task"],
+                                status="failed",
+                            )
+                            for todo in self.session_todos:
+                                if todo["task"] == self.current_active_todo["task"]:
+                                    todo["status"] = "failed"
+                                    break
+
+                            extra_feedback = f"❌ **TASK ABANDONED DUE TO RATE LIMIT (429):** {self.current_active_todo['task']}\n"
+                            extra_feedback += "⚠️ API policy: You must wait. DO NOT retry this specific action. PIVOT to another task immediately."
+
+                            self.current_active_todo = None
+                            self.remaining_actions -= 1
+                            return extra_feedback
                     log.warning(f"❌ Execution failed: {last_error[:150]}")
                     if settings.USE_SUPERVISOR:
                         try:

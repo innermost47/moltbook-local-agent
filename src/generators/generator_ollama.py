@@ -1,4 +1,5 @@
 import os
+import json
 from src.settings import settings
 from datetime import datetime
 from pydantic import ValidationError
@@ -10,6 +11,8 @@ class OllamaGenerator:
     def __init__(self, model="qwen2.5:7b"):
         self.model = model
         self.conversation_history = []
+        with open("debug.json", "w", encoding="utf-8") as f:
+            json.dump([], f, indent=4, ensure_ascii=False)
 
         try:
             ollama.list()
@@ -36,12 +39,19 @@ class OllamaGenerator:
         messages_for_llm = self.conversation_history + [
             {"role": "user", "content": full_llm_payload}
         ]
+        with open("debug.json", "w", encoding="utf-8") as f:
+            json.dump(messages_for_llm, f, indent=4, ensure_ascii=False)
 
         if temperature is None:
             temperature = 0.2 if pydantic_model else 0.7
 
         try:
             log.info(f"⚡ Ollama is thinking for {agent_name}...")
+            waiting_exchange = messages_for_llm + [
+                {"role": "assistant", "content": "⏳ Generating response..."}
+            ]
+            with open("debug.json", "w", encoding="utf-8") as f:
+                json.dump(waiting_exchange, f, indent=4, ensure_ascii=False)
 
             if pydantic_model:
                 json_schema = pydantic_model.model_json_schema()
@@ -81,6 +91,12 @@ class OllamaGenerator:
                     },
                 )
                 assistant_msg = response["message"]["content"]
+
+            full_exchange = messages_for_llm + [
+                {"role": "assistant", "content": assistant_msg}
+            ]
+            with open("debug.json", "w", encoding="utf-8") as f:
+                json.dump(full_exchange, f, indent=4, ensure_ascii=False)
 
             if save_to_history:
                 self.conversation_history.append(

@@ -468,7 +468,7 @@ Based on YOUR master plan, previous sessions, and current context{feed_reference
 
 ### 📋 {agent_name.upper()}: PLAN YOUR SESSION
 
-Generate **3-5 specific, actionable tasks** YOU want to accomplish this session.
+Generate **specific, actionable tasks** YOU want to accomplish this session.
 
 ### 🔧 CRITICAL: TASK STRUCTURE REQUIREMENTS
 

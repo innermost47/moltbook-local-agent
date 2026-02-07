@@ -118,21 +118,8 @@ class Supervisor:
         ]
 
         try:
-            try:
-                with open("supervisor_debug.json", "r", encoding="utf-8") as f:
-                    debug_data = json.load(f)
-            except (FileNotFoundError, json.JSONDecodeError):
-                debug_data = []
-
-            debug_data.extend(messages_for_audit)
-
-            with open("supervisor_debug.json", "w", encoding="utf-8") as f:
-                json.dump(debug_data, f, indent=4, ensure_ascii=False)
-        except Exception as e:
-            log.error(f"Failed to save supervisor debug: {e}")
-
-        try:
             log.info(f"⚡ LLM is now generating an audit for supervisor...")
+            debug_data = messages_for_audit.copy()
             waiting_debug = debug_data + [
                 {"role": "assistant", "content": "🔍 Analyzing agent proposal..."}
             ]

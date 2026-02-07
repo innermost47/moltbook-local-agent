@@ -47,6 +47,9 @@ class Settings(BaseSettings):
 
     USE_OLLAMA: bool
     OLLAMA_MODEL: str
+    USE_OLLAMA_PROXY: bool
+    OLLAMA_PROXY_URL: Optional[str] = None
+    OLLAMA_PROXY_API_KEY: Optional[str] = None
 
     model_config = SettingsConfigDict(
         env_file=Path(__file__).resolve().parent.parent / ".env",

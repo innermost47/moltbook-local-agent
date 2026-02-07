@@ -1,9 +1,9 @@
-import os
 import json
+import os
 from src.settings import settings
 from datetime import datetime
 from pydantic import ValidationError
-import ollama
+from ollama import Client
 from src.utils import log
 
 
@@ -11,11 +11,19 @@ class OllamaGenerator:
     def __init__(self, model="qwen2.5:7b"):
         self.model = model
         self.conversation_history = []
+        if settings.USE_OLLAMA_PROXY:
+            proxy_url = getattr(settings, "OLLAMA_PROXY_URL", "http://localhost:8000")
+            api_key = settings.OLLAMA_PROXY_API_KEY
+            self.client = Client(host=proxy_url, headers={"X-API-Key": api_key})
+            log.info(f"🌐 Ollama Generator PROXY mode enabled to {proxy_url}")
+        else:
+            self.client = Client(host="http://localhost:11434")
+            log.info("🏠 LOCAL Mode enabled (Direct Ollama)")
         with open("debug.json", "w", encoding="utf-8") as f:
             json.dump([], f, indent=4, ensure_ascii=False)
 
         try:
-            ollama.list()
+            self.client.list()
             log.success(f"Ollama connected - using model: {model}")
         except Exception as e:
             log.error(f"Ollama connection failed: {e}")
@@ -56,7 +64,7 @@ class OllamaGenerator:
             if pydantic_model:
                 json_schema = pydantic_model.model_json_schema()
 
-                response = ollama.chat(
+                response = self.client.chat(
                     model=self.model,
                     messages=messages_for_llm,
                     format=json_schema,
@@ -82,7 +90,7 @@ class OllamaGenerator:
                     log.warning("⚠️ Using unvalidated output")
 
             else:
-                response = ollama.chat(
+                response = self.client.chat(
                     model=self.model,
                     messages=messages_for_llm,
                     options={
@@ -134,7 +142,7 @@ class OllamaGenerator:
                 {"role": "user", "content": prompt},
             ]
 
-            response = ollama.chat(
+            response = self.client.chat(
                 model=self.model,
                 messages=messages,
                 options={

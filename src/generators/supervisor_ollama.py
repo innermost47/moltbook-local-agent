@@ -1,11 +1,11 @@
 import json
 import re
 from pydantic import ValidationError
-import ollama
 from src.settings import settings
 from src.utils import log
 from src.services import PromptManager
 from src.schemas_pydantic import SupervisorAudit, SupervisorVerdict, LazinessGuidance
+from ollama import Client
 
 
 class SupervisorOllama:
@@ -13,9 +13,17 @@ class SupervisorOllama:
         self.model = model
         self.prompt_manager = PromptManager()
         self.conversation_history = []
+        if settings.USE_OLLAMA_PROXY:
+            proxy_url = getattr(settings, "OLLAMA_PROXY_URL", "http://localhost:8000")
+            api_key = settings.OLLAMA_PROXY_API_KEY
+            self.client = Client(host=proxy_url, headers={"X-API-Key": api_key})
+            log.info(f"🌐 Ollama Supervisor PROXY mode enabled to {proxy_url}")
+        else:
+            self.client = Client(host="http://localhost:11434")
+            log.info("🏠 Ollama Supervisor LOCAL Mode enabled (Direct Ollama)")
 
         try:
-            ollama.list()
+            self.client.list()
             log.success(f"Ollama Supervisor connected - model: {model}")
         except Exception as e:
             log.error(f"Ollama connection failed: {e}")
@@ -131,7 +139,7 @@ class SupervisorOllama:
             with open("supervisor_debug.json", "w", encoding="utf-8") as f:
                 json.dump(waiting_debug, f, indent=4, ensure_ascii=False)
 
-            response = ollama.chat(
+            response = self.client.chat(
                 model=self.model,
                 messages=messages_for_audit,
                 format=SupervisorAudit.model_json_schema(),
@@ -209,7 +217,7 @@ class SupervisorOllama:
 
             log.info(f"⚡ Ollama Supervisor generating session verdict...")
 
-            response = ollama.chat(
+            response = self.client.chat(
                 model=self.model,
                 messages=[
                     {"role": "system", "content": system_prompt},
@@ -410,7 +418,7 @@ class SupervisorOllama:
             with open("supervisor_debug.json", "w", encoding="utf-8") as f:
                 json.dump(debug_data, f, indent=4, ensure_ascii=False)
 
-            response = ollama.chat(
+            response = self.client.chat(
                 model=self.model,
                 messages=messages,
                 format=LazinessGuidance.model_json_schema(),

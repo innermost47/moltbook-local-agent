@@ -145,6 +145,8 @@ DB_PATH=memory.db
 
 USE_OLLAMA=true/false
 OLLAMA_MODEL=qwen2.5:7b
+OLLAMA_PROXY_API_KEY=your api key for the ollama proxy
+USE_OLLAMA_PROXY=true/false
 
 # Neural Supervisor (Optional - Disable for lighter resource usage)
 USE_SUPERVISOR=true  # Set to false to disable the Neural Supervisor and run agent in autonomous mode

@@ -1139,6 +1139,28 @@ class AppSteps:
                 strategic_parts.append(
                     f"\n### 🎯 {self.agent_name.upper()}: EXECUTE YOUR NEXT ACTION\n"
                 )
+
+            logic_check_feedback = ""
+            if self.selected_post_id and not any(
+                a["action_type"] == "publish_public_comment"
+                for a in self.actions_performed
+            ):
+                logic_check_feedback = f"""
+📢 **PROTOCOL NOTICE:** You have successfully locked onto Post ID: `{self.selected_post_id}`.
+You are now in Phase 2/2. Your ONLY logical next step is to use `publish_public_comment`.
+DO NOT use `select_post_to_comment` again; you already have the focus.
+"""
+                strategic_parts.append(logic_check_feedback)
+
+            if self.selected_comment_id and not any(
+                a["action_type"] == "reply_to_comment" for a in self.actions_performed
+            ):
+                logic_check_feedback = f"""
+📢 **PROTOCOL NOTICE:** You are focused on Comment ID: `{self.selected_comment_id}`.
+Phase 2/2 active. Use `reply_to_comment` to execute your response.
+"""
+                strategic_parts.append(logic_check_feedback)
+
             self.current_prompt = "\n".join(strategic_parts)
 
             try:
@@ -1173,7 +1195,7 @@ class AppSteps:
                     ):
 
                         log.error(
-                            f"🔄 LOOP DETECTED: Agent is repeating the same action!"
+                            f"🔄 LOOP DETECTED: Agent is repeating {decision['action_type']}!"
                         )
 
                         last_error = f"""
@@ -1181,13 +1203,19 @@ class AppSteps:
 
 You just attempted EXACTLY THE SAME ACTION as your previous attempt:
 - Action: {decision['action_type']}
-- This action has FAILED {attempt-1} time(s) already
+- Params: {decision.get('action_params')}
 
 **THIS IS A LOGIC LOOP. YOU MUST CHANGE YOUR APPROACH.**
+"""
+                        if "select" in decision["action_type"]:
+                            last_error += """
+⚠️ PROTOCOL VIOLATION:
+You are stuck in Phase 1 (Selection). 
+You have ALREADY selected this target. 
+You MUST now move to Phase 2: use 'publish_public_comment' or 'reply_to_comment'.
+"""
 
-FORBIDDEN ACTIONS (will auto-fail):
-- {decision['action_type']} with these params
-
+                        last_error += f"""
 AVAILABLE ALTERNATIVES:
 {chr(10).join(f"- {t['task']} (action: {t.get('action_type', 'unspecified')})" 
               for t in self.session_todos if t.get('status') not in ['completed', 'failed'])}

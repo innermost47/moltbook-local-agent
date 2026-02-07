@@ -116,6 +116,14 @@
         document.getElementById("supervisor-logs");
       let lastSupervisorJson = "";
 
+      function checkSupervisorStatus(data) {
+        return (
+          data.length === 1 &&
+          data[0].role === "system" &&
+          /Neural Supervisor is disabled/i.test(data[0].content)
+        );
+      }
+
       async function fetchLogs() {
         fetchFile("debug.json", lastJsonString, (data, raw) => {
           lastJsonString = raw;
@@ -124,7 +132,18 @@
 
         fetchFile("supervisor_debug.json", lastSupervisorJson, (data, raw) => {
           lastSupervisorJson = raw;
-          renderLogs(data, supervisorLogsContainer);
+
+          const supervisorPanel = document.querySelector(".panel:last-child");
+          const agentPanel = document.querySelector(".panel:first-child");
+
+          if (checkSupervisorStatus(data)) {
+            supervisorPanel.style.display = "none";
+            agentPanel.style.flex = "1 1 100%";
+          } else {
+            supervisorPanel.style.display = "flex";
+            agentPanel.style.flex = "1";
+            renderLogs(data, supervisorLogsContainer);
+          }
         });
 
         lastUpdateSpan.innerText = new Date().toLocaleTimeString();

@@ -105,6 +105,7 @@ class AppSteps:
             f"**TASKS:** {', '.join([t['task'] for t in self.session_todos])}\n\n"
         )
         pending_confirmation += f"\n\n---  \n\n"
+        self.remaining_actions = len(self.session_todos)
         while self.remaining_actions > 0:
             pending_confirmation = self._perform_autonomous_action(
                 extra_feedback=pending_confirmation

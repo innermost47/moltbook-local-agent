@@ -440,14 +440,11 @@ Output your Master Plan in JSON format, then execute your first strategic action
         dynamic_context: str = "",
     ):
         if dynamic_context:
-            feed_section = f"""
-{dynamic_context}
-
-"""
-            feed_reference = ", the feed above, and the available actions listed below"
+            feed_section = f"## 🌍 CURRENT FEED STATE\n{dynamic_context}\n"
+            feed_reference = ", the feed above, and the available actions"
         else:
             feed_section = ""
-            feed_reference = " and the available actions listed below"
+            feed_reference = " and the available actions"
 
         return f"""{master_plan_success_prompt}
 ## 🚀 NEW SESSION INITIALIZED
@@ -463,10 +460,11 @@ Output your Master Plan in JSON format, then execute your first strategic action
 
 ✅ **MASTER PLAN ACTIVE**
 
-Based on YOUR master plan, previous sessions, current context{feed_reference}:
+Based on YOUR master plan, previous sessions, and current context{feed_reference}:
 **Create a concrete to-do list for THIS specific session.**
 
 ---
+
 
 ### 📋 {agent_name.upper()}: PLAN YOUR SESSION
 
@@ -475,14 +473,17 @@ Generate **3-5 specific, actionable tasks** YOU want to accomplish this session.
 ### 🔧 CRITICAL: TASK STRUCTURE REQUIREMENTS
 
 Each task MUST include:
+
 1. **task**: Short, human-readable goal (max 80 characters)
 2. **action_type**: The EXACT action you will execute
 3. **action_params**: The specific parameters (fill in what you know NOW)
 4. **priority**: 1-5 stars (5 = highest priority)
 
+
 ### 🎯 YOUR AVAILABLE ACTIONS
 
 **Moltbook Actions:**
+
 - `select_post_to_comment` (params: post_id)
 - `select_comment_to_reply` (params: post_id, comment_id)
 - `publish_public_comment` (params: post_id, content) [AFTER select_post_to_comment]
@@ -492,197 +493,54 @@ Each task MUST include:
 - `follow_agent` (params: agent_name, follow_type)
 
 **Web Actions:**
+
 - `web_scrap_for_links` (params: web_domain, web_query)
 - `web_fetch` (params: web_url)
 
 **Memory Actions:**
+
 - `memory_store` (params: memory_category, memory_content)
 - `memory_retrieve` (params: memory_category, memory_limit)
 
 **Blog Actions:**
+
 - `write_blog_article` (params: title, excerpt, content, image_prompt)
 - `share_created_blog_post_url` (params: title, share_link_url)
 
 **Planning Actions:**
-- `update_todo_status` (params: todo_task, todo_status)
+
+- `update_todo_status` (params: todo_task, todo_status) 
 
 ---
 
-### ✅ GOOD TASK EXAMPLES
-
-**Example 1: Web research with specific domain**
+### ✅ MANDATORY STRATEGIC EXAMPLE (FULL SESSION)
 ```json
 {{
-  "task": "Research AI safety frameworks",
-  "action_type": "web_scrap_for_links",
-  "action_params": {{
-    "web_domain": "example-research-site.com",
-    "web_query": "AI alignment"
-  }},
-  "priority": 5
+  "reasoning": "Establishing authority via long-form content while maintaining high engagement in the feed.",
+  "tasks": [
+    {{ "task": "Write technical audit blog", "action_type": "write_blog_article", "action_params": {{ "title": "Protocol Alpha", "content": "..." }}, "priority": 5 }},
+    {{ "task": "Share blog link on Moltbook", "action_type": "share_created_blog_post_url", "action_params": {{ "title": "New Protocol Audit", "share_link_url": "AUTO_GENERATED" }}, "priority": 5 }},
+    {{ "task": "Create standalone debate post", "action_type": "create_post", "action_params": {{ "title": "The future of Agentic AI", "submolt": "tech" }}, "priority": 4 }},
+    {{ "task": "Select first feed post for critique", "action_type": "select_post_to_comment", "action_params": {{ "post_id": "uuid-feed-1" }}, "priority": 5 }},
+    {{ "task": "Publish critique on first post", "action_type": "publish_public_comment", "action_params": {{ "post_id": "uuid-feed-1", "content": "Logic flaw detected..." }}, "priority": 5 }},
+    {{ "task": "Select second feed post for reply", "action_type": "select_comment_to_reply", "action_params": {{ "post_id": "uuid-feed-2", "comment_id": "uuid-comm-2" }}, "priority": 4 }},
+    {{ "task": "Reply to second post", "action_type": "reply_to_comment", "action_params": {{ "post_id": "uuid-feed-2", "comment_id": "uuid-comm-2", "content": "I concur with your assessment." }}, "priority": 4 }}
+  ]
 }}
-```
 
-**Example 2: Comment on specific post from feed**
-```json
-{{
-  "task": "Comment on trending ML discussion",
-  "action_type": "select_post_to_comment",
-  "action_params": {{
-    "post_id": "abc12345-6789-def0-1234-56789abcdef0"
-  }},
-  "priority": 4
-}}
-```
-
-**Example 3: Store insights in memory**
-```json
-{{
-  "task": "Store research insights",
-  "action_type": "memory_store",
-  "action_params": {{
-    "memory_category": "learnings"
-  }},
-  "priority": 3
-}}
-```
-
-**Example 4: Vote on post**
-```json
-{{
-  "task": "Upvote quality technical post",
-  "action_type": "vote_post",
-  "action_params": {{
-    "post_id": "xyz98765-4321-fedc-ba09-876543210fed",
-    "vote_type": "upvote"
-  }},
-  "priority": 2
-}}
-```
-
-**Example 5: Multi-step sequence (select THEN comment)**
-```json
-[
-  {{
-    "task": "Select post to analyze",
-    "action_type": "select_post_to_comment",
-    "action_params": {{
-      "post_id": "post123-4567-89ab-cdef-0123456789ab"
-    }},
-    "priority": 5
-  }},
-  {{
-    "task": "Write detailed technical analysis",
-    "action_type": "publish_public_comment",
-    "action_params": {{
-      "post_id": "post123-4567-89ab-cdef-0123456789ab"
-    }},
-    "priority": 5
-  }}
-]
-```
-
-**Example 6: Fetch specific article**
-```json
-{{
-  "task": "Analyze paper on neural networks",
-  "action_type": "web_fetch",
-  "action_params": {{
-    "web_url": "https://research-archive.org/papers/neural-2024"
-  }},
-  "priority": 4
-}}
-```
-
-**Example 7: Reply to specific comment**
-```json
-{{
-  "task": "Reply to technical question",
-  "action_type": "select_comment_to_reply",
-  "action_params": {{
-    "post_id": "def45678-90ab-cdef-0123-456789abcdef",
-    "comment_id": "com98765-4321-fedc-ba09-876543210abc"
-  }},
-  "priority": 3
-}}
-```
-
-**Example 8: Create new post**
-```json
-{{
-  "task": "Share findings on agent architecture",
-  "action_type": "create_post",
-  "action_params": {{
-    "submolt": "research"
-  }},
-  "priority": 4
-}}
-```
-
----
-
-### ❌ BAD TASK EXAMPLES (WILL CAUSE AUTO-COMPLETION TO FAIL)
-
-**Too vague - no action_type:**
-```json
-{{
-  "task": "Do some research",
-  "priority": 3
-}}
-```
-
-**Wrong format - action_type in task name:**
-```json
-{{
-  "task": "web_scrap_for_links: example.com - search query",
-  "action_type": "web_scrap_for_links",
-  "priority": 5
-}}
-```
-
-**Missing key parameters:**
-```json
-{{
-  "task": "Comment on something",
-  "action_type": "publish_public_comment",
-  "action_params": {{}},
-  "priority": 4
-}}
 ```
 
 ---
 
 ### 🧠 STRATEGIC PLANNING GUIDELINES
 
-1. **Be specific with IDs**: If you see post_ids or comment_ids in the feed above, USE THEM in your action_params
-2. **Respect action limits**: You have ~10 actions total - plan accordingly
-3. **Sequence multi-step actions**: 
-   - To comment on a post: First `select_post_to_comment`, THEN `publish_public_comment`
-   - To reply to a comment: First `select_comment_to_reply`, THEN `reply_to_comment`
-4. **Prioritize strategically**: 
-   - Priority 5 = Directly advances Master Plan milestones
-   - Priority 3-4 = Important but not critical
-   - Priority 1-2 = Nice to have if time permits
-5. **Fill action_params with specifics**: The more precise your parameters NOW, the more reliable auto-completion will be
+1. **BLOG-SHARE SYNC**: Never write an article without sharing it.
+2. **FEED ENGAGEMENT**: Always interact with at least 2 distinct sources from the current feed.
+3. **2-STEP RULE**: Standalone comments are FORBIDDEN. Always `select` before you `publish`.
+4. **ID SYNCHRONIZATION**: Use the real UUIDs provided in the feed above.
+5. **NO PLACEHOLDERS**: Use real technical content and precise parameters.
 
----
-
-### ⚠️ TASK FORMAT RULES
-
-**Required fields:**
-- **task**: What you want to achieve (max 80 chars) - e.g., "Research AI frameworks", "Comment on security post"
-- **action_type**: The exact action name - e.g., "web_scrap_for_links", "select_post_to_comment"
-- **action_params**: Specific parameters you know NOW - e.g., {{"web_domain": "example.com", "post_id": "abc123..."}}
-- **priority**: 1-5 (higher = more important)
-
-**Quality guidelines:**
-- ✅ **task** describes the GOAL ("Research AI safety")
-- ✅ **action_type** specifies the METHOD ("web_scrap_for_links")
-- ✅ **action_params** contains the DETAILS ({{"web_domain": "example.com"}})
-- ❌ Don't repeat domain/IDs in both task AND action_params
-- ❌ Don't write action_type syntax in the task description
-
-**YOU have {agent_name}'s full strategic autonomy. Plan wisely.**
+**YOU have {agent_name}'s full strategic autonomy. Plan the sequence. Execute the mission.**
 """
 
     def get_update_master_plan_prompt(self, agent_name: str, plan_json, summary: dict):

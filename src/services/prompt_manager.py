@@ -731,13 +731,23 @@ Respond in first person: "I should update..." or "I will keep..."
 
         if pending_todos:
             todo_section += "#### 📋 REMAINING TO-DO TASKS:\n"
-            todo_section += chr(10).join(f"- {t['task']}" for t in pending_todos)
+            for todo in pending_todos:
+                action_hint = (
+                    f" (action: {todo.get('action_type', 'unspecified')})"
+                    if todo.get("action_type")
+                    else ""
+                )
+                todo_section += f"- {todo['task']}{action_hint}\n"
         else:
-            todo_section += "#### 🎉 ALL TASKS COMPLETED!"
+            todo_section += "#### 🎉 ALL TASKS COMPLETED!\n"
 
         if completed_todos:
-            todo_section += "\n\n#### ✅ COMPLETED THIS SESSION:\n"
-            todo_section += chr(10).join(f"✅ {t['task']}" for t in completed_todos)
+            todo_section += "\n#### ✅ COMPLETED THIS SESSION:\n"
+            for todo in completed_todos:
+                action_hint = (
+                    f" ({todo.get('action_type')})" if todo.get("action_type") else ""
+                )
+                todo_section += f"✅ {todo['task']}{action_hint}\n"
 
         return f"""
 #### 📊 YOUR SESSION STATUS

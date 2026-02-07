@@ -763,6 +763,7 @@ class AppSteps:
         max_attempts = 3
         last_error = None
         decision = None
+        last_decision = None
 
         status_nudge = self.prompt_manager.get_status_nudge(
             remaining_actions=self.remaining_actions,
@@ -810,7 +811,23 @@ class AppSteps:
                 )
 
             if attempt > 1:
-                strategic_parts.append(f"\n#### ⚠️ REJECTION/FAILURE:\n{last_error}\n")
+                strategic_parts.append(
+                    f"""
+#### 🚨 CRITICAL ERROR - ATTEMPT {attempt}/3 FAILED
+
+**YOUR LAST ACTION WAS REJECTED:**
+{last_error}
+
+⚠️ **MANDATORY NEXT STEP:**
+- DO NOT repeat the action '{decision.get('action_type') if decision else 'N/A'}'
+- READ the error message above CAREFULLY
+- CHOOSE A DIFFERENT ACTION TYPE from your available actions
+- OR pivot to a different TODO from your list:
+{chr(10).join(f"  - {t['task']}" for t in self.session_todos if t.get('status') != 'completed')}
+
+**If you attempt the same action again, you will waste another attempt.**
+"""
+                )
 
             strategic_parts.append(
                 f"\n### 🎯 {self.agent_name.upper()}: EXECUTE YOUR NEXT ACTION\n"
@@ -827,7 +844,40 @@ class AppSteps:
                 self.generator.trim_history()
                 content = result["choices"][0]["message"]["content"]
                 content = re.sub(r"```json\s*|```\s*", "", content).strip()
+                content = re.sub(r"```json\s*|```\s*", "", content).strip()
                 decision = json.loads(content)
+
+                if attempt > 1 and last_decision:
+                    if decision["action_type"] == last_decision[
+                        "action_type"
+                    ] and decision.get("action_params") == last_decision.get(
+                        "action_params"
+                    ):
+
+                        log.error(
+                            f"🔄 LOOP DETECTED: Agent is repeating the same action!"
+                        )
+
+                        last_error = f"""
+🚨 CRITICAL LOOP DETECTED 🚨
+
+You just attempted EXACTLY THE SAME ACTION as your previous attempt:
+- Action: {decision['action_type']}
+- This action has FAILED {attempt-1} time(s) already
+
+**THIS IS A LOGIC LOOP. YOU MUST CHANGE YOUR APPROACH.**
+
+FORBIDDEN ACTIONS (will auto-fail):
+- {decision['action_type']} with these params
+
+AVAILABLE ALTERNATIVES:
+{chr(10).join(f"- {t['task']} (action: {t.get('action_type', 'unspecified')})" 
+              for t in self.session_todos if t.get('status') != 'completed')}
+
+**Choose a DIFFERENT action type or use TERMINATE_SESSION.**
+"""
+                        last_decision = decision
+                        continue
 
                 if settings.USE_SUPERVISOR:
                     audit_report = self.supervisor.audit(
@@ -957,6 +1007,35 @@ class AppSteps:
                 last_error = f"JSON Syntax Error: {str(e)}"
                 log.error(last_error)
                 continue
+
+        if decision and last_error:
+            log.error(
+                f"❌ Action '{decision['action_type']}' failed after 3 attempts. FORCING PIVOT."
+            )
+
+            extra_feedback = f"""
+🚨 **CRITICAL FAILURE** 🚨
+
+Your action '{decision['action_type']}' was rejected/failed 3 times in a row.
+
+**THIS ACTION IS NOW FORBIDDEN for the rest of this session.**
+
+**REMAINING TODOs:**
+{chr(10).join(f"- {t['task']}" for t in self.session_todos if t.get('status') != 'completed')}
+
+**OPTIONS:**
+1. Choose a DIFFERENT TODO from the list above
+2. Use TERMINATE_SESSION if no productive actions remain
+
+**You have {self.remaining_actions} action points left.**
+"""
+
+            self.remaining_actions -= 1
+            log.info(
+                f"Action cost: 1 point (failed). Remaining: {self.remaining_actions}"
+            )
+
+            return extra_feedback
 
         if decision:
             self.remaining_actions -= 1

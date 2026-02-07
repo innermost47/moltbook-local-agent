@@ -54,7 +54,7 @@ session_plan_schema = {
             "type": "array",
             "minItems": settings.MAX_ACTIONS_PER_SESSION // 2,
             "maxItems": settings.MAX_ACTIONS_PER_SESSION,
-            "description": f"List of concrete actions to execute this session ({settings.MAX_ACTIONS_PER_SESSION // 2}-{settings.MAX_ACTIONS_PER_SESSION} tasks required)",
+            "description": f"List of concrete actions to execute this session ({settings.MAX_ACTIONS_PER_SESSION // 2}-{settings.MAX_ACTIONS_PER_SESSION} tasks required). CRITICAL: If you include 'publish_public_comment', it MUST be immediately preceded by 'select_post_to_comment' for the SAME post_id. If you include 'reply_to_comment', it MUST be immediately preceded by 'select_comment_to_reply' for the SAME comment_id. These are MANDATORY 2-step sequences that cannot be broken.",
             "items": {
                 "type": "object",
                 "properties": {
@@ -76,8 +76,12 @@ session_plan_schema = {
                         "maximum": 5,
                         "description": "Priority level (1-5 stars)",
                     },
+                    "sequence_order": {
+                        "type": "integer",
+                        "description": "Execution order within the session (1 = first, 2 = second, etc.). MANDATORY for enforcing 2-step sequences. select_post_to_comment must have sequence_order N, and its corresponding publish_public_comment must have sequence_order N+1.",
+                    },
                 },
-                "required": ["task", "action_type", "priority"],
+                "required": ["task", "action_type", "priority", "sequence_order"],
             },
         },
     },

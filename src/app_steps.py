@@ -1,4 +1,5 @@
 import json
+from typing import List
 import time
 import random
 import re
@@ -519,18 +520,22 @@ class AppSteps:
             log.info(f"[PLAN REASONING]: {plan_data.get('reasoning', 'N/A')}")
 
             tasks = plan_data.get("tasks", [])
-            if tasks:
+            validated_tasks = self._validate_and_fix_2step_rule(tasks)
+            if validated_tasks:
                 log.info(f"Session TO-DO LIST:")
-                for i, task in enumerate(tasks, 1):
+                for i, task in enumerate(validated_tasks, 1):
                     priority = "⭐" * task.get("priority", 1)
                     action_type = task.get("action_type", "unspecified")
-                    log.info(f"  {i}. [{priority}] {task.get('task')} ({action_type})")
+                    sequence = task.get("sequence_order", i)
+                    log.info(
+                        f"  {sequence}. [{priority}] {task.get('task')} ({action_type})"
+                    )
 
                 self.planning_system.create_session_todos(
-                    session_id=self.current_session_id, tasks=tasks
+                    session_id=self.current_session_id, tasks=validated_tasks
                 )
 
-                self.session_todos = tasks
+                self.session_todos = validated_tasks
 
                 todo_context = "\n\n## 📋 YOUR SESSION TO-DO LIST\n\n"
                 for task in tasks:
@@ -575,6 +580,109 @@ class AppSteps:
             log.error(f"Traceback:\n{traceback.format_exc()}")
 
             self.session_todos = []
+
+    def _validate_and_fix_2step_rule(self, tasks: List[dict]) -> List[dict]:
+        sorted_tasks = sorted(tasks, key=lambda x: x.get("sequence_order", 999))
+
+        violations = []
+
+        for i, task in enumerate(sorted_tasks):
+            action_type = task.get("action_type")
+
+            if action_type == "publish_public_comment":
+                post_id = task.get("action_params", {}).get("post_id")
+
+                if i == 0:
+                    violations.append(
+                        f"❌ Task {i+1}: 'publish_public_comment' cannot be first - missing 'select_post_to_comment'"
+                    )
+                else:
+                    prev_task = sorted_tasks[i - 1]
+                    if prev_task.get("action_type") != "select_post_to_comment":
+                        violations.append(
+                            f"❌ Task {i+1}: 'publish_public_comment' must be preceded by 'select_post_to_comment'"
+                        )
+                    elif prev_task.get("action_params", {}).get("post_id") != post_id:
+                        violations.append(
+                            f"❌ Task {i+1}: 'publish_public_comment' post_id mismatch with previous select"
+                        )
+
+            elif action_type == "reply_to_comment":
+                comment_id = task.get("action_params", {}).get("comment_id")
+
+                if i == 0:
+                    violations.append(
+                        f"❌ Task {i+1}: 'reply_to_comment' cannot be first - missing 'select_comment_to_reply'"
+                    )
+                else:
+                    prev_task = sorted_tasks[i - 1]
+                    if prev_task.get("action_type") != "select_comment_to_reply":
+                        violations.append(
+                            f"❌ Task {i+1}: 'reply_to_comment' must be preceded by 'select_comment_to_reply'"
+                        )
+                    elif (
+                        prev_task.get("action_params", {}).get("comment_id")
+                        != comment_id
+                    ):
+                        violations.append(
+                            f"❌ Task {i+1}: 'reply_to_comment' comment_id mismatch with previous select"
+                        )
+
+        if violations:
+            log.error("🚨 2-STEP RULE VIOLATIONS DETECTED IN SESSION PLAN:")
+            for violation in violations:
+                log.error(f"  {violation}")
+
+            log.warning("⚠️ AUTO-FIXING: Removing violating tasks and re-ordering...")
+
+            fixed_tasks = []
+            i = 0
+            while i < len(sorted_tasks):
+                task = sorted_tasks[i]
+                action_type = task.get("action_type")
+
+                if action_type == "publish_public_comment":
+                    if (
+                        i > 0
+                        and sorted_tasks[i - 1].get("action_type")
+                        == "select_post_to_comment"
+                    ):
+                        fixed_tasks.append(sorted_tasks[i - 1])
+                        fixed_tasks.append(task)
+                        i += 1
+                    else:
+                        log.warning(f"  Removed orphan: {task.get('task')}")
+
+                elif action_type == "reply_to_comment":
+                    if (
+                        i > 0
+                        and sorted_tasks[i - 1].get("action_type")
+                        == "select_comment_to_reply"
+                    ):
+                        fixed_tasks.append(sorted_tasks[i - 1])
+                        fixed_tasks.append(task)
+                        i += 1
+                    else:
+                        log.warning(f"  Removed orphan: {task.get('task')}")
+
+                elif action_type not in [
+                    "select_post_to_comment",
+                    "select_comment_to_reply",
+                ]:
+                    fixed_tasks.append(task)
+
+                i += 1
+
+            for idx, task in enumerate(fixed_tasks, 1):
+                task["sequence_order"] = idx
+
+            log.success(
+                f"✅ Auto-fix complete: {len(fixed_tasks)}/{len(sorted_tasks)} tasks retained"
+            )
+            return fixed_tasks
+
+        log.success("✅ 2-STEP RULE: All sequences valid")
+        return sorted_tasks
 
     def _update_master_plan_if_needed(self, summary: dict):
         current_plan = self.planning_system.get_active_master_plan()
@@ -779,14 +887,15 @@ class AppSteps:
                 if t.get("status") not in ["completed", "failed"]
             ]
             if pending_todos:
-                self.current_active_todo = max(
-                    pending_todos, key=lambda x: x.get("priority", 1)
+                self.current_active_todo = min(
+                    pending_todos, key=lambda x: x.get("sequence_order", 999)
                 )
                 log.info(f"🎯 FOCUSING ON: {self.current_active_todo['task']}")
 
         for attempt in range(1, max_attempts + 1):
             heavy_payload = ""
             strategic_parts = []
+            attempts_left = (max_attempts - attempt) + 1
             if self.focused_context_active:
                 focused_context = self._get_focused_post_context(
                     self.selected_post_id, self.selected_comment_id
@@ -811,7 +920,6 @@ class AppSteps:
                 strategic_parts.append(f"{extra_feedback}")
 
             if attempt > 1:
-                attempts_left = (max_attempts - attempt) + 1
                 critical_error_block = f"""
 ╔══════════════════════════════════════════════════════════════╗
 ║  🚨 CRITICAL ERROR - ATTEMPT {attempt}/3 FAILED

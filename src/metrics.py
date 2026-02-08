@@ -1,10 +1,5 @@
-from src.settings import settings
-
-
 class Metrics:
-    def _calculate_session_metrics(self, remaining_actions, actions_performed):
-        total_actions = settings.MAX_ACTIONS_PER_SESSION - remaining_actions
-
+    def _calculate_session_metrics(self, actions_performed, total_actions):
         supervisor_rejections = sum(
             1 for action in actions_performed if "[REJECTED]" in action
         )

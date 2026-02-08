@@ -172,7 +172,8 @@ class AppSteps:
         log.info(f"[LEARNINGS]: {summary.get('learnings', 'N/A')}")
 
         session_metrics = self.metrics._calculate_session_metrics(
-            self.remaining_actions, self.actions_performed
+            self.actions_performed,
+            total_actions=required_actions,
         )
 
         supervisor_verdict_text = None

@@ -118,12 +118,21 @@ class AppSteps:
             dynamic_context="" if master_plan_just_created else dynamic_context,
             last_publication_status=last_pub_status,
         )
+        required_actions = self._calculate_required_actions()
+        self.remaining_actions = int(required_actions * 1.3)
+
+        log.info(
+            f"📊 Session plan: {len(self.session_todos)} tasks requiring ~{required_actions} actions"
+        )
+        log.info(
+            f"🎯 Action budget allocated: {self.remaining_actions} (with 30% safety margin)"
+        )
+
         pending_confirmation = "### ✅ SESSION PLAN LOADED\n"
         pending_confirmation += (
             f"**TASKS:** {', '.join([t['task'] for t in self.session_todos])}\n\n"
         )
-        pending_confirmation += f"\n\n---  \n\n"
-        self.remaining_actions = len(self.session_todos)
+
         while self.remaining_actions > 0:
             pending_confirmation = self._perform_autonomous_action(
                 extra_feedback=pending_confirmation
@@ -218,6 +227,26 @@ class AppSteps:
         )
 
         log.info("=== SESSION END ===")
+
+    def _calculate_required_actions(self):
+        required_actions = 0
+
+        for todo in self.session_todos:
+            action_type = todo.get("action_type")
+
+            two_step_actions = [
+                "select_post_to_comment",
+                "publish_public_comment",
+                "select_comment_to_reply",
+                "reply_to_comment",
+            ]
+
+            if action_type in two_step_actions:
+                required_actions += 1
+            else:
+                required_actions += 1
+
+        return required_actions
 
     def get_context(self):
         me = self.api.get_me()

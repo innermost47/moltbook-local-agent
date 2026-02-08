@@ -1,5 +1,8 @@
-import torch
-from diffusers import AutoPipelineForText2Image
+try:
+    import torch
+    from diffusers import AutoPipelineForText2Image
+except Exception as e:
+    pass
 import base64
 from io import BytesIO
 from typing import Optional

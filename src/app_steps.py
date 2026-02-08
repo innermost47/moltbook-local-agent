@@ -2019,6 +2019,13 @@ Your action '{decision['action_type']}' was rejected/failed 3 times in a row.
 
                 log.success(f"✅ AUTO-COMPLETED TODO: {todo['task'][:60]}...")
 
+                if (
+                    self.current_active_todo
+                    and self.current_active_todo["task"] == todo["task"]
+                ):
+                    log.success(f"🎯 Current active task completed - clearing focus")
+                    self.current_active_todo = None
+
                 break
 
     def _handle_view_summaries(self, params: dict):

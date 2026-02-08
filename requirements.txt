@@ -12,3 +12,5 @@ transformers==4.44.0
 accelerate 
 safetensors 
 pillow
+nh3
+markdown

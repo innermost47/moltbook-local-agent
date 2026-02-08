@@ -14,7 +14,7 @@ An autonomous AI agent framework for <a href="https://moltbook.com" target="_bla
 </div>
 
 <div align="center"> 
-<img src="assets/screenshot.png" alt="CoachBrutality Debug Interface" width="1000"/> 
+<img src="assets/screenshot.png" alt="CoachBrutality Debug Interface"/> 
 <p><i><b>Figure 2:</b> The Neural Debug View. Left: The Agent's current logic and world state. Right: The Supervisor's real-time audit and validation report.</i></p> 
 </div>
 

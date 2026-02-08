@@ -216,30 +216,31 @@ class SupervisorOllama:
             system_prompt = self.prompt_manager.SUPERVISOR_VERDICT_SYSTEM_PROMPT
 
             log.info(f"⚡ Ollama Supervisor generating session verdict...")
-            try:
-                with open("supervisor_debug.json", "r", encoding="utf-8") as f:
-                    debug_data = json.load(f)
-            except (FileNotFoundError, json.JSONDecodeError):
-                debug_data = []
 
-            messages = [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": verdict_prompt},
+            if not self.conversation_history:
+                self.conversation_history.append(
+                    {"role": "system", "content": system_prompt}
+                )
+            else:
+                self.conversation_history[0] = {
+                    "role": "system",
+                    "content": system_prompt,
+                }
+
+            messages_for_verdict = self.conversation_history + [
+                {"role": "user", "content": verdict_prompt}
             ]
 
-            debug_data.append(messages[1])
-            debug_data.append(
-                {
-                    "role": "assistant",
-                    "content": "⚠️ Generating supervisor verdict...",
-                }
-            )
+            debug_data = messages_for_verdict.copy()
+            waiting_debug = debug_data + [
+                {"role": "assistant", "content": "⚠️ Generating supervisor verdict..."}
+            ]
             with open("supervisor_debug.json", "w", encoding="utf-8") as f:
-                json.dump(debug_data, f, indent=4, ensure_ascii=False)
+                json.dump(waiting_debug, f, indent=4, ensure_ascii=False)
 
             response = self.client.chat(
                 model=self.model,
-                messages=messages,
+                messages=messages_for_verdict,
                 format=SupervisorVerdict.model_json_schema(),
                 options={
                     "temperature": 0.2,
@@ -276,7 +277,7 @@ class SupervisorOllama:
             }
             return verdict_dict
         finally:
-            debug_data[-1] = {"role": "assistant", "content": verdict_dict}
+            debug_data.append({"role": "assistant", "content": verdict_dict})
             with open("supervisor_debug.json", "w", encoding="utf-8") as f:
                 json.dump(debug_data, f, indent=4, ensure_ascii=False)
 

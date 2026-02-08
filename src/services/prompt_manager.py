@@ -589,6 +589,43 @@ Respond in first person: "I should update..." or "I will keep..."
         session_todos: List[dict],
         current_active_todo=None,
     ):
+        pending_todos = [
+            t for t in session_todos if t.get("status") not in ["completed", "failed"]
+        ]
+
+        final_action_warning = ""
+        if remaining_actions == 1:
+            if len(pending_todos) == 1:
+                final_action_warning = """
+╔══════════════════════════════════════════════════════════════╗
+║  🎯 FINAL TASK - FINAL ACTION
+╚══════════════════════════════════════════════════════════════╝
+
+**THIS IS YOUR LAST MOVE:**
+- Remaining actions: 1
+- Remaining tasks: 1
+
+**CRITICAL:** Get it right on the first attempt. No room for errors.
+Session ends after this action.
+
+---
+
+"""
+            else:
+                final_action_warning = f"""
+╔══════════════════════════════════════════════════════════════╗
+║  ⚠️ FINAL ACTION POINT
+╚══════════════════════════════════════════════════════════════╝
+
+**THIS IS YOUR LAST ACTION:**
+- You have {len(pending_todos)} pending tasks but only 1 action left
+- Choose the HIGHEST PRIORITY task from your TODO list
+- Session will end after this action
+
+---
+
+"""
+
         supervisor_section = ""
         if settings.USE_SUPERVISOR:
             supervisor_section = f"""
@@ -656,6 +693,7 @@ Respond in first person: "I should update..." or "I will keep..."
                 todo_section += f"✅ {todo['task']}{action_hint}\n"
 
         return f"""
+{final_action_warning}
 #### 📊 YOUR SESSION STATUS
 - YOU have {remaining_actions} action points remaining
 - Moltbook post: {'✅ YOU can still create one' if not post_creation_attempted else '❌ YOU already published'}

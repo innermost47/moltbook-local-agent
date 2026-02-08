@@ -126,7 +126,9 @@ class AppSteps:
             agent_name=self.agent_name, actions_performed=self.actions_performed
         )
         summary_raw = self.generator.generate_session_summary(
-            self.current_prompt, pydantic_model=SessionSummary
+            self.current_prompt,
+            pydantic_model=SessionSummary,
+            agent_name=self.agent_name,
         )
 
         summary_raw = re.sub(r"```json\s*|```\s*", "", summary_raw).strip()

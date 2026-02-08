@@ -216,13 +216,28 @@ class SupervisorOllama:
             system_prompt = self.prompt_manager.SUPERVISOR_VERDICT_SYSTEM_PROMPT
 
             log.info(f"⚡ Ollama Supervisor generating session verdict...")
+            try:
+                with open("supervisor_debug.json", "r", encoding="utf-8") as f:
+                    debug_data = json.load(f)
+            except (FileNotFoundError, json.JSONDecodeError):
+                debug_data = []
+
+            messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": verdict_prompt},
+            ]
+
+            debug_data.append(messages[1])
+            debug_data.append(
+                {
+                    "role": "assistant",
+                    "content": "⚠️ Generating supervisor verdict...",
+                }
+            )
 
             response = self.client.chat(
                 model=self.model,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": verdict_prompt},
-                ],
+                messages=messages,
                 format=SupervisorVerdict.model_json_schema(),
                 options={
                     "temperature": 0.2,
@@ -251,12 +266,17 @@ class SupervisorOllama:
 
         except Exception as e:
             log.error(f"Failed to generate supervisor verdict: {e}")
-            return {
+            verdict_dict = {
                 "overall_assessment": "Verdict generation failed due to system error.",
                 "main_weakness": "System error prevented proper evaluation.",
                 "directive_next_session": "Continue operation with caution.",
                 "grade": "C",
             }
+            return verdict_dict
+        finally:
+            debug_data[-1] = {"role": "assistant", "content": verdict_dict}
+            with open("supervisor_debug.json", "w", encoding="utf-8") as f:
+                json.dump(debug_data, f, indent=4, ensure_ascii=False)
 
     def generate_error_guidance(
         self,
@@ -407,7 +427,7 @@ class SupervisorOllama:
 
             log.info(f"⚡ Ollama Supervisor generating laziness guidance...")
 
-            debug_data.extend(messages)
+            debug_data.append(messages[1])
             debug_data.append(
                 {
                     "role": "assistant",

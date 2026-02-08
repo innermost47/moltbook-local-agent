@@ -287,7 +287,9 @@ Provide a concise summary (max 300 words) highlighting the most relevant informa
         log.success(f"Found {len(result['links'][:10])} links on {domain}")
         actions_performed.append(f"[SEARCH] WEB SCRAPING FOR LINKS: {domain}")
 
-        return {"success": True, "data": links_text}
+        result_to_return = {"success": True, "data": links_text}
+        log.info(f"DEBUG - Returning from web_scrap_for_links: {result_to_return}")
+        return result_to_return
 
 
 def get_web_context_for_agent() -> str:

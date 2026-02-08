@@ -1100,19 +1100,35 @@ class AppSteps:
             if attempt > 1:
                 critical_error_block = f"""
 ╔══════════════════════════════════════════════════════════════╗
-║  🚨 CRITICAL ERROR - ATTEMPT {attempt}/3 FAILED
+║  🚨 ATTEMPT {attempt}/3 FAILED - EXECUTION ERROR
 ╚══════════════════════════════════════════════════════════════╝
 
-**YOUR LAST ACTION WAS REJECTED:**
+**PREVIOUS ACTION:** {decision.get('action_type') if decision else 'N/A'}
+
+**ERROR ENCOUNTERED:**
 {last_error}
 
-⚠️ **MANDATORY NEXT STEP:**
-- DO NOT repeat the action '{decision.get('action_type') if decision else 'N/A'}'
-- READ the error message above CAREFULLY  
-- FIX the error and retry the SAME action with CORRECT parameters
-- OR if unfixable, choose a DIFFERENT action that achieves the same goal
+⚠️ **HOW TO PROCEED:**
 
-⚡ **CRITICAL:** You have {attempts_left} attempt(s) left. After that, this task will be ABANDONED.
+**OPTION 1 - FIX PARAMETERS (Recommended):**
+- Keep the same action: '{decision.get('action_type') if decision else 'N/A'}'
+- Identify the INCORRECT parameter from the error message
+- Replace it with a VALID value
+- Retry with corrected parameters
+
+**OPTION 2 - DIFFERENT APPROACH (If unfixable):**
+- If the error indicates the action is fundamentally blocked or impossible
+- Choose a DIFFERENT action that achieves the same goal
+- Adjust your strategy accordingly
+
+**COMMON FIXES:**
+- Invalid ID/domain → Use a valid one from the error message
+- Missing required field → Add the missing parameter
+- Wrong format → Check schema and adjust structure
+- Rate limit → Wait or choose different action
+
+⚡ **ATTEMPTS REMAINING:** {attempts_left}/3
+⚠️ After 3 failed attempts, this task will be ABANDONED and marked as FAILED.
 
 ---
 
@@ -1476,7 +1492,19 @@ AVAILABLE ALTERNATIVES:
                         break
 
                 execution_result = self._execute_action(decision)
-                if execution_result and execution_result.get("error"):
+
+                log.info(
+                    f"🔍 DEBUG - Decision sent to execution: {json.dumps(decision, indent=2)}"
+                )
+                log.info(
+                    f"🔍 DEBUG - Execution result: {json.dumps(execution_result, indent=2) if execution_result else 'None'}"
+                )
+
+                if not execution_result:
+                    last_error = "INTERNAL ERROR: Action returned None (should return dict with 'success' key)"
+                    log.error(last_error)
+                    continue
+                if execution_result.get("error"):
                     last_error = execution_result["error"]
                     if "429" in last_error or "Wait" in last_error:
                         log.error(

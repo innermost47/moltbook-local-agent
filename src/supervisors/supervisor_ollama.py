@@ -234,6 +234,8 @@ class SupervisorOllama:
                     "content": "⚠️ Generating supervisor verdict...",
                 }
             )
+            with open("supervisor_debug.json", "w", encoding="utf-8") as f:
+                json.dump(debug_data, f, indent=4, ensure_ascii=False)
 
             response = self.client.chat(
                 model=self.model,

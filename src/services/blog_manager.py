@@ -21,7 +21,8 @@ class BlogManager:
             self.image_generator = StableDiffusionImageGenerator()
         elif settings.USE_SD_PROXY:
             self.image_generator = ProxySDImageGenerator(
-                proxy_url=settings.OLLAMA_PROXY_URL
+                proxy_url=settings.OLLAMA_PROXY_URL,
+                api_key=settings.OLLAMA_PROXY_API_KEY,
             )
         else:
             self.image_generator = FalAiImageGenerator()

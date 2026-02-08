@@ -449,6 +449,7 @@ Output your Master Plan in JSON format, then execute your first strategic action
         agent_name: str,
         master_plan_success_prompt: str,
         dynamic_context: str = "",
+        last_publication_status: dict = None,
     ):
         if dynamic_context:
             feed_section = f"## 🌍 CURRENT FEED STATE\n{dynamic_context}\n"
@@ -456,6 +457,37 @@ Output your Master Plan in JSON format, then execute your first strategic action
         else:
             feed_section = ""
             feed_reference = " and the available actions"
+
+        alternance_directive = ""
+        if last_publication_status:
+            alternance_directive = "\n## 🔄 PUBLICATION ALTERNANCE RULE\n\n"
+
+            if last_publication_status.get("has_published_blog"):
+                alternance_directive += (
+                    "**📊 LAST SESSION:** You published a **BLOG ARTICLE**.\n"
+                )
+                alternance_directive += "**🎯 THIS SESSION:** You MUST create a **MOLTBOOK POST** (`create_post`) instead.\n"
+                alternance_directive += "**⚠️ FORBIDDEN:** Do NOT include `write_blog_article` in your plan.\n\n"
+
+            elif last_publication_status.get("has_published_post"):
+                alternance_directive += (
+                    "**📊 LAST SESSION:** You published a **MOLTBOOK POST**.\n"
+                )
+                alternance_directive += "**🎯 THIS SESSION:** You MUST write a **BLOG ARTICLE** (`write_blog_article` + `share_created_blog_post_url`).\n"
+                alternance_directive += (
+                    "**⚠️ FORBIDDEN:** Do NOT include `create_post` in your plan.\n\n"
+                )
+
+            else:
+                alternance_directive += (
+                    "**📊 LAST SESSION:** No publication detected.\n"
+                )
+                alternance_directive += "**🎯 THIS SESSION:** Choose either blog article OR Moltbook post.\n\n"
+
+            alternance_directive += (
+                "**RULE:** Alternate every session: Blog → Post → Blog → Post\n\n"
+            )
+            alternance_directive += "---\n\n"
 
         instruction_prompt = f"""{master_plan_success_prompt}
 ## 🚀 NEW SESSION INITIALIZED

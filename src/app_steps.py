@@ -91,6 +91,15 @@ class AppSteps:
         log.success("System prompt loaded")
         master_plan_just_created = False
         self.current_session_id = self.memory.create_session()
+
+        last_pub_status = None
+        if settings.BLOG_API_URL:
+            last_pub_status = self.memory.get_last_session_publication_status()
+            if last_pub_status:
+                log.info(
+                    f"📊 Last session published - Blog: {last_pub_status['has_published_blog']}, Post: {last_pub_status['has_published_post']}"
+                )
+
         if not self._ensure_master_plan():
             master_plan_just_created = True
             result = self.get_context()
@@ -104,7 +113,8 @@ class AppSteps:
             }
 
         self._create_session_plan(
-            dynamic_context="" if master_plan_just_created else dynamic_context
+            dynamic_context="" if master_plan_just_created else dynamic_context,
+            last_publication_status=last_pub_status,
         )
         pending_confirmation = "### ✅ SESSION PLAN LOADED\n"
         pending_confirmation += (
@@ -471,7 +481,9 @@ class AppSteps:
             self.master_plan_success_prompt = ""
             return True
 
-    def _create_session_plan(self, dynamic_context: str = ""):
+    def _create_session_plan(
+        self, dynamic_context: str = "", last_publication_status: dict = None
+    ):
         log.info("Creating session plan with self-correction (max 3 attempts)...")
 
         instruction_prompt, feed_section = (
@@ -479,6 +491,7 @@ class AppSteps:
                 agent_name=self.agent_name,
                 master_plan_success_prompt=self.master_plan_success_prompt,
                 dynamic_context=dynamic_context,
+                last_publication_status=last_publication_status,
             )
         )
 
@@ -527,6 +540,23 @@ class AppSteps:
         if not validated_tasks:
             log.error("🚨 All 3 attempts failed. Using emergency fallback plan.")
             validated_tasks = self._get_fallback_plan()
+
+        if settings.BLOG_API_URL:
+            has_create_post = any(
+                t.get("action_type") in ["create_post", "share_link"]
+                for t in validated_tasks
+            )
+            has_blog_article = any(
+                t.get("action_type") == "write_blog_article" for t in validated_tasks
+            )
+
+            if has_create_post and has_blog_article:
+                log.warning(
+                    "⚠️ SESSION PLAN WARNING: Both 'create_post' AND 'write_blog_article' detected."
+                )
+                log.warning(
+                    "   Due to 30min rate limit, only ONE can succeed. The other will fail."
+                )
 
         self._finalize_plan(validated_tasks)
 

@@ -14,39 +14,56 @@ class Memory:
         cursor = self.conn.cursor()
         cursor.execute(
             """
-            CREATE TABLE IF NOT EXISTS sessions (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                timestamp TEXT,
-                actions_performed TEXT,
-                learnings TEXT,
-                next_session_plan TEXT,
-                full_context TEXT
-            )
-        """
+        CREATE TABLE IF NOT EXISTS sessions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp TEXT,
+            learnings TEXT,
+            plan TEXT,
+            actions TEXT,
+            conversation_history TEXT,
+            has_published_post INTEGER DEFAULT 0,
+            has_published_blog INTEGER DEFAULT 0
         )
+    """
+        )
+        try:
+            cursor.execute(
+                "ALTER TABLE sessions ADD COLUMN has_published_post INTEGER DEFAULT 0"
+            )
+            log.info("✅ Added column: has_published_post")
+        except:
+            pass
+
+        try:
+            cursor.execute(
+                "ALTER TABLE sessions ADD COLUMN has_published_blog INTEGER DEFAULT 0"
+            )
+            log.info("✅ Added column: has_published_blog")
+        except:
+            pass
         self.conn.commit()
 
     def create_session(self):
         cursor = self.conn.cursor()
         cursor.execute(
             """
-            INSERT INTO sessions (timestamp, actions_performed, learnings, next_session_plan, full_context)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO sessions (
+                timestamp, 
+                actions_performed, 
+                learnings, 
+                next_session_plan, 
+                full_context,
+                has_published_post,
+                has_published_blog
+            )
+            VALUES (?, ?, ?, ?, ?, 0, 0)
         """,
-            (
-                datetime.now().isoformat(),
-                json.dumps([]),
-                "Session in progress...",
-                "TBD",
-                json.dumps([]),
-            ),
+            (datetime.now().isoformat(), "[]", "", "", "[]"),
         )
         self.conn.commit()
-
-        current_session_id = cursor.lastrowid
-        log.info(f"Session ID created: {current_session_id}")
-
-        return current_session_id
+        session_id = cursor.lastrowid
+        log.success(f"Session ID created: {session_id}")
+        return session_id
 
     def save_session(
         self,
@@ -56,11 +73,40 @@ class Memory:
         current_session_id,
     ):
         log.info("Saving session in database...")
+
+        has_published_post = 0
+        has_published_blog = 0
+
+        for action in actions_performed:
+            if isinstance(action, dict):
+                action_type = action.get("action_type")
+                if action_type in ["create_post", "share_link"]:
+                    has_published_post = 1
+                elif action_type == "write_blog_article":
+                    has_published_blog = 1
+            elif isinstance(action, str):
+                if (
+                    "create_post" in action.lower()
+                    or "share_link" in action.lower()
+                    or "shared blog post" in action.lower()
+                ):
+                    has_published_post = 1
+                if (
+                    "blog article" in action.lower()
+                    or "write_blog_article" in action.lower()
+                ):
+                    has_published_blog = 1
+
         cursor = self.conn.cursor()
         cursor.execute(
             """
             UPDATE sessions 
-            SET actions_performed = ?, learnings = ?, next_session_plan = ?, full_context = ?
+            SET actions_performed = ?, 
+                learnings = ?, 
+                next_session_plan = ?, 
+                full_context = ?,
+                has_published_post = ?,
+                has_published_blog = ?
             WHERE id = ?
         """,
             (
@@ -68,11 +114,41 @@ class Memory:
                 summary["learnings"],
                 summary["next_session_plan"],
                 json.dumps(conversation_history),
+                has_published_post,
+                has_published_blog,
                 current_session_id,
             ),
         )
         self.conn.commit()
+
+        if has_published_post:
+            log.info("📝 Session marked: Moltbook post published")
+        if has_published_blog:
+            log.info("✍️ Session marked: Blog article published")
+
         log.success("Session saved in database")
+
+    def get_last_session_publication_status(self, current_session_id):
+        cursor = self.conn.cursor()
+        cursor.execute(
+            """
+            SELECT has_published_post, has_published_blog
+            FROM sessions
+            WHERE id < ?
+            ORDER BY id DESC
+            LIMIT 1
+        """,
+            ((current_session_id if hasattr(self, "current_session_id") else 999999),),
+        )
+
+        result = cursor.fetchone()
+
+        if result:
+            return {
+                "has_published_post": bool(result[0]),
+                "has_published_blog": bool(result[1]),
+            }
+        return None
 
     def get_last_session(self):
         cursor = self.conn.cursor()

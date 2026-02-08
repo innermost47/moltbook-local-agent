@@ -1,9 +1,13 @@
 import requests
-import base64
 import re
-from typing import Dict, Optional
+from typing import Dict
 from src.utils import log
 from src.settings import settings
+from src.generators import (
+    FalAiImageGenerator,
+    StableDiffusionImageGenerator,
+    ProxySDImageGenerator,
+)
 
 
 class BlogManager:
@@ -13,84 +17,20 @@ class BlogManager:
         self.blog_api_key = settings.BLOG_API_KEY
         self.fal_api_key = settings.FAL_API_KEY
         self.blog_base_url = settings.BLOG_BASE_URL
-
-    def generate_image(self, prompt: str) -> Optional[str]:
-        try:
-            url = "https://fal.run/fal-ai/flux/schnell"
-
-            headers = {
-                "Authorization": f"Key {self.fal_api_key}",
-                "Content-Type": "application/json",
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
-            }
-
-            enhanced_prompt = f"{prompt}. Digital art, modern, bold, powerful aesthetic. High quality, professional. NOT horror, NOT bloody, NOT violent."
-
-            data = {
-                "prompt": enhanced_prompt,
-                "image_size": "landscape_16_9",
-                "num_inference_steps": 4,
-                "num_images": 1,
-                "enable_safety_checker": True,
-            }
-
-            log.info(f"Generating image with prompt: {prompt[:50]}...")
-
-            response = requests.post(url, headers=headers, json=data, timeout=60)
-
-            if response.status_code == 200:
-                result = response.json()
-
-                if "images" in result and len(result["images"]) > 0:
-                    image_url = result["images"][0]["url"]
-                    log.success(f"Image generated, downloading...")
-
-                    img_response = requests.get(image_url, timeout=30)
-
-                    if img_response.status_code == 200:
-                        image_bytes = img_response.content
-                        image_b64 = base64.b64encode(image_bytes).decode("utf-8")
-
-                        content_type = img_response.headers.get(
-                            "content-type", "image/png"
-                        )
-                        if "jpeg" in content_type or "jpg" in content_type:
-                            mime_type = "image/jpeg"
-                        elif "webp" in content_type:
-                            mime_type = "image/webp"
-                        else:
-                            mime_type = "image/png"
-
-                        data_uri = f"data:{mime_type};base64,{image_b64}"
-
-                        log.success(
-                            f"Image converted to base64 ({len(image_b64)} chars)"
-                        )
-                        return data_uri
-                    else:
-                        log.error(
-                            f"Failed to download image: HTTP {img_response.status_code}"
-                        )
-                        return None
-                else:
-                    log.error("No images in fal.ai response")
-                    return None
-            else:
-                log.error(f"fal.ai API error: {response.status_code} - {response.text}")
-                return None
-
-        except requests.exceptions.Timeout:
-            log.error("Image generation timeout (60s)")
-            return None
-        except Exception as e:
-            log.error(f"Image generation failed: {e}")
-            return None
+        if settings.USE_STABLE_DIFFUSION_LOCAL:
+            self.image_generator = StableDiffusionImageGenerator()
+        elif settings.USE_SD_PROXY:
+            self.image_generator = ProxySDImageGenerator(
+                proxy_url=settings.OLLAMA_PROXY_URL
+            )
+        else:
+            self.image_generator = FalAiImageGenerator()
 
     def post_article(
         self, title: str, excerpt: str, content: str, image_prompt: str
     ) -> Dict:
         try:
-            image_data = self.generate_image(image_prompt)
+            image_data = self.image_generator.generate_image(image_prompt)
 
             if not image_data:
                 log.error("Failed to generate image, aborting article post")

@@ -51,6 +51,9 @@ class Settings(BaseSettings):
     OLLAMA_PROXY_URL: Optional[str] = None
     OLLAMA_PROXY_API_KEY: Optional[str] = None
 
+    USE_STABLE_DIFFUSION_LOCAL: bool
+    USE_SD_PROXY: bool
+
     model_config = SettingsConfigDict(
         env_file=Path(__file__).resolve().parent.parent / ".env",
         env_file_encoding="utf-8",

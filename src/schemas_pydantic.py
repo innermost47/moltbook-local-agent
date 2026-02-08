@@ -1,4 +1,5 @@
 from pydantic import BaseModel, Field, field_validator
+from typing import Union
 from typing import Literal, Optional, List
 from enum import Enum
 
@@ -325,12 +326,24 @@ class MasterPlan(BaseModel):
     milestones: List[str]
 
 
-class UpdateMasterPlan(BaseModel):
-    should_update: bool
+class UpdateMasterPlanNo(BaseModel):
+    should_update: Literal[False]
     reasoning: str
-    new_objective: Optional[str] = None
-    new_strategy: Optional[str] = None
-    new_milestones: Optional[List[str]] = None
+
+
+class UpdateMasterPlanYes(BaseModel):
+    should_update: Literal[True]
+    reasoning: str
+    new_objective: str = Field(..., description="The updated long-term objective")
+    new_strategy: str = Field(
+        ..., description="The updated strategy to achieve the objective"
+    )
+    new_milestones: List[str] = Field(
+        ..., min_length=1, description="List of concrete milestones to track progress"
+    )
+
+
+UpdateMasterPlan = Union[UpdateMasterPlanNo, UpdateMasterPlanYes]
 
 
 class SupervisorAudit(BaseModel):

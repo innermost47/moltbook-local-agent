@@ -12,7 +12,8 @@ from src.services import (
     BlogActions,
     get_web_context_for_agent,
 )
-from src.generators import Generator, Supervisor, OllamaGenerator, SupervisorOllama
+from src.generators import Generator, OllamaGenerator
+from src.supervisors import Supervisor, SupervisorOllama
 from src.memory import Memory
 from src.utils import log
 from src.settings import settings
@@ -150,15 +151,6 @@ class AppSteps:
         session_metrics = self.metrics._calculate_session_metrics(
             self.remaining_actions, self.actions_performed
         )
-
-        if settings.USE_SUPERVISOR:
-            supervisor_verdict = self.supervisor.generate_supervisor_verdict(
-                summary=summary,
-                metrics=session_metrics,
-                master_plan=self.planning_system.get_active_master_plan(),
-                session_todos=self.session_todos,
-                actions_performed=self.actions_performed,
-            )
 
         supervisor_verdict_text = None
         supervisor_grade_text = None
@@ -1188,6 +1180,133 @@ Phase 2/2 active. Use `reply_to_comment` to execute your response.
                 else:
                     decision = content
 
+                action_type = decision.get("action_type")
+
+                if action_type == "publish_public_comment":
+                    if not self.selected_post_id:
+                        last_error = f"""
+╔══════════════════════════════════════════════════════════════╗
+║  🚨 CRITICAL WORKFLOW VIOLATION - ACTION REJECTED
+╚══════════════════════════════════════════════════════════════╝
+
+**YOU VIOLATED THE MANDATORY 2-PHASE PROTOCOL:**
+
+You attempted to use `publish_public_comment` WITHOUT selecting a post first.
+
+**NON-NEGOTIABLE RULE:**
+Phase 1: MUST use `select_post_to_comment` with post_id
+Phase 2: THEN use `publish_public_comment` with content
+
+**YOUR NEXT ACTION MUST BE:**
+`select_post_to_comment` with a valid post_id from the feed
+
+**THIS IS NOT OPTIONAL. YOU CANNOT SKIP PHASE 1.**
+
+⚠️ Attempts remaining: {attempts_left}/3
+"""
+                        log.error(
+                            f"🚨 WORKFLOW VIOLATION: Attempted publish_public_comment without selecting post first"
+                        )
+                        if attempt < max_attempts:
+                            continue
+                        else:
+                            break
+
+                if action_type == "reply_to_comment":
+                    if not self.selected_comment_id:
+                        last_error = f"""
+╔══════════════════════════════════════════════════════════════╗
+║  🚨 CRITICAL WORKFLOW VIOLATION - ACTION REJECTED
+╚══════════════════════════════════════════════════════════════╝
+
+**YOU VIOLATED THE MANDATORY 2-PHASE PROTOCOL:**
+
+You attempted to use `reply_to_comment` WITHOUT selecting a comment first.
+
+**NON-NEGOTIABLE RULE:**
+Phase 1: MUST use `select_comment_to_reply` with comment_id
+Phase 2: THEN use `reply_to_comment` with content
+
+**YOUR NEXT ACTION MUST BE:**
+`select_comment_to_reply` with a valid comment_id from the feed
+
+**THIS IS NOT OPTIONAL. YOU CANNOT SKIP PHASE 1.**
+
+⚠️ Attempts remaining: {attempts_left}/3
+"""
+                        log.error(
+                            f"🚨 WORKFLOW VIOLATION: Attempted reply_to_comment without selecting comment first"
+                        )
+                        if attempt < max_attempts:
+                            continue
+                        else:
+                            break
+
+                if action_type == "select_post_to_comment" and self.selected_post_id:
+                    if self.focused_context_active:
+                        last_error = f"""
+╔══════════════════════════════════════════════════════════════╗
+║  🚨 PHASE CONFUSION - ACTION REJECTED
+╚══════════════════════════════════════════════════════════════╝
+
+**YOU ARE ALREADY IN PHASE 2/2 (FOCUSED MODE)**
+
+You selected post_id: `{self.selected_post_id}`
+
+**YOU CANNOT GO BACK TO PHASE 1.**
+
+**YOUR ONLY VALID ACTION NOW:**
+`publish_public_comment` with your comment content
+
+**DO NOT:**
+- Select another post
+- Try to restart the workflow
+- Use any action other than `publish_public_comment`
+
+⚠️ Attempts remaining: {attempts_left}/3
+"""
+                        log.error(
+                            f"🚨 PHASE VIOLATION: Attempted to re-select while in focused mode"
+                        )
+                        if attempt < max_attempts:
+                            continue
+                        else:
+                            break
+
+                if (
+                    action_type == "select_comment_to_reply"
+                    and self.selected_comment_id
+                ):
+                    if self.focused_context_active:
+                        last_error = f"""
+╔══════════════════════════════════════════════════════════════╗
+║  🚨 PHASE CONFUSION - ACTION REJECTED
+╚══════════════════════════════════════════════════════════════╝
+
+**YOU ARE ALREADY IN PHASE 2/2 (FOCUSED MODE)**
+
+You selected comment_id: `{self.selected_comment_id}`
+
+**YOU CANNOT GO BACK TO PHASE 1.**
+
+**YOUR ONLY VALID ACTION NOW:**
+`reply_to_comment` with your reply content
+
+**DO NOT:**
+- Select another comment
+- Try to restart the workflow
+- Use any action other than `reply_to_comment`
+
+⚠️ Attempts remaining: {attempts_left}/3
+"""
+                        log.error(
+                            f"🚨 PHASE VIOLATION: Attempted to re-select while in focused mode"
+                        )
+                        if attempt < max_attempts:
+                            continue
+                        else:
+                            break
+
                 if attempt > 1 and last_decision:
                     if decision["action_type"] == last_decision[
                         "action_type"
@@ -1219,7 +1338,7 @@ You MUST now move to Phase 2: use 'publish_public_comment' or 'reply_to_comment'
                         last_error += f"""
 AVAILABLE ALTERNATIVES:
 {chr(10).join(f"- {t['task']} (action: {t.get('action_type', 'unspecified')})" 
-              for t in self.session_todos if t.get('status') not in ['completed', 'failed'])}
+        for t in self.session_todos if t.get('status') not in ['completed', 'failed'])}
 
 **Choose a DIFFERENT action type or use TERMINATE_SESSION.**
 """

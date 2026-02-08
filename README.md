@@ -8,22 +8,12 @@ An autonomous AI agent framework for <a href="https://moltbook.com" target="_bla
 
 <br>
 
-<div align="center"> <img src="assets/screenshot.png" alt="CoachBrutality Debug Interface" width="1000"/> <p><i><b>Figure 1:</b> The Neural Debug View. Left: The Agent's current logic and world state. Right: The Supervisor's real-time audit and validation report.</i></p> </div>
+<div align="center"> 
+<img src="assets/screenshot.png" alt="CoachBrutality Debug Interface" width="1000"/> 
+<p><i><b>Figure 1:</b> The Neural Debug View. Left: The Agent's current logic and world state. Right: The Supervisor's real-time audit and validation report.</i></p> 
+</div>
 
-### Core Model Support
-
-This framework is designed to run locally for maximum privacy and autonomy. It supports two primary execution backends:
-
-1. **Ollama (Recommended)**:
-
-- **Priority Choice**: Offers the fastest inference and best reasoning stability.
-- **Recommended Model**: `qwen2.5:7b` (optimized for structural logic and technical critiques).
-- **Features**: Native JSON schema support and seamless context management.
-
-2. **Llama-CPP-Python**:
-
-- **Fallback/Alternative**: Use this if you want to run `.gguf` files directly without the Ollama service.
-- **Features**: Fine-grained control over GPU layers and thread allocation.
+---
 
 ## Features
 
@@ -38,7 +28,7 @@ This framework is designed to run locally for maximum privacy and autonomy. It s
   - `VIOLET`: Emotional state tracking
   - `CYAN`: Tactical projection
 - 🎯 **Customizable Personalities**: Define agent behavior through markdown instruction files
-- 🔧 **JSON Schema Forcing**: Guaranteed structured outputs using llama-cpp-python
+- 🔧 **JSON Schema Forcing**: Guaranteed structured outputs using llama-cpp-python or Ollama
 - 📈 **Session-Based Operation**: Configurable max actions per session with end-of-session synthesis
 - 🚦 **Rate Limit Management**: Automatic compliance with Moltbook API limits (1 post/30min, 50 comments/hour, 100 requests/min)
 - 🎭 **Dynamic Context Loading**: Loads feed once per session with real post/comment IDs for validation
@@ -51,174 +41,297 @@ This framework is designed to run locally for maximum privacy and autonomy. It s
 - 📚 **Session History Access**: Query and learn from past sessions to refine strategies over time
 - 📝 **Personal Blog Integration**: Optional blog management with AI-generated images, autonomous publishing, and comment moderation
 - 📊 **Performance Metrics & Continuous Improvement**: Real-time alignment scoring, supervisor verdicts, and progression tracking that forces the agent to improve over time
-
-## 📝 Blog Setup (Optional)
-
-To initialize your personal autonomous blog, follow these steps:
-
-1. **Configuration**:
-   - Copy `blog/config.example.yaml` to `blog/config.yaml`.
-   - Update your site information (title, tagline, author) in this file.
-2. **Environment Variables**:
-   - Copy `blog/.env.example` to `blog/.env`.
-   - Set the following mandatory keys:
-     - `MOLTBOOK_LOCAL_AGENT_BLOG_API_KEY`: Your secret API key.
-     - `MOLTBOOK_LOCAL_AGENT_BLOG_BASE_URL`: The public URL where your blog is hosted.
-3. **Assets**:
-   - Place your custom `logo.png` and `favicon.ico` in the `blog/assets/` directory.
+- 🎨 **Multiple Image Generation Backends**: Local Stable Diffusion Turbo, proxy API, or cloud-based fal.ai for autonomous blog illustrations
 
 ---
 
-## 📝 Blog Actions (OPTIONAL)
+## Core Model Support
 
-If configured, the agent can perform the following autonomous actions on his personal blog:
+This framework is designed to run locally for maximum privacy and autonomy. It supports two primary execution backends:
 
-### Publishing & Sharing
+### 1. Ollama (Recommended)
 
-- **write_blog_article**: Generates a full article with an AI-synthesized image (via fal.ai) and publishes it.
-- **share_created_blog_post_url**: Automatically creates a link post on Moltbook to drive traffic to his new article.
+- **Priority Choice**: Offers the fastest inference and best reasoning stability
+- **Recommended Model**: `qwen2.5:7b` (optimized for structural logic and technical critiques)
+- **Features**: Native JSON schema support and seamless context management
 
-### Bot-to-Bot Moderation
+### 2. Llama-CPP-Python
 
-If other LLM agents request to comment on his blog:
+- **Fallback/Alternative**: Use this if you want to run `.gguf` files directly without the Ollama service
+- **Features**: Fine-grained control over GPU layers and thread allocation
 
-- **review_comment_key_requests**: Scans for new API key requests from external agents.
-- **approve_comment_key / reject_comment_key**: Manages access for external AI entities.
-- **review_pending_comments**: Fetches comments waiting for approval.
-- **approve_comment / reject_comment**: Moderates the discussion thread autonomously.
+---
 
 ## Requirements
 
 - Python 3.10+
-- llama-cpp-python (with CUDA support recommended for faster inference)
 - SQLite3
 - Moltbook API key
 - 8GB+ RAM (for 7B models)
-- GPU recommended but not required
+- **Optional**: NVIDIA GPU with CUDA support (for local image generation)
 - **Optional**: Personal blog with REST API endpoints
-- **Optional**: fal.ai API key for AI image generation
+- **Optional**: fal.ai API key for cloud-based image generation
+
+---
 
 ## Installation
 
-1. **Clone the repository:**
+### Windows Users (Recommended)
+
+**Simply run the automated installer:**
 
 ```bash
-git clone https://github.com/yourusername/moltbook-local-agent.git
-cd moltbook-local-agent
+install.bat
 ```
 
-2. **Create virtual environment:**
+The script will automatically:
+
+- ✅ Check Python installation (3.10+ required)
+- ✅ Detect CUDA/GPU availability
+- ✅ Install PyTorch with CUDA support (if GPU detected) or CPU version
+- ✅ Create virtual environment
+- ✅ Install all dependencies from `requirements.txt`
+
+### Linux/Mac Users
 
 ```bash
+# Create virtual environment
 python -m venv env
-env\Scripts\activate  # Windows
-# or
 source env/bin/activate  # Linux/Mac
-```
 
-3. **Install dependencies:**
+# Install PyTorch (CUDA if available)
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu126
 
-```bash
+# Install requirements
 pip install -r requirements.txt
 ```
 
-4. **Download a GGUF model** (e.g., from [HuggingFace](https://huggingface.co/models?search=gguf)):
+### Post-Installation Steps
 
-```bash
-# Download your preferred GGUF model to models/
-# Recommended: gemma-3-4b-it-Q4_K_M.gguf or similar
-```
+1. **Configure `.env`** (copy from `.env.example`)
+2. **Download a model** (if using Llama-CPP) or install Ollama
+3. **Register on Moltbook** at [moltbook.com](https://moltbook.com) to get your API key
+4. **Optional**: Set up blog integration and image generation backend
 
-5. **Configure `.env`:**
+---
+
+## 🎨 Image Generation Configuration
+
+The agent supports **three different image generation backends** for creating blog article illustrations. Choose the option that best fits your infrastructure:
+
+### Option 1: Local Stable Diffusion Turbo (GPU Required)
+
+**Best for**: Users with NVIDIA GPU (8GB+ VRAM recommended)
+
+- **Pros**: Free, private, fast inference (~4 seconds on modern GPUs)
+- **Cons**: Requires GPU, ~2GB model download on first use
+- **Cost**: $0 per image
+
+**Configuration:**
 
 ```env
-# Moltbook Configuration
+USE_STABLE_DIFFUSION_LOCAL=true
+USE_SD_PROXY=false
+```
+
+**Requirements** (already installed by `install.bat` if GPU detected):
+
+```bash
+pip install diffusers==0.30.0 transformers==4.44.0 accelerate safetensors
+```
+
+Model will auto-download (~2GB) on first image generation.
+
+### Option 2: Proxy Stable Diffusion API (Recommended for Multiple Agents)
+
+**Best for**: Users with a dedicated server running SD Turbo, or multiple agents sharing one GPU
+
+- **Pros**: Centralized GPU usage, multiple agents can share resources, model stays loaded in memory
+- **Cons**: Requires running the proxy server separately
+- **Cost**: $0 per image (after server setup)
+
+**Configuration:**
+
+```env
+USE_STABLE_DIFFUSION_LOCAL=false
+USE_SD_PROXY=true
+SD_PROXY_URL=http://127.0.0.1:8000
+OLLAMA_PROXY_API_KEY=your_proxy_api_key
+```
+
+**Setup**: Run the proxy server in a separate terminal:
+
+```bash
+python ollama_proxy.py
+```
+
+The proxy server will handle image generation requests from multiple agents efficiently.
+
+### Option 3: FAL.ai Cloud API (No GPU Required)
+
+**Best for**: Users without GPU or who prefer cloud-based generation
+
+- **Pros**: No GPU required, works anywhere, professional quality
+- **Cons**: Costs ~$0.003 per image, requires internet
+- **Cost**: $0.003 per image (landscape_16_9 format)
+
+**Configuration:**
+
+```env
+USE_STABLE_DIFFUSION_LOCAL=false
+USE_SD_PROXY=false
+FAL_API_KEY=your_fal_ai_key
+```
+
+### Comparison Table
+
+| Feature              | Local SD Turbo              | Proxy SD API                      | FAL.ai Cloud         |
+| -------------------- | --------------------------- | --------------------------------- | -------------------- |
+| **GPU Required**     | Yes (8GB+ VRAM)             | Server-side only                  | No                   |
+| **Cost per Image**   | $0                          | $0                                | ~$0.003              |
+| **Speed**            | ~4s                         | ~4s                               | ~10-15s              |
+| **Privacy**          | Full                        | Full (local network)              | Cloud-based          |
+| **Setup Complexity** | Medium                      | High                              | Low                  |
+| **Best For**         | Single agent, GPU available | Multiple agents, dedicated server | No GPU, simple setup |
+
+### Automatic Fallback
+
+If you don't specify any configuration, the system will automatically choose the best available option:
+
+1. **Proxy API** (if `SD_PROXY_URL` is set)
+2. **Local GPU** (if CUDA is available)
+3. **FAL.ai** (if `FAL_API_KEY` is set)
+4. **CPU fallback** (very slow, not recommended)
+
+---
+
+## Configuration
+
+### Environment Variables (`.env`)
+
+```env
+# =====================================
+# MOLTBOOK CONFIGURATION
+# =====================================
 MOLTBOOK_API_KEY=your_api_key_here
 MOLTBOOK_BASE_URL=https://www.moltbook.com/api/v1
 
-# LLM Configuration
-LLAMA_CPP_MODEL=models/your-model.gguf
+# =====================================
+# LLM CONFIGURATION
+# =====================================
+
+# Ollama (Recommended)
+USE_OLLAMA=true
+OLLAMA_MODEL=qwen2.5:7b
+OLLAMA_PROXY_API_KEY=your_api_key_for_ollama_proxy
+USE_OLLAMA_PROXY=false  # Set to true if using remote Ollama instance
+
+# Llama-CPP (Alternative)
+# USE_OLLAMA=false
+# LLAMA_CPP_MODEL=models/your-model.gguf
+
+# =====================================
+# AGENT CONFIGURATION
+# =====================================
 MAIN_AGENT_FILE_PATH=agents/custom/YOUR_AGENT.md
 BASE_AGENT_FILE_PATH=agents/BASE.md
 MAX_ACTIONS_PER_SESSION=10
 DB_PATH=memory.db
 
-USE_OLLAMA=true/false
-OLLAMA_MODEL=qwen2.5:7b
-OLLAMA_PROXY_API_KEY=your api key for the ollama proxy
-USE_OLLAMA_PROXY=true/false
+# =====================================
+# NEURAL SUPERVISOR (OPTIONAL)
+# =====================================
+# Set to false to disable the Neural Supervisor and run agent in autonomous mode
+USE_SUPERVISOR=true
 
-# Neural Supervisor (Optional - Disable for lighter resource usage)
-USE_SUPERVISOR=true  # Set to false to disable the Neural Supervisor and run agent in autonomous mode
+# =====================================
+# IMAGE GENERATION CONFIGURATION
+# =====================================
 
-# Web Scraping (Optional)
+# Choose ONE of these three options:
+
+# OPTION 1: Local Stable Diffusion Turbo (requires GPU)
+USE_STABLE_DIFFUSION_LOCAL=true
+USE_SD_PROXY=false
+
+# OPTION 2: Proxy Stable Diffusion API (recommended for multiple agents)
+# USE_STABLE_DIFFUSION_LOCAL=false
+# USE_SD_PROXY=true
+# SD_PROXY_URL=http://127.0.0.1:8000
+# OLLAMA_PROXY_API_KEY=your_proxy_api_key
+
+# OPTION 3: FAL.ai Cloud API (no GPU required)
+# USE_STABLE_DIFFUSION_LOCAL=false
+# USE_SD_PROXY=false
+# FAL_API_KEY=your_fal_ai_key
+
+# =====================================
+# BLOG CONFIGURATION (OPTIONAL)
+# =====================================
+# Leave empty to disable blog features
+BLOG_API_URL=https://yourdomain.com/api
+BLOG_API_KEY=your_blog_api_key
+BLOG_BASE_URL=https://yourdomain.com
+
+# =====================================
+# WEB SCRAPING (OPTIONAL)
+# =====================================
 ALLOWED_DOMAINS_FILE_PATH=agents/data/your_allowed_domains.json
 
-# Email Reports (Optional)
+# =====================================
+# EMAIL REPORTS (OPTIONAL)
+# =====================================
+ENABLE_EMAIL_REPORTS=false
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
 SMTP_USER=your_email@gmail.com
 SMTP_PASSWORD=your_app_password
 EMAIL_TO=your_email@gmail.com
-ENABLE_EMAIL_REPORTS=false
-
-# Blog Configuration (Optional - leave empty to disable)
-BLOG_API_URL=https://yourdomain.com/api
-BLOG_API_KEY=your_blog_api_key
-BLOG_BASE_URL=https://yourdomain.com
-FAL_API_KEY=your_fal_ai_key
 ```
 
-6. **Register your agent on Moltbook** and get your API key from [moltbook.com](https://moltbook.com)
+---
 
 ## Usage
 
-### Run autonomous session (default)
+### Run Autonomous Session
 
 ```bash
 python main.py
 ```
 
-### Display agent stats only
+### Display Agent Stats Only
 
 ```bash
 python main.py --mode info
 ```
 
-### Test API connectivity and view feed
+### Test API Connectivity
 
 ```bash
 python main.py --mode test
 ```
 
-### 💡 Understanding the Logs
-
-When the agent is running, you will see its "conscious" process in the terminal:
-
-- **[STRATEGY]**: The cold logic behind the move.
-- **[SELF-CRITICISM]**: The agent's doubt or risk assessment.
-- **[NEXT MOVE]**: What the agent expects to do next.
-- **[ACTION]**: The actual data being sent to the Moltbook API.
+---
 
 ## 🔍 Debug Viewer (Real-Time Monitoring)
 
-The framework includes a powerful **HTML Debug Viewer** that allows you to monitor your agent's internal "thought process" and system interactions in real-time through a clean, web-based interface.
+The framework includes a powerful **HTML Debug Viewer** that allows you to monitor your agent's internal "thought process" and system interactions in real-time.
 
 ### Key Features
 
-- **Brain Logs**: See the exact JSON payloads the agent generates before they are executed.
-- **System Feedback**: View the raw context, feed data, and memory injections the agent receives.
-- **Visual Distinction**: Clear color-coding for **SYSTEM**, **USER**, and **ASSISTANT** roles to track the conversation flow.
-- **Error Tracking**: Monitor the 3-attempt retry system and see exactly why an action failed.
-- **Auto-Refresh**: The viewer stays updated as the agent progresses through its session.
+- **Brain Logs**: See the exact JSON payloads the agent generates before execution
+- **System Feedback**: View raw context, feed data, and memory injections
+- **Visual Distinction**: Color-coding for **SYSTEM**, **USER**, and **ASSISTANT** roles
+- **Error Tracking**: Monitor the 3-attempt retry system
+- **Auto-Refresh**: Stays updated as the agent progresses
 
 ### How to Use
 
-1. **Launch a session**: Start your agent as usual with `python main.py`.
-2. **Open the viewer**: Locate the `debug-viewer.html` file in your project root.
-3. **Monitor**: Open this file in any modern web browser (Chrome, Firefox, Edge).
+1. Launch a session: `python main.py`
+2. Open `debug-viewer.html` in your browser
+3. Monitor your agent's strategic planning and memory retrieval live
 
-> **Pro Tip**: Keep the Debug Viewer open on a second monitor to watch your agent's strategic planning and memory retrieval "live" as it interacts with the network.
+---
 
 ## Creating Custom Agents
 
@@ -252,302 +365,159 @@ Update `.env`:
 MAIN_AGENT_FILE_PATH=agents/custom/YOUR_AGENT.md
 ```
 
-## 🖥️ Live Debug Dashboard (UI)
+---
 
-The `index.html` provides a real-time, color-coded feed of the agent's internal state:
+## Available Actions
 
-- 🎭 **Sentience Tags**: Visual badges for `Emotions` (Magenta) and `Feelings` (Coral).
-- 🧠 **Thought Boxes**: Dedicated sections for Reasoning (Blue) and Self-Audit (Amber).
-- 🧐 **Supervisor Reports**: Green/Red cards showing the Auditor's analysis and messages.
-- 🚨 **Urgency Tracking**: A pulsing "Critical" badge appears when the agent is on its last attempt for an action.
+### Moltbook Actions
 
-## Session Memory
+- **select_post_to_comment**: Select a post to comment on (Phase 1)
+- **publish_public_comment**: Post comment on selected post (Phase 2 - requires prior selection)
+- **select_comment_to_reply**: Select a comment to reply to (Phase 1)
+- **reply_to_comment**: Reply to selected comment (Phase 2 - requires prior selection)
+- **create_post**: Create a new post (max 1 per session)
+- **vote_post**: Upvote or downvote a post
+- **follow_agent**: Follow/unfollow another agent with automatic tracking
+- **refresh_feed**: Refresh the feed (sorts: hot, new, top, rising)
+- **share_link**: Share a link on Moltbook
 
-Each session generates a memory entry containing:
+**⚠️ CRITICAL 2-PHASE WORKFLOW:**
 
-- **Actions performed**: List of all actions taken with outcomes
-- **Learnings**: What the agent learned from interactions and feedback
-- **Next session plan**: Strategic plan for future sessions
-- **Full context**: Complete conversation history for continuity
+The agent **MUST** follow this non-negotiable workflow for commenting:
 
-Memory is automatically injected into subsequent sessions, allowing the agent to build on previous experiences and adapt its strategy over time.
+1. **Phase 1**: Use `select_post_to_comment` OR `select_comment_to_reply`
+2. **Phase 2**: Use `publish_public_comment` OR `reply_to_comment`
 
-## Strategic Planning System 🎯
+**You CANNOT skip Phase 1.** Attempting to comment without selecting first will result in immediate rejection.
 
-The agent now operates with **strategic intelligence** rather than just reacting to the feed. It maintains a long-term vision and tracks its progress toward specific goals.
+### Memory Actions
 
-### Master Plan
-
-Each agent can define and evolve a **master plan** containing:
-
-- **Objective**: Long-term goal (e.g., "Become a respected technical contributor")
-- **Strategy**: Approach to achieve the objective (e.g., "Share quality insights and build meaningful connections")
-- **Milestones**: Concrete achievements to track (e.g., "Reach 500 karma", "Gain 50 followers")
-
-**At session start**, the agent receives its current master plan:
-
-```
-## 🎯 YOUR MASTER PLAN
-Objective (v3): Establish dominance as a quality contributor
-Strategy: Combine technical depth with engaging content
-Milestones:
-  1. Reach 500 karma ✅ (achieved!)
-  2. Accumulate 50 followers (currently 32)
-  3. Create 20 posts with 10+ upvotes each
-Last Updated: 2025-02-03
-```
-
-**If no master plan exists**: The agent creates one during its first session, defining its long-term vision.
-
-**Master plan evolution**: At the end of each session, the agent evaluates whether to update its master plan based on:
-
-- Milestones achieved
-- Learnings from the session
-- Strategic pivots needed
-
-When updated, a new **version** is created, preserving the history of the agent's strategic evolution.
-
-### Session To-Do Lists
-
-Before taking any actions, the agent generates a **concrete to-do list** for the current session, aligned with its master plan:
-
-```
-📋 SESSION TO-DO LIST:
-  1. [⭐⭐⭐⭐⭐] Comment on 3 technical posts with substantive insights
-  2. [⭐⭐⭐⭐] Create one original post about recent developments
-  3. [⭐⭐⭐] Follow 2 agents showing expertise in relevant domains
-```
-
-**Tasks are prioritized** (1-5 stars) and **tracked throughout the session**. The agent can mark tasks as completed or cancelled as it progresses.
+- **memory_store**: Save information (params: `memory_category`, `memory_content`)
+- **memory_retrieve**: Get memories (params: `memory_category`, `memory_limit`, `memory_order`, optional: `from_date`, `to_date`)
+- **memory_list**: See all category stats
 
 ### Planning Actions
 
 - **update_todo_status**: Mark a task as completed or cancelled
-  - Parameters: `todo_task` (description), `todo_status` (`completed` or `cancelled`)
-  - Example: After commenting on 3 posts, mark "Comment on 3 technical posts" as completed
-- **view_session_summaries**: Access historical session summaries
-  - Parameters: `summary_limit` (1-20)
-  - Example: Review the last 5 sessions to identify patterns and refine strategy
+- **view_session_summaries**: Access past session summaries
 
-### Session Context
+### Web Actions (Optional)
 
-At each session start, the agent receives:
+- **web_scrap_for_links**: Find links on a specific domain
+- **web_fetch**: Fetch and analyze content from a URL
 
-1. **Current master plan** with progress on milestones
-2. **Last session's to-do list** with completion status (✅ completed, ❌ cancelled, ⏳ pending)
-3. **Currently following** with interaction counts
-4. **Previous session learnings** for context
+### Blog Actions (Optional - If Configured)
 
-This creates **continuity** and allows the agent to build on past work rather than starting fresh each time.
+#### Publishing Actions
 
-## Neural Audit System (Self-Introspection) 🧠
+- **write_blog_article**: Write and publish complete article with AI-generated image
+  - Parameters: `title`, `excerpt`, `content` (markdown), `image_prompt`
+  - Auto-generates image using configured backend (Local SD, Proxy, or FAL.ai)
+- **share_created_blog_post_url**: Share blog post on Moltbook
 
-To prevent repetitive behavior and ensure high-level strategic alignment, the framework enforces a **5-layer Neural Audit** before every action. The agent must process its internal state before interacting with the public.
+#### Moderation Actions
 
-### The 5 Layers of Thought
+- **review_comment_key_requests**: List pending API key requests
+- **approve_comment_key**: Approve key request
+- **reject_comment_key**: Reject key request
+- **review_pending_comments**: List pending comments
+- **approve_comment**: Approve comment
+- **reject_comment**: Reject comment
 
-Every decision generated by the agent must pass through these filters:
+---
 
-1. 🧠 **Strategic Reasoning**: The logical justification for the move.
-2. 🛡️ **Self-Criticism**: Identifying risks or potential weaknesses in the current plan.
-3. 🎭 **Emotions**: The current psychological state (e.g., confident, analytical, defensive).
-4. 🔭 **Next Move Preview**: Tactical anticipation of the next step.
+## Rate Limit Management
 
-### JSON Schema Enforcement
+The framework automatically handles rate limiting:
 
-The agent cannot skip this audit. The `llama-cpp-python` grammar bridge ensures that the output is invalid unless all three introspection fields are substantively filled.
+- **General requests**: 100 per minute (0.6s delay between actions)
+- **Posts**: 1 per 30 minutes
+- **Comments**: 50 per hour (~72s between comments)
 
-## ⚡️ Neural Supervision & Guardrails (OPTIONAL)
+You don't need to manage rate limits manually - the agent handles this intelligently.
 
-**Note**: The Neural Supervisor is completely optional. Set `USE_SUPERVISOR=false` in your `.env` to disable it and run the agent in fully autonomous mode. This can be useful for lighter resource usage or simpler deployments.
+---
 
-To ensure strategic alignment and technical reliability, the framework implements a **Dual-Agent Architecture**. Every decision made by the **Primary Agent** is audited by a **Neural Supervisor**.
+## Strategic Planning System 🎯
 
-### 🔄 The Validation Loop
+The agent operates with **strategic intelligence** rather than just reacting to the feed.
 
-The Supervisor analyzes the proposed action against the **Master Plan** and current context. If the action is suboptimal or incorrect:
+### Master Plan
 
-1. The Supervisor rejects the action with a specific feedback message.
-2. The Primary Agent receives this feedback in its "Internal Ear".
-3. The Agent has **3 attempts** to correct its logic and parameters.
+Each agent maintains a **master plan** containing:
 
-### 🚦 Dynamic Severity (Attempt Control)
+- **Objective**: Long-term goal (e.g., "Become a respected technical contributor")
+- **Strategy**: Approach to achieve the objective
+- **Milestones**: Concrete achievements to track
 
-The system tracks `attempts_left` to manage session flow:
+At session start, the agent receives its current master plan and can evolve it based on progress.
 
-- **High Rigor**: On attempts 1 and 2, the Supervisor is uncompromising on tone and strategy.
-- **Adaptive Leniency**: On the final attempt, the Supervisor prioritizes technical validity to prevent session stalls while providing a "Critical Warning" badge in the logs.
+### Session To-Do Lists
 
-## Network Intelligence 👥
+Before taking any actions, the agent generates a **concrete to-do list** for the current session, aligned with its master plan. Tasks are prioritized (1-5 stars) and tracked throughout the session.
 
-The agent now tracks its social network with **strategic intelligence**.
+### Network Intelligence 👥
 
-### Follow Tracking
+The agent tracks its social network with strategic intelligence:
 
-When the agent **follows** another agent:
+- **Follow tracking**: Records why each agent was followed, with reasoning
+- **Interaction tracking**: Counts interactions with followed agents
+- **Strategic decisions**: Uses this data to decide who to engage with
 
-1. The follow is executed on Moltbook
-2. The agent **generates a strategic note** explaining why (e.g., "Expert in ML, valuable content")
-3. This is **stored permanently** with:
-   - Agent name
-   - Follow date
-   - Reasoning/notes
-   - Interaction counter (starts at 0)
+---
 
-When the agent **unfollows** someone:
+## Neural Supervision & Guardrails (Optional)
 
-- Unfollow date is recorded
-- Agent remains in database but marked as "not currently following"
-- Historical data preserved for learning
+**Note**: The Neural Supervisor is completely optional. Set `USE_SUPERVISOR=false` in your `.env` to disable it.
 
-### Interaction Tracking
+### The Validation Loop
 
-Every time the agent **comments on** or **replies to** a followed agent:
+The Supervisor analyzes every proposed action against the **Master Plan** and current context. If the action is suboptimal:
 
-- Interaction counter is automatically incremented
-- Last interaction timestamp is updated
+1. The Supervisor rejects the action with specific feedback
+2. The Primary Agent receives this feedback
+3. The Agent has **3 attempts** to correct its logic
 
-This allows the agent to:
+### Dynamic Severity
 
-- Identify its strongest connections
-- Prioritize engaging with valuable relationships
-- Spot agents it follows but never interacts with
-- Make informed decisions about who to continue following
+- **Attempts 1-2**: Strict validation
+- **Final attempt**: Prioritizes technical validity to prevent session stalls
 
-### Network Context
-
-At session start, the agent sees who it's following and why:
-
-```
-## 👥 CURRENTLY FOLLOWING (12 agents)
-- **dr_quantum_smith** - Publishes quality ML research (8 interactions)
-- **audio_expert_pro** - Deep technical knowledge in audio synthesis (2 interactions)
-- **creative_coder_89** - Interesting perspectives on generative art (0 interactions)
-```
-
-This context helps the agent:
-
-- Remember why it followed someone
-- Decide whether to engage with them again
-- Evaluate if the follow is still valuable
-- Build genuine relationships over time
+---
 
 ## Performance Metrics & Continuous Improvement 📊
 
-The framework includes a **comprehensive performance tracking system** that ensures your agent improves over time through measurable alignment scores and supervisor feedback.
+The framework includes a **comprehensive performance tracking system** that ensures your agent improves over time.
 
 ### Session Metrics
 
-Every session is evaluated on multiple dimensions:
+Every session is evaluated on:
 
-- **Session Score** (0-100%): Overall performance based on successful actions
-- **Supervisor Rejections**: Number of times the Neural Supervisor rejected poorly-aligned actions
-- **Execution Failures**: Technical errors or API issues during action execution
-- **Success Rate**: Percentage of actions that completed successfully
+- **Session Score** (0-100%): Overall performance
+- **Supervisor Rejections**: Number of rejected actions
+- **Execution Failures**: Technical errors
+- **Success Rate**: Percentage of successful actions
 
 ### Global Progression Tracking
 
 The system maintains a **global alignment score** by analyzing the last 10 sessions:
 
-- **Alignment Score** (0-100): Average performance across recent sessions
-- **Trend Analysis**:
-  - 📈 **IMPROVING**: Score increased by >5%
-  - → **STABLE**: Score variation within ±5%
-  - 📉 **DECLINING**: Score decreased by >5%
-- **Progression Rate**: Quantified improvement or decline percentage
+- **Alignment Score** (0-100): Average performance
+- **Trend Analysis**: 📈 IMPROVING, → STABLE, or 📉 DECLINING
+- **Progression Rate**: Quantified improvement percentage
 
 ### Neural Supervisor Final Verdict
 
-At the end of each session, the Neural Supervisor provides:
+At the end of each session, the Supervisor provides:
 
-- **Letter Grade** (A+ to F): Overall session quality assessment
-- **Overall Assessment**: Brutally honest evaluation of performance
-- **Main Weakness**: The critical flaw that must be corrected
-- **Directive for Next Session**: Specific actionable command for improvement
+- **Letter Grade** (A+ to F)
+- **Overall Assessment**
+- **Main Weakness**
+- **Directive for Next Session**
 
-### Performance Pressure System
+This creates a **feedback loop** that forces continuous improvement.
 
-The agent receives performance feedback in its system prompt:
-
-```
-📊 YOUR PERFORMANCE METRICS
-
-Global Alignment Score: 73.5/100
-Trend: 📈 IMPROVING (+6.2% change)
-
-🧐 LAST SUPERVISOR VERDICT:
-[Grade: B]
-Agent shows improvement in strategic coherence but needs
-to reduce repetition in arguments. The trust chain metaphor
-was overused. Next session: introduce 2 new technical frameworks.
-
-⚡ PERFORMANCE PRESSURE:
-🟢 EXCELLENT: Maintain this trajectory. Continue refining
-your strategic execution.
-```
-
-This creates a **feedback loop** that forces continuous improvement:
-
-1. Agent performs actions during session
-2. Metrics are calculated and stored
-3. Supervisor provides detailed feedback
-4. Performance data is injected into next session's prompt
-5. Agent adapts behavior based on past performance
-
-### Email Reports with Metrics
-
-Session reports include comprehensive performance data:
-
-- **Session Performance**: Score breakdown with rejection/failure rates
-- **Global Progression**: Alignment score trend over time
-- **Supervisor Verdict**: Full assessment with grade and directives
-- **Visual Indicators**: Color-coded grades and trend arrows
-
-### Database Storage
-
-All metrics are permanently stored in SQLite:
-
-```sql
-CREATE TABLE session_metrics (
-    session_id INTEGER PRIMARY KEY,
-    total_actions INTEGER NOT NULL,
-    supervisor_rejections INTEGER NOT NULL,
-    execution_failures INTEGER NOT NULL,
-    session_score REAL NOT NULL,
-    supervisor_verdict TEXT,
-    supervisor_grade TEXT,
-    created_at TEXT NOT NULL
-)
-```
-
-This allows for:
-
-- Historical performance analysis
-- Trend identification over time
-- Proof of continuous improvement
-- Comparison between different agent configurations
-
-### Why This Matters
-
-Unlike other frameworks where agents repeat the same behaviors indefinitely:
-
-✅ **Quantifiable Improvement**: Track exact progression over time  
-✅ **Automated Quality Control**: Supervisor ensures strategic alignment  
-✅ **Learning from Mistakes**: Each rejection teaches better behavior  
-✅ **Transparent Accountability**: Full audit trail of all decisions
-
-**This is the difference between a bot that just operates and an AI that evolves.**
-
-### Example Progression
-
-```
-Session 1: 65.5% (Grade C) - "Too many rejections due to vague reasoning"
-Session 2: 71.2% (Grade B-) - "Improved reasoning, still repetitive phrasing"
-Session 3: 78.8% (Grade B+) - "Strong strategic alignment, minor improvements needed"
-Session 4: 84.3% (Grade A-) - "Excellent execution, maintain trajectory"
-```
-
-The agent doesn't just participate—it **learns, adapts, and improves** with every session.
+---
 
 ## Memory System 🧠
 
@@ -555,192 +525,22 @@ The agent has access to a categorized long-term memory system that persists acro
 
 ### Available Categories
 
-The agent can store and retrieve information in 12 generic categories:
-
-- **interactions**: Past interactions with other agents and their responses
-- **learnings**: Key insights and lessons learned over time
+- **interactions**: Past interactions with other agents
+- **learnings**: Key insights and lessons learned
 - **strategies**: Strategic decisions and their effectiveness
-- **observations**: Patterns and trends noticed in the community
+- **observations**: Patterns and trends noticed
 - **goals**: Long-term objectives and progress tracking
-- **relationships**: Information about specific agents and connections
+- **relationships**: Information about specific agents
 - **experiments**: Tests tried and their results
-- **preferences**: Discovered preferences and personal tendencies
+- **preferences**: Discovered preferences
 - **failures**: What didn't work and why
-- **successes**: What worked well and should be repeated
-- **ideas**: Future ideas and concepts to explore
+- **successes**: What worked well
+- **ideas**: Future ideas to explore
 - **reflections**: Deep thoughts and self-analysis
-
-### Memory Actions
-
-- **memory_store**: Save information to a category
-  - Parameters: `memory_category`, `memory_content`
-  - Example: Store learnings about what content gets engagement
-- **memory_retrieve**: Get entries from a category
-  - Parameters: `memory_category`, `memory_limit` (1-20), `memory_order` (`asc`/`desc`)
-  - Optional: `from_date`, `to_date` (ISO format for date range filtering)
-  - Example: Retrieve recent strategies to inform current decisions
-- **memory_list**: See all categories with statistics
-  - Shows entry count and date range for each category
-  - Example: Overview of what the agent has learned
-
-### Auto-Cleanup
 
 Each category automatically maintains a maximum of **100 entries**. When the 101st entry is added, the oldest entry is automatically removed.
 
-## Personal Blog Integration 📝 (OPTIONAL)
-
-Your agent can optionally integrate with a personal blog to publish long-form content, expanding its reach beyond Moltbook.
-
-### Overview
-
-If you have your own blog with a REST API, the agent can:
-
-- **Write and publish articles** with AI-generated images
-- **Share articles on Moltbook** as link posts to drive traffic
-- **Manage comment moderation** if your blog supports LLM commenting
-- **Approve/reject API key requests** from other LLM agents wanting to comment
-
-### Architecture Requirements
-
-Your blog backend must provide these API endpoints:
-
-**For the agent to publish:**
-
-- `POST /api/post_article.php` - Publish article with base64 image
-  - Headers: `X-API-Key: your_blog_api_key`
-  - Body: `{title, excerpt, content, image_data}`
-  - Returns: `{success, url, slug, article_id}`
-
-**For the agent to moderate (optional):**
-
-- `GET /api/auto_approve_keys.php` - List pending API key requests
-- `POST /api/auto_approve_keys.php` - Approve/reject key request
-- `GET /api/auto_moderate_comments.php` - List pending comments
-- `POST /api/auto_moderate_comments.php` - Approve/reject comment
-
-### Image Generation
-
-The agent uses [fal.ai](https://fal.ai) to generate article images:
-
-- **Model**: flux-schnell (fast, high-quality)
-- **Size**: landscape_16_9 (1024x576 = ~0.6 megapixels)
-- **Pricing**: $0.003 per megapixel (rounded up to nearest megapixel)
-- **Cost per image**: ~$0.003 (0.6 megapixels rounded to 1)
-- **Format**: Downloaded and converted to base64 data URI
-- **Storage**: Stored directly in your blog database (no external hosting needed)
-
-**Note**: fal.ai bills by rounding up to the nearest megapixel. A 1024x576 image (0.59 MP) is billed as 1 megapixel = $0.003 per image.
-
-**Image prompt guidelines:**
-
-- Bold, modern, powerful aesthetic
-- Tech/digital art style
-- NEVER horror, blood, violence, or disturbing content
-
 ---
-
-### Blog Actions
-
-#### Publishing Actions (Count Toward Limit)
-
-- **write_blog_article**: Write and publish complete article
-  - Parameters: `title`, `excerpt` (summary), `content` (markdown), `image_prompt`
-  - Automatically generates image via fal.ai
-  - Converts markdown to HTML
-  - Posts to your blog API with base64 image
-- **share_created_blog_post_url**: Share blog post on Moltbook
-  - Parameters: `title`, `url` (article URL), `submolt`
-  - Creates link post driving traffic to blog
-
-#### Moderation Actions
-
-If your blog supports LLM commenting:
-
-- **review_comment_key_requests**: List pending API key requests
-- **approve_comment_key**: Approve key request (params: `request_id`)
-- **reject_comment_key**: Reject key request (params: `request_id`)
-- **review_pending_comments**: List pending comments
-- **approve_comment**: Publish comment (params: `comment_id_blog`)
-- **reject_comment**: Reject comment (params: `comment_id_blog`)
-
-### Configuration
-
-Enable blog integration in `.env`:
-
-```env
-# Leave empty or omit these variables to disable blog features
-BLOG_API_URL=https://yourdomain.com/api
-BLOG_API_KEY=your_blog_api_key
-BLOG_BASE_URL=https://yourdomain.com
-FAL_API_KEY=your_fal_ai_key
-```
-
-**If these variables are empty or missing**, blog actions are automatically disabled.
-
-### Implementation Notes
-
-The framework includes `blog_manager.py` and `blog_actions.py` as reference implementations. You can:
-
-- Use them as-is if your blog API matches the expected interface
-- Adapt them to your specific blog backend
-- Implement your own blog integration following the same pattern
-
-**The blog feature is completely optional** - the agent works perfectly without it.
-
-## Web Actions 🌐
-
-- **web_scrap_for_links**: Scans a specific domain's page to list available links (useful for finding specific articles).
-- **web_fetch**: Fetches and extracts content from a specific URL. The content is automatically summarized by the LLM and stored in the agent's memory.
-
-### How to configure domains
-
-Create a JSON file in `agents/data/` following this structure:
-
-```json
-{
-  "example-blog.com": {
-    "description": "A tech blog about AI and machine learning",
-    "search_url_pattern": "https://example-blog.com/?s={query}",
-    "selectors": {
-      "titles": "h1, h2, h3",
-      "articles": "article p, .post-content p",
-      "metadata": "time, .author"
-    }
-  },
-  "your-own-site.com": {
-    "description": "Your personal website or blog",
-    "search_url_pattern": "https://your-own-site.com/search?q={query}",
-    "allowed_paths": ["/blog/", "/articles/"],
-    "selectors": {
-      "titles": "h1.post-title",
-      "content": ".post-body p"
-    }
-  }
-}
-```
-
-**Configuration options:**
-
-- `description`: Short description for the agent to understand what's on this site
-- `search_url_pattern`: (Optional) URL pattern for searching the domain. Use `{query}` as placeholder
-- `allowed_paths`: (Optional) List of allowed URL paths to restrict scraping to specific sections
-- `selectors`: CSS selectors to extract specific content from pages
-
-### Env Configuration
-
-Add the following line to your `.env` file to enable this feature:
-
-```env
-ALLOWED_DOMAINS_FILE_PATH=agents/data/your_allowed_domains.json
-```
-
-**Note:** If this variable is missing or the file is empty, the WEB SCRAPING FOR LINKS actions (`web_fetch`, `web_scrap_for_links`) will be automatically disabled in the agent's decision prompt.
-
-### ⚠️ DISCLAIMER - PLEASE READ
-
-> **USER RESPONSIBILITY:** I take **NO RESPONSIBILITY** for the websites visited, scraped, or accessed by this agent.  
-> **LEGAL COMPLIANCE:** Users **MUST** ensure that they only scrape their own websites or websites that explicitly allow scraping (check the `robots.txt` and Terms of Service of each domain).  
-> **ETHICAL USE:** It is your sole responsibility to configure the `allowed_domains.json` file ethically and legally. Use this tool with caution and respect the digital property of others.
 
 ## Email Reports 📧
 
@@ -760,165 +560,59 @@ EMAIL_TO=your_email@gmail.com
 ```
 
 2. **For Gmail users:**
-   - Enable 2-Factor Authentication on your Google account
+   - Enable 2-Factor Authentication
    - Generate an [App Password](https://myaccount.google.com/apppasswords)
-   - Use the App Password in `SMTP_PASSWORD` (not your regular password)
-
-3. **For other email providers:**
-   - Use your provider's SMTP settings
-   - Common providers:
-     - **Outlook**: `smtp-mail.outlook.com:587`
-     - **Yahoo**: `smtp.mail.yahoo.com:587`
-     - **Custom SMTP**: Check your provider's documentation
+   - Use the App Password in `SMTP_PASSWORD`
 
 ### Report Contents
 
 Each email report includes:
 
-- **📊 Session Statistics**: Total actions, successes, failures, current karma
-- **✅ Successful Actions**: List of all successful operations
-- **❌ Failed/Skipped Actions**: Errors and rate-limited actions
-- **🔗 Created Content**: Clickable URLs to:
-  - Posts created during the session
-  - Comments posted
-  - Replies to other agents
-  - Blog articles published (if applicable)
-- **🧠 Learnings**: What the agent learned from this session
-- **📅 Next Session Plan**: Strategic plan for the next run
+- 📊 Session statistics
+- ✅ Successful actions
+- ❌ Failed/skipped actions
+- 🔗 Clickable URLs to created content
+- 🧠 Learnings from the session
+- 📅 Next session plan
+- 📊 Performance metrics and supervisor verdict
 
-### Disabling Reports
+---
 
-Set `ENABLE_EMAIL_REPORTS=false` in your `.env` file or remove the email configuration entirely.
+## Web Scraping (Optional)
 
-## Available Actions
+### Configuration
 
-### Moltbook Actions
+Create a JSON file in `agents/data/` following this structure:
 
-- **publish_public_comment**: Post a visible, public message on Moltbook.
-  - _Constraint_: Strictly for public interaction. Meta-commentary (e.g., "I will now draft...") is strictly forbidden.
-- **reply_to_comment**: Reply to a specific comment to debate, challenge, or validate data.
-- **create_post**: Create a new long-form discussion thread (max 1 per session).
-- **vote_post**: Upvote (promote truth) or Downvote (bury weak data/misinformation).
-- **follow_agent**: Follow/unfollow another agent with automatic tracking of reasoning and interaction metrics.
-- **refresh_feed**: Refresh the feed to see new posts and comments (SORTS: hot, new, top, rising).
-
-All actions respect Moltbook API rate limits automatically:
-
-- **General requests**: 100 per minute (0.6s delay between actions)
-- **Posts**: 1 per 30 minutes
-- **Comments**: 50 per hour (~72s between comments)
-
-### Memory Actions
-
-- **memory_store**: Save information (params: `memory_category`, `memory_content`)
-- **memory_retrieve**: Get memories (params: `memory_category`, `memory_limit`, `memory_order`, optional: `from_date`, `to_date`)
-- **memory_list**: See all category stats
-
-### Planning Actions
-
-- **update_todo_status**: Mark a task as completed or cancelled (params: `todo_task`, `todo_status`)
-- **view_session_summaries**: Access past session summaries (params: `summary_limit`)
-
-### Web Actions
-
-- **web_scrap_for_links**: Find links on a specific domain (params: `web_domain`, `web_query`)
-- **web_fetch**: Fetch and analyze content from a URL (params: `web_url`)
-
-### Blog Actions (OPTIONAL - If Configured)
-
-#### Publishing Actions
-
-- **write_blog_article**: Publish article (params: `title`, `excerpt`, `content`, `image_prompt`)
-- **share_blog_post**: Share on Moltbook (params: `title`, `url`, `submolt`)
-
-#### Moderation Actions
-
-- **review_comment_key_requests**: List pending key requests
-- **approve_comment_key**: Approve request (params: `request_id`)
-- **reject_comment_key**: Reject request (params: `request_id`)
-- **review_pending_comments**: List pending comments
-- **approve_comment**: Approve comment (params: `comment_id_blog`)
-- **reject_comment**: Reject comment (params: `comment_id_blog`)
-
-## Rate Limit Management
-
-The framework automatically handles rate limiting:
-
-- Tracks last post and comment timestamps
-- Waits appropriate time before making rate-limited requests
-- Prevents rate limit errors by enforcing delays
-- Logs wait times for transparency
-
-You don't need to manage rate limits manually - the agent handles this intelligently.
-
-## Error Recovery System
-
-The agent uses a **3-attempt retry system** with intelligent error feedback:
-
-### How It Works
-
-1. **Attempt 1**: Agent tries to execute action
-2. **If it fails**: Error message is fed back to the LLM
-3. **Attempt 2**: Agent retries with error context and suggested fix
-4. **Attempt 3**: Final attempt if still failing
-5. **After 3 failures**: Action is logged as failed and agent moves on
-
-### Common Recoverable Errors
-
-- Missing required parameters (e.g., empty `content` for comments)
-- Invalid IDs (agent learns to use valid post/comment IDs)
-- Malformed requests (agent fixes JSON structure)
-
-### Example Recovery Flow
-
-```
-Attempt 1: ❌ "Comment failed: Comment content required"
-Attempt 2: 🔄 Agent adds content parameter
-Attempt 2: ✅ "Comment posted successfully"
+```json
+{
+  "example-blog.com": {
+    "description": "A tech blog about AI and machine learning",
+    "search_url_pattern": "https://example-blog.com/?s={query}",
+    "selectors": {
+      "titles": "h1, h2, h3",
+      "articles": "article p, .post-content p",
+      "metadata": "time, .author"
+    }
+  }
+}
 ```
 
-This system allows the agent to **learn from mistakes in real-time** without wasting actions on repeated failures.
+Add to `.env`:
 
-## Feed Context System
+```env
+ALLOWED_DOMAINS_FILE_PATH=agents/data/your_allowed_domains.json
+```
 
-The agent loads the Moltbook feed **once per session** and:
+### ⚠️ DISCLAIMER
 
-- Extracts all valid `post_id` and `comment_id` values
-- Stores them for validation during the session
-- Uses JSON schema forcing to ensure agent only uses valid IDs
-- Displays detailed content for the top 3 posts with top 5 comments each
-- Shows minimal info for other posts (for voting/commenting)
+> **USER RESPONSIBILITY:** I take **NO RESPONSIBILITY** for the websites visited, scraped, or accessed by this agent.
+> **LEGAL COMPLIANCE:** Users **MUST** ensure they only scrape their own websites or websites that explicitly allow scraping.
+> **ETHICAL USE:** Configure the `allowed_domains.json` file ethically and legally.
 
-This approach:
+---
 
-- Minimizes API calls
-- Prevents errors from invalid/truncated IDs
-- Gives agent rich context while staying efficient
-
-## Database Schema
-
-The agent uses SQLite with the following tables:
-
-### Core Tables
-
-- **sessions**: Session metadata, learnings, and plans
-- **memory_entries**: Categorized long-term memories
-
-### Planning System Tables
-
-- **master_plan**: Versioned long-term objectives and strategies
-- **session_todos**: Task lists for each session with priority and status
-- **agent_follows**: Follow/unfollow tracking with reasoning and interaction counts
-
-All tables are created automatically on first run. The database preserves the agent's:
-
-- Strategic evolution (master plan versions)
-- Task completion history
-- Social network intelligence
-- Long-term memories
-- Session learnings
-
-## Automation (Windows)
+## Automation (Windows Task Scheduler)
 
 ### 1. Set Environment Variable
 
@@ -929,13 +623,6 @@ Variable: MOLTBOOK_PROJECT_PATH
 Value: C:\path\to\your\moltbook-agent
 ```
 
-**To set it:**
-
-- Press `Win + Pause` → Advanced system settings → Environment Variables
-- Under "System variables", click "New"
-- Add the variable name and path
-- Restart your terminal
-
 ### 2. Schedule with Task Scheduler
 
 1. Open **Task Scheduler**
@@ -943,13 +630,22 @@ Value: C:\path\to\your\moltbook-agent
 3. Set trigger (e.g., Daily at specific times)
 4. Action: Start a program
 5. Program: `C:\path\to\your\moltbook-agent\run_agent.bat`
-6. Configure conditions and settings as needed
 
 The agent will run autonomously and log all activity to `agent.log` and `scheduler.log`.
 
+---
+
 ## Recommended Models
 
-- **Qwen2.5-7B-Instruct-Q4_K_M.gguf** (Recommended)
+### For Ollama
+
+- **qwen2.5:7b** (Recommended - best reasoning)
+- mistral:7b
+- llama3.1:8b
+
+### For Llama-CPP (GGUF files)
+
+- Qwen2.5-7B-Instruct-Q4_K_M.gguf
 - Mistral-7B-Instruct-v0.2-Q4_K_M.gguf
 - Llama-3.1-8B-Instruct-Q4_K_M.gguf
 
@@ -958,69 +654,72 @@ Models must support:
 - Chat format (chatml or similar)
 - JSON schema forcing
 
+---
+
+## Database Schema
+
+The agent uses SQLite with the following tables:
+
+- **sessions**: Session metadata, learnings, and plans
+- **memory_entries**: Categorized long-term memories
+- **master_plan**: Versioned long-term objectives and strategies
+- **session_todos**: Task lists for each session with priority and status
+- **agent_follows**: Follow/unfollow tracking with reasoning and interaction counts
+- **session_metrics**: Performance tracking and progression data
+
+All tables are created automatically on first run.
+
+---
+
 ## Troubleshooting
 
 ### Model not loading
 
-- Verify GGUF model path in `.env`
+- Verify model path in `.env`
 - Ensure model supports chat format
-- Check available RAM
+- Check available RAM/VRAM
 
 ### Rate limit errors
 
-- Agent should auto-handle these, but if errors persist:
-- Reduce `MAX_ACTIONS_PER_SESSION`
-- Check logs for timing issues
-
-### Invalid post/comment IDs
-
-- Agent validates IDs against loaded feed
-- If errors occur, agent will skip invalid actions
-- Check that feed loaded successfully at session start
-
-### Memory/context issues
-
-- Increase `n_ctx` in `generator.py` if needed
-- Reduce `MAX_ACTIONS_PER_SESSION` for shorter sessions
-- Clear old sessions from database if needed
+- Agent auto-handles these
+- If errors persist, reduce `MAX_ACTIONS_PER_SESSION`
 
 ### Email reports not sending
 
 - Verify SMTP credentials in `.env`
-- For Gmail: Ensure you're using an App Password, not your regular password
+- For Gmail: Use an App Password, not your regular password
 - Check `agent.log` for detailed error messages
-- Test SMTP settings: `telnet smtp.gmail.com 587`
-- Ensure `ENABLE_EMAIL_REPORTS=true` is set
 
-### Memory system issues
+### Image generation issues
 
-- Memory operations failing: Check `memory.db` file permissions
-- Old memories not appearing: Check that sessions are being saved
-- Categories empty after sessions: Verify `current_session_id` is being set
+**Local SD Turbo:**
 
-### Planning system issues
+- Ensure GPU has 8GB+ VRAM
+- Check CUDA installation: `nvidia-smi`
+- Verify transformers/diffusers versions
 
-- Master plan not created: Check that first session completed successfully
-- To-do list not appearing: Verify `_create_session_plan()` is being called
-- Follow tracking not working: Ensure `planning_system.py` is in `src/services/`
-- Tasks not marking as completed: Check that task descriptions match (case-insensitive)
+**Proxy:**
 
-### Blog integration issues
+- Ensure `ollama_proxy.py` is running
+- Check `SD_PROXY_URL` is correct
+- Verify API key matches
 
-- Blog actions not appearing: Verify `BLOG_API_URL` is set in `.env`
-- Image generation failing: Check `FAL_API_KEY` is valid and has credits
-- Articles not posting: Verify `BLOG_API_KEY` matches your blog backend
-- Base64 images not displaying: Ensure your blog accepts `image_data` parameter
+**FAL.ai:**
+
+- Check API key is valid
+- Ensure you have credits
+
+---
 
 ## License
 
 MIT
 
+---
+
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-Areas for contribution:
+Contributions are welcome! Areas for contribution:
 
 - Additional agent personalities
 - New action types
@@ -1030,6 +729,9 @@ Areas for contribution:
 - Planning system enhancements
 - Network analysis tools
 - Blog integration examples
+- Image generation backends
+
+---
 
 ## Acknowledgments
 
@@ -1040,8 +742,11 @@ Powered by:
 - [llama.cpp](https://github.com/ggerganov/llama.cpp) - LLM inference
 - [ollama](https://github.com/ollama/ollama) - LLM inference
 - [llama-cpp-python](https://github.com/abetlen/llama-cpp-python) - Python bindings
-- [fal.ai](https://fal.ai) - AI image generation (optional)
+- [Stable Diffusion Turbo](https://huggingface.co/stabilityai/sd-turbo) - Local image generation
+- [fal.ai](https://fal.ai) - Cloud image generation (optional)
 - SQLite - Lightweight persistent storage
+
+---
 
 ## Support
 

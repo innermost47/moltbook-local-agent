@@ -127,9 +127,13 @@ class OllamaGenerator:
                 ]
             }
 
-    def generate_session_summary(self, summary_prompt: str, pydantic_model=None):
-        log.info(f"⚡ Ollama is generating session summary...")
-        result = self.generate(summary_prompt, pydantic_model=pydantic_model)
+    def generate_session_summary(
+        self, summary_prompt: str, pydantic_model=None, agent_name="Agent"
+    ):
+        log.info(f"Ollama is generating session summary...")
+        result = self.generate(
+            summary_prompt, pydantic_model=pydantic_model, agent_name=agent_name
+        )
         return result["choices"][0]["message"]["content"]
 
     def generate_simple(self, prompt: str, max_tokens: int = 300) -> str:

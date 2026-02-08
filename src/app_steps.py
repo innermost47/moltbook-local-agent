@@ -1098,41 +1098,12 @@ class AppSteps:
                 strategic_parts.append(f"{extra_feedback}")
 
             if attempt > 1:
-                critical_error_block = f"""
-╔══════════════════════════════════════════════════════════════╗
-║  🚨 ATTEMPT {attempt}/3 FAILED - EXECUTION ERROR
-╚══════════════════════════════════════════════════════════════╝
-
-**PREVIOUS ACTION:** {decision.get('action_type') if decision else 'N/A'}
-
-**ERROR ENCOUNTERED:**
-{last_error}
-
-⚠️ **HOW TO PROCEED:**
-
-**OPTION 1 - FIX PARAMETERS (Recommended):**
-- Keep the same action: '{decision.get('action_type') if decision else 'N/A'}'
-- Identify the INCORRECT parameter from the error message
-- Replace it with a VALID value
-- Retry with corrected parameters
-
-**OPTION 2 - DIFFERENT APPROACH (If unfixable):**
-- If the error indicates the action is fundamentally blocked or impossible
-- Choose a DIFFERENT action that achieves the same goal
-- Adjust your strategy accordingly
-
-**COMMON FIXES:**
-- Invalid ID/domain → Use a valid one from the error message
-- Missing required field → Add the missing parameter
-- Wrong format → Check schema and adjust structure
-- Rate limit → Wait or choose different action
-
-⚡ **ATTEMPTS REMAINING:** {attempts_left}/3
-⚠️ After 3 failed attempts, this task will be ABANDONED and marked as FAILED.
-
----
-
-"""
+                critical_error_block = self.prompt_manager.get_critical_error_block(
+                    attempt=attempt,
+                    decision=decision,
+                    last_error=last_error,
+                    attempts_left=attempts_left,
+                )
                 strategic_parts.insert(0, critical_error_block)
 
             status_nudge = self.prompt_manager.get_status_nudge(
@@ -1240,26 +1211,9 @@ Phase 2/2 active. Use `reply_to_comment` to execute your response.
 
                 if action_type == "publish_public_comment":
                     if not self.selected_post_id:
-                        last_error = f"""
-╔══════════════════════════════════════════════════════════════╗
-║  🚨 CRITICAL WORKFLOW VIOLATION - ACTION REJECTED
-╚══════════════════════════════════════════════════════════════╝
-
-**YOU VIOLATED THE MANDATORY 2-PHASE PROTOCOL:**
-
-You attempted to use `publish_public_comment` WITHOUT selecting a post first.
-
-**NON-NEGOTIABLE RULE:**
-Phase 1: MUST use `select_post_to_comment` with post_id
-Phase 2: THEN use `publish_public_comment` with content
-
-**YOUR NEXT ACTION MUST BE:**
-`select_post_to_comment` with a valid post_id from the feed
-
-**THIS IS NOT OPTIONAL. YOU CANNOT SKIP PHASE 1.**
-
-⚠️ Attempts remaining: {attempts_left}/3
-"""
+                        last_error = self.prompt_manager.get_publish_public_comment_phase_2_protocol_error(
+                            attempts_left=attempts_left
+                        )
                         log.error(
                             f"🚨 WORKFLOW VIOLATION: Attempted publish_public_comment without selecting post first"
                         )
@@ -1270,26 +1224,9 @@ Phase 2: THEN use `publish_public_comment` with content
 
                 if action_type == "reply_to_comment":
                     if not self.selected_comment_id:
-                        last_error = f"""
-╔══════════════════════════════════════════════════════════════╗
-║  🚨 CRITICAL WORKFLOW VIOLATION - ACTION REJECTED
-╚══════════════════════════════════════════════════════════════╝
-
-**YOU VIOLATED THE MANDATORY 2-PHASE PROTOCOL:**
-
-You attempted to use `reply_to_comment` WITHOUT selecting a comment first.
-
-**NON-NEGOTIABLE RULE:**
-Phase 1: MUST use `select_comment_to_reply` with comment_id
-Phase 2: THEN use `reply_to_comment` with content
-
-**YOUR NEXT ACTION MUST BE:**
-`select_comment_to_reply` with a valid comment_id from the feed
-
-**THIS IS NOT OPTIONAL. YOU CANNOT SKIP PHASE 1.**
-
-⚠️ Attempts remaining: {attempts_left}/3
-"""
+                        last_error = self.prompt_manager.get_reply_to_comment_phase_2_protocol_error(
+                            attempts_left=attempts_left
+                        )
                         log.error(
                             f"🚨 WORKFLOW VIOLATION: Attempted reply_to_comment without selecting comment first"
                         )
@@ -1300,27 +1237,10 @@ Phase 2: THEN use `reply_to_comment` with content
 
                 if action_type == "select_post_to_comment" and self.selected_post_id:
                     if self.focused_context_active:
-                        last_error = f"""
-╔══════════════════════════════════════════════════════════════╗
-║  🚨 PHASE CONFUSION - ACTION REJECTED
-╚══════════════════════════════════════════════════════════════╝
-
-**YOU ARE ALREADY IN PHASE 2/2 (FOCUSED MODE)**
-
-You selected post_id: `{self.selected_post_id}`
-
-**YOU CANNOT GO BACK TO PHASE 1.**
-
-**YOUR ONLY VALID ACTION NOW:**
-`publish_public_comment` with your comment content
-
-**DO NOT:**
-- Select another post
-- Try to restart the workflow
-- Use any action other than `publish_public_comment`
-
-⚠️ Attempts remaining: {attempts_left}/3
-"""
+                        last_error = self.prompt_manager.get_confusion_error_on_select_post_to_comment(
+                            selected_post_id=self.selected_post_id,
+                            attempts_left=attempts_left,
+                        )
                         log.error(
                             f"🚨 PHASE VIOLATION: Attempted to re-select while in focused mode"
                         )
@@ -1334,27 +1254,12 @@ You selected post_id: `{self.selected_post_id}`
                     and self.selected_comment_id
                 ):
                     if self.focused_context_active:
-                        last_error = f"""
-╔══════════════════════════════════════════════════════════════╗
-║  🚨 PHASE CONFUSION - ACTION REJECTED
-╚══════════════════════════════════════════════════════════════╝
-
-**YOU ARE ALREADY IN PHASE 2/2 (FOCUSED MODE)**
-
-You selected comment_id: `{self.selected_comment_id}`
-
-**YOU CANNOT GO BACK TO PHASE 1.**
-
-**YOUR ONLY VALID ACTION NOW:**
-`reply_to_comment` with your reply content
-
-**DO NOT:**
-- Select another comment
-- Try to restart the workflow
-- Use any action other than `reply_to_comment`
-
-⚠️ Attempts remaining: {attempts_left}/3
-"""
+                        last_error = (
+                            self.prompt_manager.get_confusion_error_on_reply_to_comment(
+                                selected_comment_id=self.selected_comment_id,
+                                attempts_left=attempts_left,
+                            )
+                        )
                         log.error(
                             f"🚨 PHASE VIOLATION: Attempted to re-select while in focused mode"
                         )

@@ -684,3 +684,136 @@ The feed will be completely replaced with new posts and comments.
 
 **Once refreshed, all previous IDs become INVALID. YOU cannot go back.**
 """
+
+    def get_critical_error_block(
+        self, attempt, decision: dict, last_error, attempts_left
+    ):
+        return f"""
+╔══════════════════════════════════════════════════════════════╗
+║  🚨 ATTEMPT {attempt}/3 FAILED - EXECUTION ERROR
+╚══════════════════════════════════════════════════════════════╝
+
+**PREVIOUS ACTION:** {decision.get('action_type') if decision else 'N/A'}
+
+**ERROR ENCOUNTERED:**
+{last_error}
+
+⚠️ **HOW TO PROCEED:**
+
+**OPTION 1 - FIX PARAMETERS (Recommended):**
+- Keep the same action: '{decision.get('action_type') if decision else 'N/A'}'
+- Identify the INCORRECT parameter from the error message
+- Replace it with a VALID value
+- Retry with corrected parameters
+
+**OPTION 2 - DIFFERENT APPROACH (If unfixable):**
+- If the error indicates the action is fundamentally blocked or impossible
+- Choose a DIFFERENT action that achieves the same goal
+- Adjust your strategy accordingly
+
+**COMMON FIXES:**
+- Invalid ID/domain → Use a valid one from the error message
+- Missing required field → Add the missing parameter
+- Wrong format → Check schema and adjust structure
+- Rate limit → Wait or choose different action
+
+⚡ **ATTEMPTS REMAINING:** {attempts_left}/3
+⚠️ After 3 failed attempts, this task will be ABANDONED and marked as FAILED.
+
+---
+
+"""
+
+    def get_publish_public_comment_phase_2_protocol_error(self, attempts_left):
+        return f"""
+╔══════════════════════════════════════════════════════════════╗
+║  🚨 CRITICAL WORKFLOW VIOLATION - ACTION REJECTED
+╚══════════════════════════════════════════════════════════════╝
+
+**YOU VIOLATED THE MANDATORY 2-PHASE PROTOCOL:**
+
+You attempted to use `publish_public_comment` WITHOUT selecting a post first.
+
+**NON-NEGOTIABLE RULE:**
+Phase 1: MUST use `select_post_to_comment` with post_id
+Phase 2: THEN use `publish_public_comment` with content
+
+**YOUR NEXT ACTION MUST BE:**
+`select_post_to_comment` with a valid post_id from the feed
+
+**THIS IS NOT OPTIONAL. YOU CANNOT SKIP PHASE 1.**
+
+⚠️ Attempts remaining: {attempts_left}/3
+"""
+
+    def get_reply_to_comment_phase_2_protocol_error(self, attempts_left):
+        return f"""
+╔══════════════════════════════════════════════════════════════╗
+║  🚨 CRITICAL WORKFLOW VIOLATION - ACTION REJECTED
+╚══════════════════════════════════════════════════════════════╝
+
+**YOU VIOLATED THE MANDATORY 2-PHASE PROTOCOL:**
+
+You attempted to use `reply_to_comment` WITHOUT selecting a comment first.
+
+**NON-NEGOTIABLE RULE:**
+Phase 1: MUST use `select_comment_to_reply` with comment_id
+Phase 2: THEN use `reply_to_comment` with content
+
+**YOUR NEXT ACTION MUST BE:**
+`select_comment_to_reply` with a valid comment_id from the feed
+
+**THIS IS NOT OPTIONAL. YOU CANNOT SKIP PHASE 1.**
+
+⚠️ Attempts remaining: {attempts_left}/3
+"""
+
+    def get_confusion_error_on_select_post_to_comment(
+        self, selected_post_id, attempts_left
+    ):
+        return f"""
+╔══════════════════════════════════════════════════════════════╗
+║  🚨 PHASE CONFUSION - ACTION REJECTED
+╚══════════════════════════════════════════════════════════════╝
+
+**YOU ARE ALREADY IN PHASE 2/2 (FOCUSED MODE)**
+
+You selected post_id: `{selected_post_id}`
+
+**YOU CANNOT GO BACK TO PHASE 1.**
+
+**YOUR ONLY VALID ACTION NOW:**
+`publish_public_comment` with your comment content
+
+**DO NOT:**
+- Select another post
+- Try to restart the workflow
+- Use any action other than `publish_public_comment`
+
+⚠️ Attempts remaining: {attempts_left}/3
+"""
+
+    def get_confusion_error_on_reply_to_comment(
+        self, selected_comment_id, attempts_left
+    ):
+        return f"""
+╔══════════════════════════════════════════════════════════════╗
+║  🚨 PHASE CONFUSION - ACTION REJECTED
+╚══════════════════════════════════════════════════════════════╝
+
+**YOU ARE ALREADY IN PHASE 2/2 (FOCUSED MODE)**
+
+You selected comment_id: `{selected_comment_id}`
+
+**YOU CANNOT GO BACK TO PHASE 1.**
+
+**YOUR ONLY VALID ACTION NOW:**
+`reply_to_comment` with your reply content
+
+**DO NOT:**
+- Select another comment
+- Try to restart the workflow
+- Use any action other than `reply_to_comment`
+
+⚠️ Attempts remaining: {attempts_left}/3
+"""

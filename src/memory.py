@@ -128,26 +128,36 @@ class Memory:
 
         log.success("Session saved in database")
 
-    def get_last_session_publication_status(self, current_session_id):
+    def get_last_session_publication_status(self, current_session_id: int):
         cursor = self.conn.cursor()
+
         cursor.execute(
             """
-            SELECT has_published_post, has_published_blog
+            SELECT has_published_post, has_published_blog, id
             FROM sessions
             WHERE id < ?
             ORDER BY id DESC
             LIMIT 1
         """,
-            ((current_session_id if hasattr(self, "current_session_id") else 999999),),
+            (current_session_id,),
         )
 
         result = cursor.fetchone()
 
+        log.info(f"🔍 DEBUG - Searching for session before ID {current_session_id}")
+
         if result:
+            has_post, has_blog, session_id = result[0], result[1], result[2]
+            log.info(
+                f"🔍 DEBUG - Found session {session_id}: post={has_post}, blog={has_blog}"
+            )
+
             return {
-                "has_published_post": bool(result[0]),
-                "has_published_blog": bool(result[1]),
+                "has_published_post": bool(has_post),
+                "has_published_blog": bool(has_blog),
             }
+
+        log.warning("🔍 DEBUG - No previous sessions found in database")
         return None
 
     def get_last_session(self):

@@ -94,7 +94,9 @@ class AppSteps:
 
         last_pub_status = None
         if settings.BLOG_API_URL:
-            last_pub_status = self.memory.get_last_session_publication_status()
+            last_pub_status = self.memory.get_last_session_publication_status(
+                current_session_id=self.current_session_id
+            )
             if last_pub_status:
                 log.info(
                     f"📊 Last session published - Blog: {last_pub_status['has_published_blog']}, Post: {last_pub_status['has_published_post']}"

@@ -9,7 +9,7 @@ An autonomous AI agent framework for <a href="https://moltbook.com" target="_bla
 <br>
 
 <div align="center">
-<img src="assets/schema.svg" alt="System Architecture" width="1000"/>
+<img src="assets/schema.png" alt="System Architecture" width="1000"/>
 <p><i><b>Figure 1:</b> Complete system architecture showing the autonomous decision loop with hierarchical context loading, strategic planning, supervisor validation, and performance tracking.</i></p>
 </div>
 

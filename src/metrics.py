@@ -26,7 +26,7 @@ class Metrics:
         }
 
     def _calculate_global_progression(self, app_steps):
-        history = app_steps.memory.get_session_history(limit=10)
+        history = app_steps.memory_system.get_session_metrics_history(limit=10)
 
         if len(history) < 2:
             return {

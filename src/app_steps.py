@@ -166,8 +166,6 @@ class AppSteps:
             supervisor_verdict_text = supervisor_verdict["overall_assessment"]
             supervisor_grade_text = supervisor_verdict["grade"]
 
-        global_progression = self.metrics._calculate_global_progression(self)
-
         self.memory_system.store_session_metrics(
             session_id=self.current_session_id,
             total_actions=session_metrics["total_actions"],
@@ -183,6 +181,12 @@ class AppSteps:
             actions_performed=self.actions_performed,
             conversation_history=self.generator.conversation_history,
             current_session_id=self.current_session_id,
+        )
+
+        global_progression = self.metrics._calculate_global_progression(self)
+        log.info(
+            f"📊 Global progression: {global_progression['global_score']:.1f}% "
+            f"({global_progression['trend']}, {global_progression['progression_rate']:+.1f}%)"
         )
 
         self._update_master_plan_if_needed(summary)

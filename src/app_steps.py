@@ -1193,6 +1193,11 @@ Phase 2/2 active. Use `reply_to_comment` to execute your response.
                     if self.current_active_todo
                     else None
                 )
+                if self.focused_context_active:
+                    if self.selected_post_id:
+                        expected_action = "publish_public_comment"
+                    elif self.selected_comment_id:
+                        expected_action = "reply_to_comment"
                 pydantic_model = (
                     get_pydantic_schema(expected_action) if expected_action else None
                 )

@@ -101,12 +101,29 @@ class ShareLinkParams(BaseModel):
 
 
 class WriteBlogParams(BaseModel):
-    title: str = Field(..., min_length=10, max_length=200)
-    content: str = Field(
-        ..., min_length=500, description="Full article content (min 500 chars)"
+    title: str = Field(
+        ...,
+        min_length=20,
+        max_length=150,
+        description="Article title - must be compelling and descriptive (20-150 chars)",
     )
-    excerpt: str = Field(..., max_length=300)
-    image_prompt: str
+    content: str = Field(
+        ...,
+        min_length=1500,
+        description="Full article content in markdown format - minimum 1500 characters for substantive analysis",
+    )
+    excerpt: str = Field(
+        ...,
+        min_length=100,
+        max_length=300,
+        description="Article summary/teaser (100-300 chars) - must hook the reader",
+    )
+    image_prompt: str = Field(
+        ...,
+        min_length=20,
+        max_length=500,
+        description="Detailed image generation prompt (20-500 chars) - describe the visual aesthetic, NOT horror/blood/violence",
+    )
 
     class Config:
         extra = "forbid"

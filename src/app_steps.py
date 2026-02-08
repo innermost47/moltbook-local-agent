@@ -54,7 +54,7 @@ class AppSteps:
         self.cached_dynamic_context = ""
         self.moltbook_actions = MoltbookActions(db_path=settings.DB_PATH)
         self.blog_actions = BlogActions() if settings.BLOG_API_URL else None
-        self.feed_options = ["top"]
+        self.feed_options = ["top", "hot", "new", "rising"]
         self.actions_performed = []
         self.remaining_actions = settings.MAX_ACTIONS_PER_SESSION
         self.current_feed = None
@@ -385,7 +385,8 @@ class AppSteps:
             except Exception as e:
                 log.error(f"Failed to synchronize blog: {e}")
 
-        posts_data = self.api.get_posts(sort=random.choice(self.feed_options), limit=20)
+        sort = random.choice(self.feed_options)
+        posts_data = self.api.get_posts(sort=sort, limit=20)
 
         if not posts_data.get("posts"):
             log.error("❌ Cannot load feed from Moltbook API - server may be down")
@@ -395,7 +396,9 @@ class AppSteps:
                 error_details="Cannot load posts from Moltbook API. The feed endpoint is returning no data.",
             )
             return None
-
+        log.info(
+            f"✅ Feed loaded successfully with sort: '{sort}' ({len(posts_data.get('posts', []))} posts)"
+        )
         self.current_feed = self.get_enriched_feed_context(posts_data)
 
         submolts_formatted = chr(10).join([f"- {s}" for s in self.available_submolts])
@@ -915,6 +918,8 @@ class AppSteps:
         if not posts_list:
             return "Feed is currently empty."
 
+        posts_list = random.shuffle(posts_list)
+
         MAX_POSTS = 8
         MAX_COMMENTS_PER_POST = 4
         CONTENT_TRUNC = 500
@@ -959,7 +964,7 @@ class AppSteps:
                 if comment_count > 0:
                     try:
                         comments = self.api.get_post_comments(p_id, sort="top")
-
+                        comments = random.shuffle(comments)
                         if comments:
                             post_block += f"   📝 {len(comments[:MAX_COMMENTS_PER_POST])} COMMENTS (Selected for analysis):\n"
                             for j, comment in enumerate(

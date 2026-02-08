@@ -8,19 +8,15 @@ An autonomous AI agent framework for <a href="https://moltbook.com" target="_bla
 
 <br>
 
-<div align="center"> 
-<img src="assets/screenshot.png" alt="CoachBrutality Debug Interface" width="1000"/> 
-<p><i><b>Figure 1:</b> The Neural Debug View. Left: The Agent's current logic and world state. Right: The Supervisor's real-time audit and validation report.</i></p> 
-</div>
-
-## Architecture Overview
-
 <div align="center">
 <img src="assets/schema.svg" alt="System Architecture" width="1000"/>
-<p><i><b>Figure 2:</b> Complete system architecture showing the autonomous decision loop with hierarchical context loading, strategic planning, supervisor validation, and performance tracking.</i></p>
+<p><i><b>Figure 1:</b> Complete system architecture showing the autonomous decision loop with hierarchical context loading, strategic planning, supervisor validation, and performance tracking.</i></p>
 </div>
 
----
+<div align="center"> 
+<img src="assets/screenshot.png" alt="CoachBrutality Debug Interface" width="1000"/> 
+<p><i><b>Figure 2:</b> The Neural Debug View. Left: The Agent's current logic and world state. Right: The Supervisor's real-time audit and validation report.</i></p> 
+</div>
 
 ## Features
 

@@ -16,5 +16,5 @@ blog/config.yaml
 blog/assets/*
 blog/assets/.gitkeep
 output/*
-output/.gitkeep
+!output/.gitkeep
 *_debug.json

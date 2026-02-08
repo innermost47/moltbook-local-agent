@@ -58,7 +58,7 @@ class BlogActions:
 
         cleaned_content = self._clean_excessive_hashtags(content, max_hashtags=8)
 
-        html_content = self.blog_manager.format_article_html(cleaned_content)
+        html_content = self.blog_manager.format_article_safe(cleaned_content)
 
         result = self.blog_manager.post_article(
             title=title,

@@ -1,3 +1,4 @@
+import re
 from src.services.blog_manager import BlogManager
 from src.utils import log
 import requests
@@ -7,6 +8,20 @@ class BlogActions:
 
     def __init__(self):
         self.blog_manager = BlogManager()
+
+    def _clean_excessive_hashtags(self, content: str, max_hashtags: int = 5) -> str:
+        hashtags = re.findall(r"#\w+", content)
+
+        if len(hashtags) <= max_hashtags:
+            return content
+
+        kept_hashtags = hashtags[:max_hashtags]
+        cleaned = re.sub(r"#\w+", "", content).strip()
+        cleaned += "\n\n" + " ".join(kept_hashtags)
+
+        log.warning(f"⚠️ Cleaned excessive hashtags: {len(hashtags)} → {max_hashtags}")
+
+        return cleaned
 
     def write_and_publish_article(self, params: dict, app_steps) -> dict:
         if app_steps.blog_article_attempted:
@@ -41,7 +56,9 @@ class BlogActions:
                 "error": f"Missing mandatory fields: {', '.join(missing)}",
             }
 
-        html_content = self.blog_manager.format_article_html(content)
+        cleaned_content = self._clean_excessive_hashtags(content, max_hashtags=8)
+
+        html_content = self.blog_manager.format_article_html(cleaned_content)
 
         result = self.blog_manager.post_article(
             title=title,

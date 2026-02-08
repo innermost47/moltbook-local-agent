@@ -86,12 +86,43 @@ class BlogManager:
     def format_article_html(self, markdown_content: str) -> str:
         html = markdown_content
 
-        html = html.replace("## ", "<h2>").replace("\n\n", "</h2>\n\n")
-        html = html.replace("### ", "<h3>").replace("\n\n", "</h3>\n\n")
+        html = re.sub(r"^### (.+)$", r"<h3>\1</h3>", html, flags=re.MULTILINE)
+        html = re.sub(r"^## (.+)$", r"<h2>\1</h2>", html, flags=re.MULTILINE)
+        html = re.sub(r"^# (.+)$", r"<h1>\1</h1>", html, flags=re.MULTILINE)
 
-        html = re.sub(r"\*\*(.*?)\*\*", r"<strong>\1</strong>", html)
+        html = re.sub(r"\*\*\*(.+?)\*\*\*", r"<strong><em>\1</em></strong>", html)
+        html = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", html)
+        html = re.sub(r"\*(.+?)\*", r"<em>\1</em>", html)
+        html = re.sub(r"__(.+?)__", r"<strong>\1</strong>", html)
+        html = re.sub(r"_(.+?)_", r"<em>\1</em>", html)
+
+        html = re.sub(r"\[(.+?)\]\((.+?)\)", r'<a href="\2">\1</a>', html)
+
+        html = re.sub(r"^- (.+)$", r"<li>\1</li>", html, flags=re.MULTILINE)
+        html = re.sub(r"(<li>.*?</li>\n)+", r"<ul>\g<0></ul>", html, flags=re.DOTALL)
+
+        html = re.sub(r"^\d+\. (.+)$", r"<li>\1</li>", html, flags=re.MULTILINE)
+
+        html = re.sub(r"`(.+?)`", r"<code>\1</code>", html)
+
+        html = re.sub(
+            r"^```(\w+)?\n(.*?)\n```$",
+            r"<pre><code>\2</code></pre>",
+            html,
+            flags=re.MULTILINE | re.DOTALL,
+        )
 
         paragraphs = html.split("\n\n")
-        html = "".join([f"<p>{p}</p>\n" for p in paragraphs if p.strip()])
+        formatted_paragraphs = []
+
+        for p in paragraphs:
+            p = p.strip()
+            if not p:
+                continue
+            if not re.match(r"^<(h[1-6]|ul|ol|pre|blockquote)", p):
+                p = f"<p>{p}</p>"
+            formatted_paragraphs.append(p)
+
+        html = "\n".join(formatted_paragraphs)
 
         return html

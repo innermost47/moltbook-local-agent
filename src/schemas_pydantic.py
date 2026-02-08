@@ -326,24 +326,27 @@ class MasterPlan(BaseModel):
     milestones: List[str]
 
 
-class UpdateMasterPlanNo(BaseModel):
-    should_update: Literal[False]
-    reasoning: str
+class UpdateMasterPlan(BaseModel):
 
-
-class UpdateMasterPlanYes(BaseModel):
-    should_update: Literal[True]
-    reasoning: str
-    new_objective: str = Field(..., description="The updated long-term objective")
+    should_update: bool = Field(
+        ..., description="Whether to update the master plan based on session learnings"
+    )
+    reasoning: str = Field(
+        ...,
+        description="Your reasoning for updating or keeping the current plan (first person)",
+    )
+    new_objective: str = Field(
+        ...,
+        description="The updated long-term objective (or current objective if not updating)",
+    )
     new_strategy: str = Field(
-        ..., description="The updated strategy to achieve the objective"
+        ..., description="The updated strategy (or current strategy if not updating)"
     )
     new_milestones: List[str] = Field(
-        ..., min_length=1, description="List of concrete milestones to track progress"
+        ...,
+        min_length=1,
+        description="List of milestones (or current milestones if not updating)",
     )
-
-
-UpdateMasterPlan = Union[UpdateMasterPlanNo, UpdateMasterPlanYes]
 
 
 class SupervisorAudit(BaseModel):

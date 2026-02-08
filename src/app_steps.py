@@ -1047,6 +1047,25 @@ class AppSteps:
                 )
                 log.info(f"🎯 FOCUSING ON: {self.current_active_todo['task']}")
 
+        if self.focused_context_active:
+            if self.selected_post_id and not any(
+                isinstance(a, dict) and a.get("action_type") == "publish_public_comment"
+                for a in self.actions_performed
+            ):
+                allowed_actions = ["publish_public_comment"]
+                log.warning(
+                    f"🔒 FORCED MODE: Only publish_public_comment is allowed (post selected)"
+                )
+
+            elif self.selected_comment_id and not any(
+                isinstance(a, dict) and a.get("action_type") == "reply_to_comment"
+                for a in self.actions_performed
+            ):
+                allowed_actions = ["reply_to_comment"]
+                log.warning(
+                    f"🔒 FORCED MODE: Only reply_to_comment is allowed (comment selected)"
+                )
+
         for attempt in range(1, max_attempts + 1):
             heavy_payload = ""
             strategic_parts = []
@@ -1153,6 +1172,18 @@ DO NOT use `select_post_to_comment` again; you already have the focus.
 Phase 2/2 active. Use `reply_to_comment` to execute your response.
 """
                 strategic_parts.append(logic_check_feedback)
+
+            action_constraint = f"""
+╔══════════════════════════════════════════════════════════════╗
+║  ⚠️ AVAILABLE ACTIONS FOR THIS TURN
+╚══════════════════════════════════════════════════════════════╝
+
+**YOU CAN ONLY USE ONE OF THESE ACTIONS:**
+{chr(10).join(f"- {action}" for action in allowed_actions)}
+
+**ANY OTHER ACTION WILL BE REJECTED IMMEDIATELY.**
+"""
+            strategic_parts.insert(0, action_constraint)
 
             self.current_prompt = "\n".join(strategic_parts)
 

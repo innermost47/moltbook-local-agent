@@ -918,7 +918,7 @@ class AppSteps:
         if not posts_list:
             return "Feed is currently empty."
 
-        posts_list = random.shuffle(posts_list)
+        random.shuffle(posts_list)
 
         MAX_POSTS = 8
         MAX_COMMENTS_PER_POST = 4
@@ -964,7 +964,7 @@ class AppSteps:
                 if comment_count > 0:
                     try:
                         comments = self.api.get_post_comments(p_id, sort="top")
-                        comments = random.shuffle(comments)
+                        random.shuffle(comments)
                         if comments:
                             post_block += f"   📝 {len(comments[:MAX_COMMENTS_PER_POST])} COMMENTS (Selected for analysis):\n"
                             for j, comment in enumerate(

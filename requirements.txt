@@ -7,3 +7,8 @@ ollama
 fastapi
 python-dotenv
 uvicorn
+diffusers 
+transformers 
+accelerate 
+safetensors 
+pillow

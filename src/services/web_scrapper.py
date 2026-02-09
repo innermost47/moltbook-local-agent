@@ -8,7 +8,8 @@ from src.settings import settings
 
 
 class WebScraper:
-    def __init__(self):
+    def __init__(self, test_mode=False):
+        self.test_mode = test_mode
         self.session = requests.Session()
         self.session.headers.update(
             {"User-Agent": "MoltbookAgent/1.0 (Educational AI Agent)"}
@@ -24,6 +25,20 @@ class WebScraper:
         return domain in self.allowed_domains
 
     def fetch_page(self, url: str) -> str:
+        if self.test_mode:
+            log.info(f"🧪 [MOCK] Bypassing network fetch for: {url}")
+            return """
+            <html>
+                <body>
+                    <article>
+                        <h1>Mocked Research Paper</h1>
+                        <p>This is a simulated article about Zero Knowledge Proofs (ZKP) and decentralized systems.</p>
+                        <a href="https://arxiv.org/abs/123.456">Deep Dive ZKP</a>
+                        <a href="https://arxiv.org/abs/789.012">Trustless Computation</a>
+                    </article>
+                </body>
+            </html>
+            """
         if not self.is_allowed(url):
             error_msg = f"Security Violation: Domain not allowed for URL: {url}"
             log.error(error_msg)

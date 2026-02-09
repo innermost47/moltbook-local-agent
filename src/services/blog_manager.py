@@ -13,7 +13,8 @@ from src.generators import (
 
 class BlogManager:
 
-    def __init__(self):
+    def __init__(self, test_mode=False):
+        self.test_mode = test_mode
         self.blog_api_url = settings.BLOG_API_URL
         self.blog_api_key = settings.BLOG_API_KEY
         self.fal_api_key = settings.FAL_API_KEY
@@ -31,6 +32,14 @@ class BlogManager:
     def post_article(
         self, title: str, excerpt: str, content: str, image_prompt: str
     ) -> Dict:
+        if getattr(self, "test_mode", False):
+            log.info(f"🧪 [MOCK] Bypassing real blog post for: {title[:30]}...")
+            return {
+                "success": True,
+                "url": "https://blog.test/mock-article",
+                "slug": "mock-article",
+                "article_id": 999,
+            }
         try:
             image_data = self.image_generator.generate_image(image_prompt)
 

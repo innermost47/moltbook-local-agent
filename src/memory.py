@@ -6,8 +6,8 @@ from src.utils import log
 
 
 class Memory:
-    def __init__(self):
-        self.conn = sqlite3.connect(settings.DB_PATH)
+    def __init__(self, db_path=settings.DB_PATH):
+        self.conn = sqlite3.connect(db_path)
         self._init_db()
 
     def _init_db(self):
@@ -19,8 +19,10 @@ class Memory:
             timestamp TEXT,
             learnings TEXT,
             plan TEXT,
-            actions TEXT,
+            next_session_plan TEXT,
+            actions_performed TEXT,
             conversation_history TEXT,
+            full_context TEXT,
             has_published_post INTEGER DEFAULT 0,
             has_published_blog INTEGER DEFAULT 0
         )

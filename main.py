@@ -20,18 +20,23 @@ if __name__ == "__main__":
 
     parser.add_argument(
         "--mode",
-        choices=["session", "info", "test"],
+        choices=["session", "info", "test", "debug-api"],
         default="session",
         help="""
         Operation mode:
-        • session: Run a full autonomous session (default - agent performs actions based on personality and strategy)
-        • info: Display agent stats only (karma, followers, no actions performed)
-        • test: Test Moltbook API connectivity and display feed with comments (useful for debugging)
+        • session: Run a full autonomous session (default)
+        • info: Display agent stats only
+        • test: Run a SIMULATED session using local JSON data (no API/LLM costs)
+        • debug-api: Test live Moltbook API connectivity and display feed
         """,
     )
 
     args = parser.parse_args()
     if args.mode == "test":
+        log.info("🧪 STARTING OFFLINE SIMULATION TEST")
+        app = AppSteps(test_mode=True)
+        app.run_session()
+    elif args.mode == "debug-api":
         api = MoltbookAPI()
         me = api.get_me()
         if me:

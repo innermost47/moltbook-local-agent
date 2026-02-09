@@ -1,4 +1,5 @@
 import json
+import os
 from typing import List
 import time
 import random
@@ -26,55 +27,92 @@ from src.schemas_pydantic import (
     MasterPlan,
     UpdateMasterPlan,
 )
+from src.mocks import LLMMock, MoltbookMock, MoltbookActionsMock
 
 
 class AppSteps:
-    def __init__(self):
-        self.api = MoltbookAPI()
-        if settings.USE_OLLAMA:
-            self.generator = OllamaGenerator(model=settings.OLLAMA_MODEL)
-            self.supervisor = SupervisorOllama(model=settings.OLLAMA_MODEL)
-        else:
-            self.generator = Generator()
-            self.supervisor = Supervisor(self.generator.llm)
-        self.memory = Memory()
-        self.reporter = EmailReporter()
-        self.memory_system = MemorySystem()
-        self.prompt_manager = PromptManager()
-        self.planning_system = PlanningSystem(db_path=settings.DB_PATH)
-        self.web_scraper = WebScraper()
-        self.metrics = Metrics()
-        self.selected_post_id = None
-        self.selected_comment_id = None
-        self.focused_context_active = False
-        self.current_active_todo = None
-        self.feed_posts_data = {}
-        self.feed_comments_data = {}
-        self.agent_name = "Agent"
-        self.cached_dynamic_context = ""
-        self.moltbook_actions = MoltbookActions(db_path=settings.DB_PATH)
-        self.blog_actions = BlogActions() if settings.BLOG_API_URL else None
-        self.feed_options = ["top", "hot", "new", "rising"]
+    def __init__(self, test_mode=False):
+        self.test_mode = test_mode
+        self.remaining_actions = settings.MAX_ACTIONS_PER_SESSION
         self.actions_performed = []
         self.actions_failed = []
         self.actions_rejected = []
         self.actions_aborted = []
-        self.remaining_actions = settings.MAX_ACTIONS_PER_SESSION
-        self.current_feed = None
+        self.created_content_urls = []
+        self.session_todos = []
+        self.feed_posts_data = {}
+        self.feed_comments_data = {}
         self.available_post_ids = []
         self.available_comment_ids = {}
         self.post_creation_attempted = False
-        self.available_submolts = ["general"]
-        self.last_post_time = None
-        self.last_comment_time = None
-        self.created_content_urls = []
-        self.current_session_id = None
-        self.allowed_domains = settings.get_domains()
-        self.session_todos = []
         self.blog_article_attempted = False
-        self.current_prompt = None
         self.has_created_master_plan = False
+        self.focused_context_active = False
+        self.current_active_todo = None
+        self.selected_post_id = None
+        self.selected_comment_id = None
         self.master_plan_success_prompt = ""
+        self.allowed_domains = settings.get_domains()
+        self.current_feed = None
+        self.reporter = None
+        self.last_comment_time = None
+        self.blog_actions = (
+            BlogActions(self.test_mode) if settings.BLOG_API_URL else None
+        )
+        if self.test_mode:
+            shared_db = "file:testdb?mode=memory&cache=shared"
+            mock_data_path = "tests/data/fake_moltbook_api.json"
+            if os.path.exists(mock_data_path):
+                with open(mock_data_path, "r", encoding="utf-8") as f:
+                    raw_data = json.load(f)
+                    log.info(f"🧪 [DEBUG] JSON Keys found: {list(raw_data.keys())}")
+                    posts_data = raw_data.get("posts", [])
+                    comments_data = raw_data.get("comments", [])
+
+                    self.available_post_ids = [p["id"] for p in posts_data if "id" in p]
+                    self.available_comment_ids = {
+                        c["id"]: c["post_id"] for c in comments_data if "id" in c
+                    }
+
+                    log.info(
+                        f"🧪 [MOCK] Feed populated: {len(self.available_post_ids)} posts, {len(self.available_comment_ids)} comments."
+                    )
+            else:
+                log.error(f"❌ Mock JSON file not found at {mock_data_path}")
+            self.api = MoltbookMock()
+            self.generator = LLMMock()
+            self.memory = Memory(db_path=shared_db)
+            self.memory_system = MemorySystem(db_path=shared_db)
+            self.planning_system = PlanningSystem(db_path=shared_db)
+            self.moltbook_actions = MoltbookActionsMock(db_path=shared_db)
+            self.metrics = Metrics()
+            self.prompt_manager = PromptManager()
+            self.web_scraper = WebScraper(self.test_mode)
+            self.agent_name = "MoltbookLocalAgent_TEST"
+            log.warning("⚠️ RUNNING IN OFFLINE TEST MODE")
+        else:
+            self.api = MoltbookAPI()
+            if settings.USE_OLLAMA:
+                self.generator = OllamaGenerator(model=settings.OLLAMA_MODEL)
+                self.supervisor = SupervisorOllama(model=settings.OLLAMA_MODEL)
+            else:
+                self.generator = Generator()
+                self.supervisor = Supervisor(self.generator.llm)
+            self.memory = Memory()
+            self.reporter = EmailReporter()
+            self.memory_system = MemorySystem(db_path=settings.DB_PATH)
+            self.prompt_manager = PromptManager()
+            self.planning_system = PlanningSystem(db_path=settings.DB_PATH)
+            self.web_scraper = WebScraper()
+            self.metrics = Metrics()
+            self.agent_name = "Agent"
+            self.cached_dynamic_context = ""
+            self.moltbook_actions = MoltbookActions(db_path=settings.DB_PATH)
+            self.feed_options = ["top", "hot", "new", "rising"]
+            self.available_submolts = ["general"]
+            self.last_post_time = None
+            self.current_session_id = None
+            self.current_prompt = None
 
     def run_session(self):
         log.info("=== SESSION START ===")
@@ -140,7 +178,10 @@ class AppSteps:
             pending_confirmation = self._perform_autonomous_action(
                 extra_feedback=pending_confirmation
             )
-            if pending_confirmation and "TERMINATE_SESSION" in pending_confirmation:
+            if (
+                isinstance(pending_confirmation, dict)
+                and pending_confirmation.get("action_type") == "TERMINATE_SESSION"
+            ):
                 log.info("Agent decided to terminate session early.")
                 unfinished_tasks = [
                     t
@@ -235,20 +276,23 @@ class AppSteps:
 
         self._update_master_plan_if_needed(summary)
 
-        self.reporter.send_session_report(
-            agent_name=agent_name,
-            karma=current_karma,
-            learnings=summary["learnings"],
-            next_plan=summary["next_session_plan"],
-            content_urls=self.created_content_urls,
-            session_metrics=session_metrics,
-            supervisor_verdict=supervisor_verdict if settings.USE_SUPERVISOR else None,
-            global_progression=global_progression,
-            actions_performed=self.actions_performed,
-            actions_failed=self.actions_failed,
-            actions_aborted=self.actions_aborted,
-            actions_rejected=self.actions_rejected,
-        )
+        if self.reporter:
+            self.reporter.send_session_report(
+                agent_name=agent_name,
+                karma=current_karma,
+                learnings=summary["learnings"],
+                next_plan=summary["next_session_plan"],
+                content_urls=self.created_content_urls,
+                session_metrics=session_metrics,
+                supervisor_verdict=(
+                    supervisor_verdict if settings.USE_SUPERVISOR else None
+                ),
+                global_progression=global_progression,
+                actions_performed=self.actions_performed,
+                actions_failed=self.actions_failed,
+                actions_aborted=self.actions_aborted,
+                actions_rejected=self.actions_rejected,
+            )
 
         log.info("=== SESSION END ===")
 
@@ -273,6 +317,13 @@ class AppSteps:
         return required_actions
 
     def get_context(self):
+        if self.test_mode:
+            return (
+                "System Context Test",
+                "Dynamic Context Test",
+                "MoltbookLocalAgent_TEST",
+                1000,
+            )
         me = self.api.get_me()
 
         if me:
@@ -508,7 +559,7 @@ class AppSteps:
                 agent_name=self.agent_name
             )
             try:
-                result = self.generator.generate(
+                content = self.generator.generate(
                     init_prompt,
                     pydantic_model=MasterPlan,
                     agent_name=self.agent_name,
@@ -571,8 +622,18 @@ class AppSteps:
                     heavy_context=feed_section,
                 )
 
-                content = result["choices"][0]["message"]["content"]
-                plan_data = json.loads(content) if isinstance(content, str) else content
+                if isinstance(result, dict) and "choices" in result:
+                    content = result["choices"][0]["message"]["content"]
+                elif isinstance(result, str):
+                    content = result
+                else:
+                    content = str(result)
+
+                if isinstance(content, str):
+                    content = re.sub(r"```json\s*|```\s*", "", content).strip()
+                    plan_data = json.loads(content)
+                else:
+                    plan_data = content
 
                 tasks = plan_data.get("tasks", [])
 
@@ -580,7 +641,7 @@ class AppSteps:
 
                 if is_valid:
                     log.success(f"✅ Session plan valid on attempt {attempts}!")
-                    validated_tasks = fixed_tasks
+                    validated_tasks = fixed_tasks if fixed_tasks else tasks
                     break
                 else:
                     feedback = "\n".join(violations)
@@ -592,7 +653,7 @@ class AppSteps:
                 feedback = f"JSON/Parsing Error: {str(e)}"
                 log.error(f"⚠️ Attempt {attempts} parse error: {e}")
 
-        if not validated_tasks:
+        if attempts >= max_attempts and not validated_tasks:
             log.error("🚨 All 3 attempts failed. Using emergency fallback plan.")
             validated_tasks = self._get_fallback_plan()
 

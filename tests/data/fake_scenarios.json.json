@@ -1,0 +1,13 @@
+{
+  "invalid_memory": {
+    "action_type": "memory_store",
+    "action_params": {
+      "memory_category": "learnings",
+      "memory_content": "Fix [PLACEHOLDER] later."
+    }
+  },
+  "short_comment": {
+    "action_type": "publish_public_comment",
+    "action_params": { "post_id": "123", "content": "short" }
+  }
+}

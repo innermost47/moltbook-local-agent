@@ -1211,11 +1211,7 @@ class AppSteps:
 
             strategic_parts.append(status_nudge)
 
-            if attempts_left == 1:
-                strategic_parts.append(
-                    "⚠️ **YOUR FINAL ATTEMPT.** If YOU fail or are rejected, the session will move on. Be precise and follow the schema."
-                )
-            else:
+            if attempts_left != 1:
                 strategic_parts.append(
                     f"#### 🛡️ ATTEMPTS REMAINING FOR THIS ACTION: {attempts_left}/3"
                 )
@@ -1521,6 +1517,12 @@ AVAILABLE ALTERNATIVES:
                                     f"- `{key}`: Expected `{expected_val}`, got `{actual_val}`"
                                 )
 
+                        is_last_chance = attempt == max_attempts - 1
+                        warning_header = (
+                            "🚨 **FINAL WARNING: LOGIC LOOP DETECTED** 🚨"
+                            if is_last_chance
+                            else "🚨 **CRITICAL TASK PARAMETER MISMATCH** 🚨"
+                        )
                         mismatch_details = (
                             "\n".join(mismatches)
                             if mismatches
@@ -1528,18 +1530,30 @@ AVAILABLE ALTERNATIVES:
                         )
 
                         last_error = f"""
-🚨 **CRITICAL TASK PARAMETER MISMATCH** 🚨
+{warning_header}
 
 Your proposed action does not align with the requirements of your Active Task.
 **Divergences detected:**
 {mismatch_details}
 
 **REQUIRED ACTION TYPE:** `{self.current_active_todo.get('action_type')}`
+"""
+                        if is_last_chance:
+                            last_error += f"""
+⚠️ **TERMINATION PROTOCOL INITIATED:**
+You have failed this ID match twice. You are currently anchored to an incorrect ID `{act_params.get('post_id', 'N/A')}`.
+This is your **LAST CHANCE**. 
 
+**DIRECTIVE:**
+- Copy/Paste the expected value: `{todo_params.get('post_id', 'N/A')}`.
+- If you repeat the same wrong ID again, Task '{self.current_active_todo.get('task')[:30]}' will be MARKED AS FAILED and you will lose access to this thread.
+- If the expected ID is missing from your feed, use `update_todo_status` to CANCEL this task NOW.
+"""
+                        else:
+                            last_error += """
 **FIX:**
 1. Use the EXACT parameters defined in your Session Plan.
-2. If the target (ID/URL) is no longer valid or accessible, you MUST use `update_todo_status` to mark this task as 'cancelled' before moving to the next one.
-3. DO NOT persist with incorrect IDs; it is a waste of action points.
+2. If the target is no longer accessible, use `update_todo_status` to mark as 'cancelled'.
 """
                         log.error(
                             f"🚫 Action blocked: Parameter Mismatch for task '{self.current_active_todo.get('task')[:30]}'"

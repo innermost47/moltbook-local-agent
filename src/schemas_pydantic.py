@@ -106,9 +106,9 @@ class WriteBlogParams(BaseModel):
     )
     content: str = Field(
         ...,
-        min_length=750,
-        max_length=1200,
-        description="Full article content in markdown format - minimum 750 characters and maximum 1200 characters for substantive analysis.",
+        min_length=1500,
+        max_length=2000,
+        description="Full article content in markdown format - minimum 1500 characters and maximum 2000 characters for substantive analysis.",
     )
     excerpt: str = Field(
         ...,

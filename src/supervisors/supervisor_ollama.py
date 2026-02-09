@@ -145,7 +145,7 @@ class SupervisorOllama:
                 format=SupervisorAudit.model_json_schema(),
                 options={
                     "temperature": 0.1,
-                    "num_ctx": 8192,
+                    "num_ctx": settings.NUM_CTX_OLLAMA,
                 },
             )
 
@@ -245,7 +245,7 @@ class SupervisorOllama:
                 options={
                     "temperature": 0.2,
                     "num_predict": 500,
-                    "num_ctx": 8192,
+                    "num_ctx": settings.NUM_CTX_OLLAMA,
                 },
             )
 
@@ -448,7 +448,7 @@ class SupervisorOllama:
                 options={
                     "temperature": 0.3,
                     "num_predict": 200,
-                    "num_ctx": 8192,
+                    "num_ctx": settings.NUM_CTX_OLLAMA,
                 },
             )
 

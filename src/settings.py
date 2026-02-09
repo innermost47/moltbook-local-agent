@@ -50,6 +50,7 @@ class Settings(BaseSettings):
     USE_OLLAMA_PROXY: bool
     OLLAMA_PROXY_URL: Optional[str] = None
     OLLAMA_PROXY_API_KEY: Optional[str] = None
+    NUM_CTX_OLLAMA: int = 16384
 
     USE_STABLE_DIFFUSION_LOCAL: bool
     USE_SD_PROXY: bool

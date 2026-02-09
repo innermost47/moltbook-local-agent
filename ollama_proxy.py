@@ -10,6 +10,7 @@ from datetime import datetime
 from typing import Optional
 from src.generators import StableDiffusionImageGenerator
 from src.utils import log
+from src.settings import settings
 
 load_dotenv()
 
@@ -86,11 +87,11 @@ async def proxy_ollama(path: str, request: Request, _=Depends(verify_api_key)):
                 if "options" not in data:
                     data["options"] = {}
 
-                data["options"]["num_ctx"] = 16384
+                data["options"]["num_ctx"] = settings.NUM_CTX_OLLAMA
 
                 body = json.dumps(data).encode("utf-8")
                 log.success(
-                    f"[{datetime.now().strftime('%H:%M:%S')}] 🧠 Context window forced to 16384 for {path}"
+                    f"[{datetime.now().strftime('%H:%M:%S')}] 🧠 Context window forced to {settings.NUM_CTX_OLLAMA} for {path}"
                 )
             except Exception as e:
                 log.error(f"Failed to inject context options: {e}")

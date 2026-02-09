@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 from datetime import datetime
 from typing import Optional
 from src.generators import StableDiffusionImageGenerator
+from src.utils import log
 
 load_dotenv()
 
@@ -96,8 +97,21 @@ async def proxy_ollama(path: str, request: Request, _=Depends(verify_api_key)):
                 headers=headers,
             )
             ollama_resp = await client.send(ollama_request, stream=True)
+
+            async def stream_and_log():
+                full_response = []
+                async for chunk in ollama_resp.aiter_raw():
+                    full_response.append(chunk)
+                    yield chunk
+                try:
+                    complete_content = b"".join(full_response).decode("utf-8")
+                    if "api/chat" in path or "api/generate" in path:
+                        log.info(f"📄 FULL BOT RESPONSE ({path}):\n{complete_content}")
+                except Exception as log_err:
+                    log.error(f"Failed to log proxy response: {log_err}")
+
             return StreamingResponse(
-                ollama_resp.aiter_raw(),
+                stream_and_log(),
                 status_code=ollama_resp.status_code,
                 headers=dict(ollama_resp.headers),
             )

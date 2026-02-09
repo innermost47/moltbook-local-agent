@@ -10,6 +10,7 @@ from src.utils import log
 class Generator:
     def __init__(self):
         log.info(f"Loading model: {settings.LLAMA_CPP_MODEL}")
+        self.last_raw_response = None
         self.llm = Llama(
             model_path=settings.LLAMA_CPP_MODEL,
             n_ctx=settings.LLAMA_CPP_MODEL_CTX_SIZE,
@@ -82,6 +83,7 @@ class Generator:
             )
 
             assistant_msg = result["choices"][0]["message"]["content"]
+            self.last_raw_response = assistant_msg
             if pydantic_model:
                 try:
                     clean_json = assistant_msg.strip()
@@ -119,6 +121,9 @@ class Generator:
 
         except Exception as e:
             log.error(f"LLM generation failed: {e}")
+            self.last_raw_response = locals().get(
+                "assistant_msg", "No response generated"
+            )
             return {
                 "choices": [
                     {

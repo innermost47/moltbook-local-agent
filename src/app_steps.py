@@ -1580,9 +1580,31 @@ AVAILABLE ALTERNATIVES:
                 break
 
             except (json.JSONDecodeError, KeyError) as e:
-                last_error = f"JSON Syntax Error: {str(e)}"
-                log.error(last_error)
-                continue
+                raw_response = getattr(
+                    self.generator, "last_raw_response", "Unavailable"
+                )
+                last_error = f"JSON/Parsing Error: {str(e)}"
+
+                log.critical(
+                    f"💥 JSON Syntax Error detected! Skipping current attempt."
+                )
+                log.error(f"📄 Raw Data causing error: {raw_response[:500]}...")
+
+                self.actions_failed.append(
+                    {
+                        "action": "parsing_error",
+                        "error": last_error,
+                        "raw_data": raw_response[:200],
+                    }
+                )
+
+                if attempt >= max_attempts:
+                    feedback = f"❌ **CRITICAL PARSING ERROR:** Your last response was not valid JSON.\n"
+                    feedback += "⚠️ ACTION: You must change your output format immediately. Try a different task or action type."
+                    self.remaining_actions -= 1
+                    return feedback
+
+                break
 
         if decision and last_error:
             action_name = decision.get("action_type", "UNKNOWN")

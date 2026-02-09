@@ -11,6 +11,7 @@ class OllamaGenerator:
     def __init__(self, model="qwen2.5:7b"):
         self.model = model
         self.conversation_history = []
+        self.last_raw_response = None
         if settings.USE_OLLAMA_PROXY:
             proxy_url = getattr(settings, "OLLAMA_PROXY_URL", "http://localhost:8000")
             api_key = settings.OLLAMA_PROXY_API_KEY
@@ -75,6 +76,7 @@ class OllamaGenerator:
                 )
 
                 assistant_msg = response["message"]["content"]
+                self.last_raw_response = assistant_msg
 
                 try:
                     clean_json = assistant_msg.strip()
@@ -99,6 +101,7 @@ class OllamaGenerator:
                     },
                 )
                 assistant_msg = response["message"]["content"]
+                self.last_raw_response = assistant_msg
 
             full_exchange = messages_for_llm + [
                 {"role": "assistant", "content": assistant_msg}
@@ -117,6 +120,9 @@ class OllamaGenerator:
 
         except Exception as e:
             log.error(f"Ollama generation failed: {e}")
+            self.last_raw_response = locals().get(
+                "assistant_msg", "No response generated"
+            )
             return {
                 "choices": [
                     {

@@ -56,6 +56,9 @@ class AppSteps:
         self.blog_actions = BlogActions() if settings.BLOG_API_URL else None
         self.feed_options = ["top", "hot", "new", "rising"]
         self.actions_performed = []
+        self.actions_failed = []
+        self.actions_rejected = []
+        self.actions_aborted = []
         self.remaining_actions = settings.MAX_ACTIONS_PER_SESSION
         self.current_feed = None
         self.available_post_ids = []
@@ -173,7 +176,9 @@ class AppSteps:
 
         session_metrics = self.metrics._calculate_session_metrics(
             self.actions_performed,
-            total_actions=required_actions,
+            self.actions_failed,
+            self.actions_rejected,
+            self.actions_aborted,
         )
 
         supervisor_verdict_text = None
@@ -190,15 +195,17 @@ class AppSteps:
             supervisor_verdict_text = supervisor_verdict["overall_assessment"]
             supervisor_grade_text = supervisor_verdict["grade"]
 
-        self.memory_system.store_session_metrics(
-            session_id=self.current_session_id,
-            total_actions=session_metrics["total_actions"],
-            supervisor_rejections=session_metrics.get("supervisor_rejections", 0),
-            execution_failures=session_metrics["execution_failures"],
-            session_score=session_metrics["session_score"],
-            supervisor_verdict=supervisor_verdict_text,
-            supervisor_grade=supervisor_grade_text,
-        )
+            self.memory_system.store_session_metrics(
+                session_id=self.current_session_id,
+                total_actions=session_metrics["total_actions"],
+                successful_actions=session_metrics["success_count"],
+                supervisor_rejections=session_metrics["supervisor_rejections"],
+                execution_failures=session_metrics["execution_failures"],
+                aborted_tasks=session_metrics["aborted_tasks"],
+                session_score=session_metrics["session_score"],
+                supervisor_verdict=supervisor_verdict_text,
+                supervisor_grade=supervisor_grade_text,
+            )
 
         self.memory.save_session(
             summary=summary,
@@ -1392,6 +1399,13 @@ AVAILABLE ALTERNATIVES:
 
                     if not audit_report["validate"]:
                         last_error = f"**🤖 SUPERVISOR REJECTION:** {audit_report['message_for_agent']}"
+                        self.actions_rejected.append(
+                            {
+                                "action": action_type,
+                                "attempt": attempt,
+                                "reason": last_error,
+                            }
+                        )
                         log.warning(f"❌ Attempt {attempt} rejected by Supervisor.")
                         if attempt < max_attempts:
                             continue
@@ -1480,6 +1494,9 @@ AVAILABLE ALTERNATIVES:
                     continue
                 if execution_result.get("error"):
                     last_error = execution_result["error"]
+                    self.actions_failed.append(
+                        {"action": action_type, "error": last_error}
+                    )
                     if "429" in last_error or "Wait" in last_error:
                         log.error(
                             f"🛑 RATE LIMIT DETECTED (429). FORCING IMMEDIATE TASK FAILURE."
@@ -1555,6 +1572,9 @@ AVAILABLE ALTERNATIVES:
             action_name = decision.get("action_type", "UNKNOWN")
             log.error(
                 f"❌ Action '{action_name}' failed after 3 attempts. FORCING PIVOT."
+            )
+            self.actions_aborted.append(
+                {"action": action_type, "final_error": last_error}
             )
             task_failure_msg = ""
             if self.current_active_todo:

@@ -55,7 +55,7 @@ This framework is designed to run locally for maximum privacy and autonomy. It s
 ### 1. Ollama (Recommended)
 
 - **Priority Choice**: Offers the fastest inference and best reasoning stability
-- **Recommended Model**: `qwen2.5:7b` (optimized for structural logic and technical critiques)
+- **Recommended Model**: `qwen3:8b` (optimized for structural logic and technical critiques)
 - **Features**: Native JSON schema support and seamless context management
 
 ### 2. Llama-CPP-Python
@@ -225,7 +225,7 @@ MOLTBOOK_BASE_URL=https://www.moltbook.com/api/v1
 
 # Ollama (Recommended)
 USE_OLLAMA=true
-OLLAMA_MODEL=qwen2.5:7b
+OLLAMA_MODEL=qwen3:8b
 OLLAMA_PROXY_API_KEY=your_api_key_for_ollama_proxy
 USE_OLLAMA_PROXY=false  # Set to true if using remote Ollama instance
 
@@ -642,13 +642,13 @@ The agent will run autonomously and log all activity to `agent.log` and `schedul
 
 ### For Ollama
 
-- **qwen2.5:7b** (Recommended - best reasoning)
+- **qwen3:8b** (Recommended - best reasoning)
 - mistral:7b
 - llama3.1:8b
 
 ### For Llama-CPP (GGUF files)
 
-- Qwen2.5-7B-Instruct-Q4_K_M.gguf
+- Qwen3-8B-Instruct-Q4_K_M.gguf
 - Mistral-7B-Instruct-v0.2-Q4_K_M.gguf
 - Llama-3.1-8B-Instruct-Q4_K_M.gguf
 

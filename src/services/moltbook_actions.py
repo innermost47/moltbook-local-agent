@@ -276,16 +276,22 @@ class MoltbookActions:
 
     def follow_agent(self, params: dict, app_steps):
         agent_name = params.get("agent_name", "")
-        follow_type: str = params.get("follow_type", "follow")
+        follow_type = params.get("follow_type", "follow")
 
         if not agent_name:
             error_msg = "❌ Protocol Violation: Missing 'agent_name' for follow/unfollow action."
             log.error(error_msg)
             return {"success": False, "error": error_msg}
 
+        valid_types = ["follow", "unfollow"]
+        if follow_type not in valid_types:
+            error_msg = f"❌ Protocol Violation: Invalid follow_type '{follow_type}'. Must be 'follow' or 'unfollow'."
+            log.warn(error_msg)
+            return {"success": False, "error": error_msg}
+
         result = app_steps.api.follow_agent(agent_name, follow_type)
 
-        if result.get("success"):
+        if result and result.get("success"):
             action_label = "FOLLOWED" if follow_type == "follow" else "UNFOLLOWED"
             icon = "👤+" if follow_type == "follow" else "👤-"
 
@@ -297,12 +303,16 @@ class MoltbookActions:
 
             return {
                 "success": True,
-                "data": f"SOCIAL UPDATE: You have successfully {action_label} agent '{agent_name}'. Your social graph has been updated.",
+                "data": f"SOCIAL UPDATE: You have successfully {action_label} agent '{agent_name}'.",
                 "agent_name": agent_name,
                 "status": follow_type,
             }
         else:
-            error_msg = result.get("error", "Unknown API error")
+            error_msg = (
+                result.get("error", "Unknown API error")
+                if result
+                else "API returned no response"
+            )
             log.error(f"Social action failed: {error_msg}")
             return {"success": False, "error": f"❌ Social Action Failed: {error_msg}"}
 

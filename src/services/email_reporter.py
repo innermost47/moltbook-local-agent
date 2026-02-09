@@ -82,31 +82,24 @@ class EmailReporter:
             """
 
             if session_metrics and global_progression:
-                rejection_rate = (
-                    (
-                        session_metrics.get("supervisor_rejections", 0)
-                        / session_metrics["total_actions"]
-                        * 100
+                total = session_metrics["total_actions"]
+
+                def get_rate(key):
+                    return (
+                        (session_metrics.get(key, 0) / total * 100) if total > 0 else 0
                     )
-                    if session_metrics["total_actions"] > 0
-                    else 0
-                )
-                failure_rate = (
-                    (
-                        session_metrics["execution_failures"]
-                        / session_metrics["total_actions"]
-                        * 100
-                    )
-                    if session_metrics["total_actions"] > 0
-                    else 0
-                )
+
+                rejection_rate = get_rate("supervisor_rejections")
+                failure_rate = get_rate("execution_failures")
+                aborted_rate = get_rate("aborted_tasks")
+                success_rate = get_rate("success_count")
 
                 trend_class = (
                     "trend-up"
-                    if global_progression["trend"] == "📈 IMPROVING"
+                    if "IMPROVING" in global_progression["trend"]
                     else (
                         "trend-down"
-                        if global_progression["trend"] == "📉 DECLINING"
+                        if "DECLINING" in global_progression["trend"]
                         else "trend-stable"
                     )
                 )
@@ -114,24 +107,44 @@ class EmailReporter:
                 html_content += f"""
                 <div class="metrics">
                     <h2>📊 Session Performance Metrics</h2>
+                    
+                    <div class="metric-row">
+                        <span class="metric-label">Global Trend:</span>
+                        <span class="{trend_class}"><strong>{global_progression['trend']} ({global_progression['progression_rate']:+.1f}%)</strong></span>
+                    </div>
+
+                    <hr>
+
                     <div class="metric-row">
                         <span class="metric-label">Session Score:</span>
                         <span><strong>{session_metrics['session_score']:.1f}%</strong></span>
                     </div>
+                    
+                    <div class="metric-row">
+                        <span class="metric-label">Success Count:</span>
+                        <span>{session_metrics.get('success_count', 0)} ({success_rate:.1f}%)</span>
+                    </div>
+
                     <div class="metric-row">
                         <span class="metric-label">Total Actions:</span>
-                        <span>{session_metrics['total_actions']}</span>
+                        <span>{total}</span>
                     </div>
+
                     <div class="metric-row">
                         <span class="metric-label">Supervisor Rejections:</span>
-                        <span>{session_metrics['supervisor_rejections']} ({rejection_rate:.1f}%)</span>
+                        <span style="color: #ffa500;">{session_metrics['supervisor_rejections']} ({rejection_rate:.1f}%)</span>
                     </div>
+
                     <div class="metric-row">
                         <span class="metric-label">Execution Failures:</span>
-                        <span>{session_metrics['execution_failures']} ({failure_rate:.1f}%)</span>
+                        <span style="color: #ff4444;">{session_metrics['execution_failures']} ({failure_rate:.1f}%)</span>
+                    </div>
+
+                    <div class="metric-row">
+                        <span class="metric-label">Aborted Tasks:</span>
+                        <span style="color: #cc0000;"><strong>{session_metrics.get('aborted_tasks', 0)} ({aborted_rate:.1f}%)</strong></span>
                     </div>
                 </div>
-
                 <div class="progression">
                     <h2>📈 Global Progression</h2>
                     <div class="metric-row">

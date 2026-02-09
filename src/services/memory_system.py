@@ -16,19 +16,6 @@ class MemorySystem:
 
         cursor.execute(
             """
-            CREATE TABLE IF NOT EXISTS memory_entries (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                category TEXT NOT NULL,
-                content TEXT NOT NULL,
-                created_at TEXT NOT NULL,
-                session_id INTEGER,
-                FOREIGN KEY (session_id) REFERENCES sessions(id)
-            )
-        """
-        )
-
-        cursor.execute(
-            """
             CREATE TABLE IF NOT EXISTS session_metrics (
                 session_id INTEGER PRIMARY KEY,
                 total_actions INTEGER NOT NULL,
@@ -43,22 +30,42 @@ class MemorySystem:
         """
         )
 
+        migrations = [
+            ("successful_actions", "INTEGER DEFAULT 0"),
+            ("aborted_tasks", "INTEGER DEFAULT 0"),
+        ]
+
+        for col_name, col_type in migrations:
+            try:
+                cursor.execute(
+                    f"ALTER TABLE session_metrics ADD COLUMN {col_name} {col_type}"
+                )
+                log.info(f"✅ Added column: {col_name} to session_metrics")
+            except Exception:
+                pass
+
         cursor.execute(
             """
-            CREATE INDEX IF NOT EXISTS idx_category 
-            ON memory_entries(category)
+            CREATE TABLE IF NOT EXISTS memory_entries (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                category TEXT NOT NULL,
+                content TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                session_id INTEGER,
+                FOREIGN KEY (session_id) REFERENCES sessions(id)
+            )
         """
         )
 
         cursor.execute(
-            """
-            CREATE INDEX IF NOT EXISTS idx_category_date 
-            ON memory_entries(category, created_at DESC)
-        """
+            "CREATE INDEX IF NOT EXISTS idx_category ON memory_entries(category)"
+        )
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_category_date ON memory_entries(category, created_at DESC)"
         )
 
         self.conn.commit()
-        log.info("Memory system tables initialized")
+        log.info("ℹ️ Memory system tables initialized and migrated")
 
     def store_memory(self, category: str, content: str, session_id: int = None) -> Dict:
         if category not in settings.MEMORY_CATEGORIES:
@@ -354,8 +361,10 @@ class MemorySystem:
         self,
         session_id: int,
         total_actions: int,
+        successful_actions: int,
         supervisor_rejections: int,
         execution_failures: int,
+        aborted_tasks: int,
         session_score: float,
         supervisor_verdict: str = None,
         supervisor_grade: str = None,
@@ -365,15 +374,20 @@ class MemorySystem:
             cursor.execute(
                 """
                 INSERT INTO session_metrics 
-                (session_id, total_actions, supervisor_rejections, execution_failures, 
-                session_score, supervisor_verdict, supervisor_grade, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                (
+                    session_id, total_actions, successful_actions, supervisor_rejections, 
+                    execution_failures, aborted_tasks, session_score, 
+                    supervisor_verdict, supervisor_grade, created_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
                 (
                     session_id,
                     total_actions,
+                    successful_actions,
                     supervisor_rejections,
                     execution_failures,
+                    aborted_tasks,
                     session_score,
                     supervisor_verdict,
                     supervisor_grade,
@@ -382,18 +396,20 @@ class MemorySystem:
             )
             self.conn.commit()
 
-            if supervisor_grade:
-                log.success(
-                    f"📊 Session metrics stored: {session_score:.1f}% (Grade: {supervisor_grade})"
-                )
-            else:
-                log.success(
-                    f"📊 Session metrics stored: {session_score:.1f}% (Autonomous mode)"
-                )
+            status_icon = "🌟" if session_score > 80 else "📊"
+            grade_info = (
+                f"(Grade: {supervisor_grade})" if supervisor_grade else "(Autonomous)"
+            )
+
+            log.success(
+                f"{status_icon} Session {session_id} saved: {session_score:.1f}% "
+                f"| Done: {successful_actions} | Rejected: {supervisor_rejections} "
+                f"| Failed: {execution_failures} | Aborted: {aborted_tasks} {grade_info}"
+            )
 
             return True
         except Exception as e:
-            log.error(f"Failed to store session metrics: {e}")
+            log.error(f"❌ Failed to store session metrics: {e}")
             return False
 
     def get_session_metrics_history(self, limit: int = 10) -> List[Dict]:

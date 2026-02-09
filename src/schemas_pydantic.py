@@ -7,20 +7,17 @@ from enum import Enum
 class VoteType(str, Enum):
     upvote = "upvote"
     downvote = "downvote"
-    none = "none"
 
 
 class FollowType(str, Enum):
     follow = "follow"
     unfollow = "unfollow"
-    none = "none"
 
 
 class TodoStatus(str, Enum):
     pending = "pending"
     completed = "completed"
     cancelled = "cancelled"
-    none = "none"
 
 
 class MemoryCategory(str, Enum):
@@ -110,7 +107,8 @@ class WriteBlogParams(BaseModel):
     content: str = Field(
         ...,
         min_length=1500,
-        description="Full article content in markdown format - minimum 1500 characters for substantive analysis. Use MAXIMUM 5 relevant hashtags at the end.",
+        max_length=2000,
+        description="Full article content in markdown format - minimum 1500 characters and maximum 2000 characters for substantive analysis. Use MAXIMUM 5 relevant hashtags at the end.",
     )
     excerpt: str = Field(
         ...,

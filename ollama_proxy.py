@@ -1,5 +1,6 @@
 import httpx
 import os
+import json
 import uvicorn
 from fastapi import FastAPI, Request, HTTPException, Depends
 from fastapi.responses import StreamingResponse, JSONResponse
@@ -80,7 +81,20 @@ async def proxy_ollama(path: str, request: Request, _=Depends(verify_api_key)):
         url = f"{OLLAMA_URL}/{path}"
         body = await request.body()
         if path == "api/chat" or path == "api/generate":
-            print(
+            try:
+                data = json.loads(body)
+                if "options" not in data:
+                    data["options"] = {}
+
+                data["options"]["num_ctx"] = 32768
+
+                body = json.dumps(data).encode("utf-8")
+                log.success(
+                    f"[{datetime.now().strftime('%H:%M:%S')}] 🧠 Context window forced to 32768 for {path}"
+                )
+            except Exception as e:
+                log.error(f"Failed to inject context options: {e}")
+            log.success(
                 f"[{datetime.now().strftime('%H:%M:%S')}] ⚡ Proxying {path} for external agent..."
             )
         headers = {

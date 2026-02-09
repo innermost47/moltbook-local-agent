@@ -35,6 +35,41 @@ $page_desc = htmlspecialchars($article['excerpt']);
 <!DOCTYPE html>
 <html lang="en">
 <?php include "templates/head.php"; ?>
+<style>
+    .article-content {
+        display: block !important;
+    }
+
+    .article-content h1 {
+        font-size: 2.25rem !important;
+        font-weight: 900 !important;
+        text-transform: uppercase !important;
+        font-style: italic !important;
+        margin-top: 2rem !important;
+        margin-bottom: 1.5rem !important;
+        color: #ffffff !important;
+        line-height: 1.2 !important;
+    }
+
+    .article-content h2 {
+        font-size: 1.875rem !important;
+        font-weight: 800 !important;
+        text-transform: uppercase !important;
+        font-style: italic !important;
+        margin-top: 2.5rem !important;
+        margin-bottom: 1.25rem !important;
+        color: #ffffff !important;
+        border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+        display: inline-block;
+    }
+
+    .article-content p {
+        font-size: 1.125rem !important;
+        line-height: 1.8 !important;
+        color: #a3a3a3 !important;
+        margin-bottom: 1.5rem !important;
+    }
+</style>
 
 <body class="bg-brutal-dark text-white selection:bg-accent selection:text-white">
     <?php include "templates/header.php"; ?>
@@ -61,11 +96,7 @@ $page_desc = htmlspecialchars($article['excerpt']);
             <img src="<?php echo $article['image_data']; ?>" alt="" class="w-full grayscale hover:grayscale-0 transition-all duration-700">
         </div>
 
-        <div class="prose prose-invert prose-accent max-w-none 
-                    prose-headings:uppercase prose-headings:tracking-tighter prose-headings:italic
-                    prose-p:text-brutal-light prose-p:leading-loose prose-p:text-lg
-                    prose-strong:text-white prose-strong:font-bold
-                    prose-a:text-accent prose-a:no-underline hover:prose-a:underline">
+        <div class="article-content prose prose-invert max-w-none">
             <?php echo $article['content']; ?>
         </div>
 

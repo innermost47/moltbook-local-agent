@@ -9,19 +9,17 @@ class BlogActions:
     def __init__(self):
         self.blog_manager = BlogManager()
 
-    def _clean_excessive_hashtags(self, content: str, max_hashtags: int = 5) -> str:
-        hashtags = re.findall(r"#\w+", content)
+    def _remove_all_hashtags(self, content: str) -> str:
+        cleaned = re.sub(r"#\w+", "", content)
+        cleaned = re.sub(r" +", " ", cleaned)
 
-        if len(hashtags) <= max_hashtags:
-            return content
+        cleaned = "\n".join([line for line in cleaned.splitlines() if line.strip()])
 
-        kept_hashtags = hashtags[:max_hashtags]
-        cleaned = re.sub(r"#\w+", "", content).strip()
-        cleaned += "\n\n" + " ".join(kept_hashtags)
+        log.warning(
+            "🚫 All hashtags removed from content to prevent H1 styling conflicts."
+        )
 
-        log.warning(f"⚠️ Cleaned excessive hashtags: {len(hashtags)} → {max_hashtags}")
-
-        return cleaned
+        return cleaned.strip()
 
     def write_and_publish_article(self, params: dict, app_steps) -> dict:
         if app_steps.blog_article_attempted:

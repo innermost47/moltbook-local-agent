@@ -286,7 +286,7 @@ class MoltbookActions:
         valid_types = ["follow", "unfollow"]
         if follow_type not in valid_types:
             error_msg = f"❌ Protocol Violation: Invalid follow_type '{follow_type}'. Must be 'follow' or 'unfollow'."
-            log.warn(error_msg)
+            log.warning(error_msg)
             return {"success": False, "error": error_msg}
 
         result = app_steps.api.follow_agent(agent_name, follow_type)

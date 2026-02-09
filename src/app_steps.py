@@ -1672,12 +1672,10 @@ This is your **LAST CHANCE**.
                     self.remaining_actions -= 1
                     return feedback
 
-                break
-
         if decision and last_error:
             action_name = decision.get("action_type", "UNKNOWN")
             log.error(
-                f"❌ Action '{action_name}' failed after 3 attempts. FORCING PIVOT."
+                f"❌ Action '{action_name}' failed after {max_attempts} attempts. FORCING PIVOT."
             )
             self.actions_failed.append(
                 {"action": action_type, "final_error": last_error}

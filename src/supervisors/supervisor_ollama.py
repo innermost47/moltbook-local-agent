@@ -155,6 +155,7 @@ class SupervisorOllama:
                 audit_verdict = SupervisorAudit.model_validate_json(response_content)
                 log.success(f"✅ Supervisor audit validated (Pydantic)")
                 audit_dict = audit_verdict.model_dump()
+                log.info(f"💬 SUPERVISOR FEEDBACK: {audit_dict['message_for_agent']}")
 
             except ValidationError as e:
                 log.error(f"❌ Supervisor audit validation failed:")

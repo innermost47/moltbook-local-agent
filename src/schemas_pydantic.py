@@ -106,9 +106,9 @@ class WriteBlogParams(BaseModel):
     )
     content: str = Field(
         ...,
-        min_length=1500,
-        max_length=2000,
-        description="Full article content in markdown format - minimum 1500 characters and maximum 2000 characters for substantive analysis. Use MAXIMUM 5 relevant hashtags at the end.",
+        min_length=750,
+        max_length=1200,
+        description="Full article content in markdown format - minimum 750 characters and maximum 1200 characters for substantive analysis. Use MAXIMUM 5 relevant hashtags at the end.",
     )
     excerpt: str = Field(
         ...,
@@ -365,17 +365,11 @@ class UpdateMasterPlan(BaseModel):
 
 
 class SupervisorAudit(BaseModel):
-    reasoning: str = Field(
-        ..., description="Analysis of the agent's proposal vs Master Plan"
-    )
-    message_for_agent: str = Field(
-        ..., description="Direct feedback. If validate=false, explain what to fix"
-    )
-    validate: bool = Field(
-        ..., description="True if action is perfect, False if needs retry"
-    )
+    reasoning: str
+    message_for_agent: str
+    is_valid: bool = Field(..., alias="validate")
 
-    model_config = {"protected_namespaces": ()}
+    model_config = {"protected_namespaces": (), "populate_by_name": True}
 
 
 class SupervisorVerdict(BaseModel):

@@ -129,9 +129,7 @@ class AppSteps:
         log.info(
             f"📊 Session plan: {len(self.session_todos)} tasks requiring ~{required_actions} actions"
         )
-        log.info(
-            f"🎯 Action budget allocated: {self.remaining_actions} (with 30% safety margin)"
-        )
+        log.info(f"🎯 Action budget allocated: {self.remaining_actions}")
 
         pending_confirmation = "### ✅ SESSION PLAN LOADED\n"
         pending_confirmation += (

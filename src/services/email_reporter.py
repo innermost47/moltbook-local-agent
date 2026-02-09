@@ -16,29 +16,26 @@ class EmailReporter:
         self,
         agent_name: str,
         karma: int,
-        actions: list,
-        learnings: str,
-        next_plan: str,
-        content_urls: list,
+        actions_performed: list,
+        actions_failed: list = None,
+        actions_rejected: list = None,
+        actions_aborted: list = None,
+        learnings: str = "",
+        next_plan: str = "",
+        content_urls: list = None,
         session_metrics: dict = None,
         supervisor_verdict: dict = None,
         global_progression: dict = None,
     ):
+        failed_list = actions_failed or []
+        rejected_list = actions_rejected or []
+        aborted_list = actions_aborted or []
 
         if not self.enabled:
             log.info("Email reports disabled, skipping")
             return
 
         try:
-            successes = [
-                a
-                for a in actions
-                if not a.startswith("FAILED") and not a.startswith("SKIPPED")
-            ]
-            failures = [
-                a for a in actions if a.startswith("FAILED") or a.startswith("SKIPPED")
-            ]
-
             subject = f"🤖 Moltbook Agent Report - {agent_name} - {datetime.now().strftime('%Y-%m-%d %H:%M')}"
 
             html_content = f"""
@@ -182,40 +179,55 @@ class EmailReporter:
                 """
 
             html_content += f"""
-                <div class="stats">
-                    <h2>📊 Session Statistics</h2>
-                    <p><strong>Karma:</strong> {karma}</p>
-                    <p><strong>Total Actions:</strong> {total}</p>
-                    <p class="success"><strong>✅ Successful:</strong> {len(successes)}</p>
-                    <p class="failure"><strong>❌ Failed/Skipped:</strong> {len(failures)}</p>
-                </div>
-                
-                <div class="section">
-                    <h2>✅ Successful Actions</h2>
-                    <ul>
+            <div class="stats">
+                <h2>📊 Session Statistics</h2>
+                <p><strong>Karma:</strong> {karma}</p>
+                <p><strong>Success Rate:</strong> {session_metrics.get('session_score', 0):.1f}%</p>
+                <hr>
+                <p class="success"><strong>✅ Successful:</strong> {len(actions_performed)}</p>
+                <p style="color: #ffa500;"><strong>⚠️ Supervisor Rejections:</strong> {len(rejected_list)}</p>
+                <p class="failure"><strong>❌ Execution Failures:</strong> {len(failed_list)}</p>
+                <p style="color: #cc0000;"><strong>🛑 Tasks Aborted:</strong> {len(aborted_list)}</p>
+            </div>
             """
 
-            for action in successes:
-                html_content += f"<li class='success'>{action}</li>"
+            if aborted_list:
+                html_content += """
+                <div class="section" style="border: 1px solid #cc0000; padding: 15px; border-radius: 5px; background: #fff5f5;">
+                    <h2 style="color: #cc0000; margin-top: 0;">🛑 Abandoned Tasks</h2>
+                    <ul style="margin-bottom: 0;">
+                """
+                for a in aborted_list:
+                    reason = (
+                        a.get("reason") or a.get("final_error") or "No details provided"
+                    )
+                    html_content += f"<li><strong>{a.get('action', 'Task')}</strong>: <span style='color: #666;'>{reason}</span></li>"
+                html_content += "</ul></div>"
 
-            html_content += """
-                    </ul>
-                </div>
-            """
-
-            if failures:
+            if actions_performed:
                 html_content += """
                 <div class="section">
-                    <h2>❌ Failed/Skipped Actions</h2>
+                    <h2>✅ Success History</h2>
                     <ul>
                 """
-                for action in failures:
-                    html_content += f"<li class='failure'>{action}</li>"
+                for action in actions_performed:
+                    act_name = (
+                        action.get("action_type")
+                        if isinstance(action, dict)
+                        else action
+                    )
+                    html_content += f"<li class='success'>{act_name}</li>"
+                html_content += "</ul></div>"
 
+            if failed_list:
                 html_content += """
-                    </ul>
-                </div>
+                <div class="section">
+                    <h2 class="failure">❌ Technical Errors</h2>
+                    <ul>
                 """
+                for f in failed_list:
+                    html_content += f"<li class='failure'><strong>{f.get('action')}</strong>: {f.get('error', 'Unknown error')}</li>"
+                html_content += "</ul></div>"
 
             if content_urls:
                 html_content += """

@@ -238,13 +238,16 @@ class AppSteps:
         self.reporter.send_session_report(
             agent_name=agent_name,
             karma=current_karma,
-            actions=self.actions_performed,
             learnings=summary["learnings"],
             next_plan=summary["next_session_plan"],
             content_urls=self.created_content_urls,
             session_metrics=session_metrics,
             supervisor_verdict=supervisor_verdict if settings.USE_SUPERVISOR else None,
             global_progression=global_progression,
+            actions_performed=self.actions_performed,
+            actions_failed=self.actions_failed,
+            actions_aborted=self.actions_aborted,
+            actions_rejected=self.actions_rejected,
         )
 
         log.info("=== SESSION END ===")

@@ -86,11 +86,11 @@ async def proxy_ollama(path: str, request: Request, _=Depends(verify_api_key)):
                 if "options" not in data:
                     data["options"] = {}
 
-                data["options"]["num_ctx"] = 32768
+                data["options"]["num_ctx"] = 16384
 
                 body = json.dumps(data).encode("utf-8")
                 log.success(
-                    f"[{datetime.now().strftime('%H:%M:%S')}] 🧠 Context window forced to 32768 for {path}"
+                    f"[{datetime.now().strftime('%H:%M:%S')}] 🧠 Context window forced to 16384 for {path}"
                 )
             except Exception as e:
                 log.error(f"Failed to inject context options: {e}")

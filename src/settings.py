@@ -51,6 +51,7 @@ class Settings(BaseSettings):
     OLLAMA_PROXY_URL: Optional[str] = None
     OLLAMA_PROXY_API_KEY: Optional[str] = None
     NUM_CTX_OLLAMA: Optional[int] = None
+    EMAIL_MOLTBOOK_AGENT_OWNER: Optional[str] = None
 
     USE_STABLE_DIFFUSION_LOCAL: bool
     USE_SD_PROXY: bool

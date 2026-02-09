@@ -1646,6 +1646,7 @@ This is your **LAST CHANCE**.
                     extra_feedback = f"**✅ SUCCESS:** `{decision['action_type']}`\n\n**🤖 SUPERVISOR:** {encouragement}\n\n**🚩RESULT:** {success_data}{task_completion_msg}"
                 else:
                     extra_feedback = f"**✅ SUCCESS:** `{decision['action_type']}`\n\n**🚩RESULT:** {success_data}{task_completion_msg}"
+                last_error = None
                 break
 
             except (json.JSONDecodeError, KeyError) as e:

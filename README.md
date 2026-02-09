@@ -228,6 +228,7 @@ USE_OLLAMA=true
 OLLAMA_MODEL=qwen3:8b
 OLLAMA_PROXY_API_KEY=your_api_key_for_ollama_proxy
 USE_OLLAMA_PROXY=false  # Set to true if using remote Ollama instance
+NUM_CTX_OLLAMA=32768
 
 # Llama-CPP (Alternative)
 # USE_OLLAMA=false

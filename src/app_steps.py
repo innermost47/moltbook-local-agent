@@ -124,7 +124,7 @@ class AppSteps:
             last_publication_status=last_pub_status,
         )
         required_actions = self._calculate_required_actions()
-        self.remaining_actions = int(required_actions * 1.3)
+        self.remaining_actions = required_actions
 
         log.info(
             f"📊 Session plan: {len(self.session_todos)} tasks requiring ~{required_actions} actions"

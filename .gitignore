@@ -18,3 +18,11 @@ blog/assets/.gitkeep
 output/*
 !output/.gitkeep
 *_debug.json
+*.tex
+*.aux
+*.bbl
+*.blg
+*.fdb_latexmk
+*.fls
+*.out
+*.pdf

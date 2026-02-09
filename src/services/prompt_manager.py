@@ -138,12 +138,21 @@ Remember: Your verdict will be injected into the next session's system prompt. M
         formatted_todos,
         attempts_left,
     ):
+        action_diagnostics = """
+### 🎯 ACTION-SPECIFIC LOGIC:
+- **publish_public_comment / reply_to_comment**: You are in the FINAL stage. No placeholders allowed. If the agent lacks a URL, order them to DELETE it and write a pure technical text response.
+- **write_blog_article**: This must be a >500 word final piece. "Drafting..." or "[insert blog here]" is a fatal logic error. Demand the full text now.
+- **create_post / create_link_post**: The agent is talking to a LIVE audience. No "I will write...", no meta-commentary. Just the final message.
+- **select_post / select_comment**: The agent is likely hallucinating an ID. Tell them to re-read the feed for the correct ID.
+- **share_link / share_created_blog_post_url**: If they use 'example.com', they are lazy. If the real URL isn't in history, order them to skip this task.
+"""
+
         forbidden_patterns_examples = """
 **FORBIDDEN LAZY PATTERNS (Examples):**
 - Brackets/Placeholders: [insert X], <placeholder>, {YOUR_TEXT}
 - Meta-instructions: "I will write...", "add more details here", "summarize insights"
 - Incomplete markers: TODO:, TBD, FIXME, placeholder, to be filled
-- Template leftovers: example.com, sample-content, lorem ipsum
+- Template leftovers: example.com, sample-content, lorem ipsum, technical_xyz
 - Ellipsis abuse: ........ (4+ dots)
 - Future tense instead of action: "this will contain...", "here's where I should..."
 """
@@ -152,8 +161,7 @@ Remember: Your verdict will be injected into the next session's system prompt. M
 ## 🧐 NEURAL SUPERVISOR - LAZINESS AUDIT
 
 **CRITICAL VIOLATION DETECTED:**
-
-The agent attempted to execute action '{action_type}' with PLACEHOLDER data instead of real content.
+The agent attempted to execute action '{action_type}' with PLACEHOLDER data.
 
 **Offending Pattern Found:** `{offending_pattern}`
 
@@ -161,6 +169,7 @@ The agent attempted to execute action '{action_type}' with PLACEHOLDER data inst
 {json.dumps(lazy_action, indent=2)}
 
 {forbidden_patterns_examples}
+{action_diagnostics}
 
 **Current Session TO-DO List:**
 {formatted_todos}
@@ -169,25 +178,20 @@ The agent attempted to execute action '{action_type}' with PLACEHOLDER data inst
 
 ---
 
-**YOUR TASK:**
+**YOUR TASK (DRILL SERGEANT MODE):**
+Provide blunt, actionable guidance to fix this. 
 
-Provide SPECIFIC, ACTIONABLE guidance to fix this laziness. Tell the agent:
+**STRICT URL RULE:** If the pattern is 'example.com' or a placeholder URL:
+1. Check the recent context for a REAL URL.
+2. If NO REAL URL is found, order the agent to: "DELETE THE LINK and provide a 100% text-based technical response."
 
-1. **What's wrong** with the current approach (be specific about the placeholder)
-2. **What real data** they should provide instead
-3. **How to extract** that data from their current context or session goals
+**FORMAT:** - Concise instruction (2 sentences max).
+- Direct command. No "Please" or "Maybe".
 
-**FORMAT YOUR RESPONSE AS:**
-
-A direct, concise instruction (2-3 sentences max) that will be injected into the agent's next attempt.
-
-**EXAMPLES OF GOOD GUIDANCE:**
-
-❌ BAD: "Don't use placeholders."
-✅ GOOD: "Instead of '[insert technical insight]', write a specific observation about the trust chain architecture mentioned in post abc123. Use concrete technical terminology."
-
-❌ BAD: "Be more specific."
-✅ GOOD: "Replace '[meaningful comment]' with an actual argument. For example, challenge the claim about Byzantine fault tolerance by citing the CAP theorem."
+**EXAMPLES OF ELITE GUIDANCE:**
+✅ "You used a fake URL. No real blog URL is in your memory. DELETE the link and rewrite the comment as a purely technical rebuttal using text only."
+✅ "Stop using meta-commentary like 'I will write...'. You are already in the action. Write the FINAL content for the audience immediately."
+✅ "Replace '[insert technical data]' with the specific Byzantine Fault Tolerance percentage mentioned in the target post, or use your internal knowledge to critique the logic."
 
 **NOW PROVIDE YOUR GUIDANCE:**
 """

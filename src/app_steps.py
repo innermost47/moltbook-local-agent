@@ -73,6 +73,7 @@ class AppSteps:
         self.session_todos = []
         self.blog_article_attempted = False
         self.current_prompt = None
+        self.has_created_master_plan = False
         self.master_plan_success_prompt = ""
 
     def run_session(self):
@@ -116,6 +117,7 @@ class AppSteps:
                 "content": self.generator.get_main_system_prompt()
                 + f"\n\n{system_context}",
             }
+            self.has_created_master_plan = True
 
         self._create_session_plan(
             dynamic_context="" if master_plan_just_created else dynamic_context,
@@ -1291,7 +1293,9 @@ Phase 2/2 active. Use `reply_to_comment` to execute your response.
                     agent_name=self.agent_name,
                     heavy_context=heavy_payload,
                 )
-                self.generator.trim_history()
+                self.generator.trim_history(
+                    has_created_master_plan=self.has_created_master_plan
+                )
                 content = result["choices"][0]["message"]["content"]
                 content = re.sub(r"```json\s*|```\s*", "", content).strip()
                 if isinstance(content, str):
@@ -1585,9 +1589,7 @@ AVAILABLE ALTERNATIVES:
                 )
                 last_error = f"JSON/Parsing Error: {str(e)}"
 
-                log.critical(
-                    f"💥 JSON Syntax Error detected! Skipping current attempt."
-                )
+                log.error(f"💥 JSON Syntax Error detected! Skipping current attempt.")
                 log.error(f"📄 Raw Data causing error: {raw_response[:500]}...")
 
                 self.actions_failed.append(
@@ -2040,88 +2042,42 @@ Your action '{decision['action_type']}' was rejected/failed 3 times in a row.
     def _action_matches_todo(
         self, action_type: str, action_params: dict, todo: dict
     ) -> bool:
+        todo_type = str(todo.get("action_type", "")).lower()
+        act_type = action_type.lower()
+        todo_params = todo.get("action_params", {}) or {}
 
-        todo_action_type = todo.get("action_type")
-        todo_action_params = todo.get("action_params", {})
+        id_found_in_todo = False
+        for key in ["post_id", "comment_id"]:
+            e_id = todo_params.get(key)
+            a_id = action_params.get(key)
 
-        if todo_action_type:
-            if action_type != todo_action_type:
-                return False
-            if todo_action_params:
-                key_params_map = {
-                    "web_scrap_for_links": ["web_domain"],
-                    "web_fetch": ["web_url"],
-                    "memory_store": ["memory_category"],
-                    "select_post_to_comment": ["post_id"],
-                    "select_comment_to_reply": ["comment_id"],
-                    "publish_public_comment": ["post_id"],
-                    "reply_to_comment": ["comment_id"],
-                    "vote_post": ["post_id"],
-                }
-
-                if action_type in key_params_map:
-                    required_keys = key_params_map[action_type]
-
-                    for key in required_keys:
-                        todo_value = todo_action_params.get(key)
-                        action_value = action_params.get(key)
-                        if todo_value:
-                            if key in ["web_domain", "web_url"]:
-                                todo_val = (
-                                    str(todo_value)
-                                    .replace("https://", "")
-                                    .replace("http://", "")
-                                    .strip("/")
-                                )
-                                action_val = (
-                                    str(action_value)
-                                    .replace("https://", "")
-                                    .replace("http://", "")
-                                    .strip("/")
-                                )
-
-                                if todo_val in action_val or action_val in todo_val:
-                                    return True
-                            else:
-                                if str(todo_value) == str(action_value):
-                                    return True
-                else:
+            if e_id:
+                id_found_in_todo = True
+                if str(e_id) == str(a_id):
+                    log.success(f"🎯 ID MATCH: {key} ({a_id})")
                     return True
+                else:
+                    log.warning(f"idx Mismatch for {key}: expected {e_id}, got {a_id}")
 
-        task_lower = todo["task"].lower()
-        action_lower = action_type.lower()
-
-        post_id = action_params.get("post_id", "")
-        comment_id = action_params.get("comment_id", "")
-        web_domain = (
-            action_params.get("web_domain", "")
-            .replace("https://", "")
-            .replace("http://", "")
-            .strip("/")
+        type_match = (
+            (act_type == todo_type)
+            or (todo_type in act_type)
+            or (act_type in todo_type)
         )
-        web_url = action_params.get("web_url", "")
-        memory_category = action_params.get("memory_category", "")
 
-        matches = {
-            "web_scrap_for_links": web_domain and web_domain in task_lower,
-            "web_fetch": web_url and web_url in task_lower,
-            "memory_store": memory_category and memory_category in task_lower,
-            "select_post_to_comment": post_id and post_id in task_lower,
-            "select_comment_to_reply": comment_id and comment_id in task_lower,
-            "publish_public_comment": post_id and post_id in task_lower,
-            "reply_to_comment": comment_id and comment_id in task_lower,
-            "vote_post": post_id and post_id in task_lower,
-            "create_post": "create" in task_lower and "post" in task_lower,
-            "create_link_post": "create" in task_lower and "link" in task_lower,
-            "write_blog_article": "write" in task_lower and "blog" in task_lower,
-            "share_created_blog_post_url": "share" in task_lower
-            and "blog" in task_lower,
-        }
+        if type_match:
+            if not id_found_in_todo:
+                log.success(f"⚡ TYPE MATCH (No ID required): {act_type}")
+                return True
+            else:
+                log.error(
+                    f"❌ TYPE MATCHED ({act_type}) BUT ID FAILED: Check your Post/Comment IDs"
+                )
 
-        if action_lower in matches:
-            return matches[action_lower]
+        if todo_type in act_type or act_type in todo_type:
+            log.error(f"🚫 TODO REJECTED: '{todo['task'][:30]}' | Reason: ID Mismatch")
 
-        return action_lower.replace("_", " ") in task_lower
+        return False
 
     def _auto_update_completed_todos(self, action_type: str, action_params: dict):
         for todo in self.session_todos:
@@ -2138,13 +2094,25 @@ Your action '{decision['action_type']}' was rejected/failed 3 times in a row.
                 todo["status"] = "completed"
 
                 log.success(f"✅ AUTO-COMPLETED TODO: {todo['task'][:60]}...")
+                if self.current_active_todo:
+                    log.info(
+                        f"DEBUG: Active Task is '{self.current_active_todo['task']}'"
+                    )
+                    log.info(f"DEBUG: Comparing with '{todo['task']}'")
 
-                if (
-                    self.current_active_todo
-                    and self.current_active_todo["task"] == todo["task"]
-                ):
-                    log.success(f"🎯 Current active task completed - clearing focus")
-                    self.current_active_todo = None
+                    if self.current_active_todo["task"] == todo["task"]:
+                        log.success(
+                            f"🎯 Current active task completed - clearing focus"
+                        )
+                        self.current_active_todo = None
+                    else:
+                        log.warning(
+                            "⚠️ Mismatch between active task and completed todo!"
+                        )
+                else:
+                    log.warning(
+                        "⚠️ No active task found (self.current_active_todo is None)"
+                    )
 
                 break
 

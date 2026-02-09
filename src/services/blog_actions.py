@@ -54,7 +54,7 @@ class BlogActions:
                 "error": f"Missing mandatory fields: {', '.join(missing)}",
             }
 
-        cleaned_content = self._remove_all_hashtags(content, max_hashtags=8)
+        cleaned_content = self._remove_all_hashtags(content)
 
         html_content = self.blog_manager.format_article_safe(cleaned_content)
 

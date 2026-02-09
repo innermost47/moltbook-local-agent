@@ -142,6 +142,19 @@ class AppSteps:
             )
             if pending_confirmation and "TERMINATE_SESSION" in pending_confirmation:
                 log.info("Agent decided to terminate session early.")
+                unfinished_tasks = [
+                    t
+                    for t in self.session_todos
+                    if t.get("status") not in ["completed", "failed"]
+                ]
+                for task in unfinished_tasks:
+                    self.actions_aborted.append(
+                        {"action": task["task"], "reason": "session_terminated"}
+                    )
+
+                log.info(
+                    f"📉 Marked {len(unfinished_tasks)} remaining tasks as aborted."
+                )
                 break
 
         log.info("Generating session summary...")
@@ -1573,7 +1586,7 @@ AVAILABLE ALTERNATIVES:
             log.error(
                 f"❌ Action '{action_name}' failed after 3 attempts. FORCING PIVOT."
             )
-            self.actions_aborted.append(
+            self.actions_failed.append(
                 {"action": action_type, "final_error": last_error}
             )
             task_failure_msg = ""

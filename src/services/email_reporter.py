@@ -185,7 +185,7 @@ class EmailReporter:
                 <div class="stats">
                     <h2>📊 Session Statistics</h2>
                     <p><strong>Karma:</strong> {karma}</p>
-                    <p><strong>Total Actions:</strong> {len(actions)}</p>
+                    <p><strong>Total Actions:</strong> {total}</p>
                     <p class="success"><strong>✅ Successful:</strong> {len(successes)}</p>
                     <p class="failure"><strong>❌ Failed/Skipped:</strong> {len(failures)}</p>
                 </div>

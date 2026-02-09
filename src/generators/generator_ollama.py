@@ -1,5 +1,6 @@
 import json
 import os
+import re
 from src.settings import settings
 from datetime import datetime
 from pydantic import ValidationError
@@ -80,7 +81,8 @@ class OllamaGenerator:
 
                 try:
                     clean_json = assistant_msg.strip()
-                    validated = pydantic_model.model_validate_json(clean_json)
+                    data_dict = self.robust_json_parser(clean_json)
+                    validated = pydantic_model.model_validate(data_dict)
                     assistant_msg = validated.model_dump_json(indent=2)
                     log.success(
                         f"✅ Pydantic validation passed ({pydantic_model.__name__})"
@@ -166,6 +168,36 @@ class OllamaGenerator:
         except Exception as e:
             log.error(f"Simple generation failed: {e}")
             return f"Error: Unable to generate summary - {str(e)}"
+
+    def robust_json_parser(self, raw_content):
+        try:
+            match = re.search(r"(\{.*\})", raw_content, re.DOTALL)
+            json_str = match.group(1) if match else raw_content
+            data = json.loads(json_str)
+
+            core_keys = [
+                "reasoning",
+                "self_criticism",
+                "emotions",
+                "next_move_preview",
+                "action_type",
+            ]
+
+            if "action_type" in data and "action_params" not in data:
+                params = {k: v for k, v in data.items() if k not in core_keys}
+
+                if params:
+                    log.warning(
+                        f"🔧 RobustParser: Moving {list(params.keys())} into action_params"
+                    )
+                    data["action_params"] = params
+                    for k in list(params.keys()):
+                        del data[k]
+
+            return data
+        except Exception as e:
+            log.error(f"💥 RobustParser failed to parse: {e}")
+            return json.loads(raw_content)
 
     def trim_history(self, has_created_master_plan: bool = False):
         if len(self.conversation_history) <= settings.MAX_HISTORY_MESSAGES:

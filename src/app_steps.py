@@ -1499,6 +1499,57 @@ AVAILABLE ALTERNATIVES:
                     else:
                         break
 
+                if self.current_active_todo:
+                    is_match = self._action_matches_todo(
+                        action_type=decision.get("action_type"),
+                        action_params=decision.get("action_params", {}),
+                        todo=self.current_active_todo,
+                    )
+
+                    if not is_match:
+                        todo_params = (
+                            self.current_active_todo.get("action_params", {}) or {}
+                        )
+                        act_params = decision.get("action_params", {}) or {}
+
+                        mismatches = []
+
+                        for key, expected_val in todo_params.items():
+                            actual_val = act_params.get(key)
+                            if str(expected_val) != str(actual_val):
+                                mismatches.append(
+                                    f"- `{key}`: Expected `{expected_val}`, got `{actual_val}`"
+                                )
+
+                        mismatch_details = (
+                            "\n".join(mismatches)
+                            if mismatches
+                            else "- Parameter structure mismatch."
+                        )
+
+                        last_error = f"""
+🚨 **CRITICAL TASK PARAMETER MISMATCH** 🚨
+
+Your proposed action does not align with the requirements of your Active Task.
+**Divergences detected:**
+{mismatch_details}
+
+**REQUIRED ACTION TYPE:** `{self.current_active_todo.get('action_type')}`
+
+**FIX:**
+1. Use the EXACT parameters defined in your Session Plan.
+2. If the target (ID/URL) is no longer valid or accessible, you MUST use `update_todo_status` to mark this task as 'cancelled' before moving to the next one.
+3. DO NOT persist with incorrect IDs; it is a waste of action points.
+"""
+                        log.error(
+                            f"🚫 Action blocked: Parameter Mismatch for task '{self.current_active_todo.get('task')[:30]}'"
+                        )
+
+                        if attempt < max_attempts:
+                            continue
+                        else:
+                            break
+
                 execution_result = self._execute_action(decision)
 
                 log.info(

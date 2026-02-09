@@ -365,8 +365,12 @@ class UpdateMasterPlan(BaseModel):
 
 
 class SupervisorAudit(BaseModel):
-    reasoning: str
-    message_for_agent: str
+    reasoning: str = Field(
+        ..., description="Analysis of the agent's proposal vs Master Plan"
+    )
+    message_for_agent: str = Field(
+        ..., description="Direct feedback. If is_valid=false, explain what to fix"
+    )
     is_valid: bool = Field(..., alias="validate")
 
     model_config = {"protected_namespaces": (), "populate_by_name": True}

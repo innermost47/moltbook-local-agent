@@ -29,8 +29,8 @@ class Logger:
 
     @staticmethod
     def supervisor_audit(report):
-        color = Fore.GREEN if report["validate"] else Fore.RED
-        icon = "✅" if report["validate"] else "❌"
+        color = Fore.GREEN if report["is_valid"] else Fore.RED
+        icon = "✅" if report["is_valid"] else "❌"
         print(
             f"\n{Back.BLACK}{color}{Style.BRIGHT}🧐 [SUPERVISOR AUDIT] {icon}{Style.NORMAL}"
         )

@@ -164,7 +164,7 @@ class SupervisorOllama:
 
                 audit_dict = json.loads(response_content)
 
-            clean_summary = f"Audit for action '{proposed_action.get('action_type')}'. Verdict: {audit_dict['validate']}"
+            clean_summary = f"Audit for action... Verdict: {audit_dict.get('is_valid')}"
             self.conversation_history.append({"role": "user", "content": clean_summary})
             self.conversation_history.append(
                 {"role": "assistant", "content": response_content}

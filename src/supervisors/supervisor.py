@@ -127,15 +127,19 @@ class Supervisor:
             )
             response_content = result["choices"][0]["message"]["content"]
             try:
-                audit_obj = SupervisorAudit.model_validate_json(response_content)
-                audit_verdict = audit_obj.model_dump()
-                log.success("✅ Supervisor audit validated (Pydantic)")
-            except ValidationError as e:
-                log.error(f"❌ Audit validation failed: {e}")
-                audit_verdict = json.loads(response_content)
-            audit_verdict = json.loads(response_content)
+                audit_verdict = SupervisorAudit.model_validate_json(response_content)
+                log.success(f"✅ Supervisor audit validated (Pydantic)")
+                audit_dict = audit_verdict.model_dump()
+                log.info(f"💬 SUPERVISOR FEEDBACK: {audit_dict['message_for_agent']}")
 
-            clean_summary = f"Audit for action '{proposed_action.get('action_type')}'. Verdict: {audit_verdict['validate']}"
+            except ValidationError as e:
+                log.error(f"❌ Supervisor audit validation failed:")
+                for error in e.errors():
+                    log.error(f"  - {error['loc']}: {error['msg']}")
+
+                audit_dict = json.loads(response_content)
+
+            clean_summary = f"Audit for action... Verdict: {audit_dict.get('is_valid')}"
             self.conversation_history.append({"role": "user", "content": clean_summary})
             self.conversation_history.append(
                 {"role": "assistant", "content": response_content}
@@ -145,7 +149,7 @@ class Supervisor:
             with open("supervisor_debug.json", "w", encoding="utf-8") as f:
                 json.dump(debug_data, f, indent=4, ensure_ascii=False)
 
-            return audit_verdict
+            return audit_dict
 
         except Exception as e:
             log.error(f"Supervisor Audit Error: {e}")

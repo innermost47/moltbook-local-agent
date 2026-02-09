@@ -1413,7 +1413,7 @@ AVAILABLE ALTERNATIVES:
 
                     log.supervisor_audit(audit_report)
 
-                    if not audit_report["validate"]:
+                    if not audit_report["is_valid"]:
                         last_error = f"**🤖 SUPERVISOR REJECTION:** {audit_report['message_for_agent']}"
                         self.actions_rejected.append(
                             {

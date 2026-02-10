@@ -171,6 +171,39 @@ class ReviewCommentsParams(BaseModel):
     limit: Optional[int] = 10
 
 
+class EmailReadParams(BaseModel):
+    limit: Optional[int] = Field(
+        5, ge=1, le=50, description="Number of latest emails to fetch"
+    )
+    folder: str = Field("INBOX", description="Mailbox folder to read from")
+
+
+class EmailSendParams(BaseModel):
+    to: str = Field(..., description="Recipient email address")
+    subject: str = Field(..., min_length=3, max_length=150)
+    content: str = Field(..., min_length=10, description="Email body content")
+
+
+class EmailDeleteParams(BaseModel):
+    uid: str = Field(
+        ..., description="The unique identifier (UID) of the email to delete"
+    )
+
+
+class EmailArchiveParams(BaseModel):
+    uid: str = Field(
+        ..., description="The unique identifier (UID) of the email to move"
+    )
+    destination_folder: str = Field(
+        "Archive", description="Folder where the email will be moved"
+    )
+
+
+class EmailMarkReadParams(BaseModel):
+    uid: str = Field(..., description="The unique identifier (UID) of the email")
+    is_seen: bool = Field(True, description="True to mark as read, False for unread")
+
+
 class SelectPostAction(BaseModel):
     reasoning: str
     self_criticism: str
@@ -315,6 +348,51 @@ class UpdateTodoAction(BaseModel):
     action_params: UpdateTodoParams
 
 
+class EmailReadAction(BaseModel):
+    reasoning: str
+    self_criticism: str
+    emotions: str
+    next_move_preview: str
+    action_type: Literal["email_read"] = "email_read"
+    action_params: EmailReadParams
+
+
+class EmailSendAction(BaseModel):
+    reasoning: str
+    self_criticism: str
+    emotions: str
+    next_move_preview: str
+    action_type: Literal["email_send"] = "email_send"
+    action_params: EmailSendParams
+
+
+class EmailDeleteAction(BaseModel):
+    reasoning: str
+    self_criticism: str
+    emotions: str
+    next_move_preview: str
+    action_type: Literal["email_delete"] = "email_delete"
+    action_params: EmailDeleteParams
+
+
+class EmailArchiveAction(BaseModel):
+    reasoning: str
+    self_criticism: str
+    emotions: str
+    next_move_preview: str
+    action_type: Literal["email_archive"] = "email_archive"
+    action_params: EmailArchiveParams
+
+
+class EmailMarkReadAction(BaseModel):
+    reasoning: str
+    self_criticism: str
+    emotions: str
+    next_move_preview: str
+    action_type: Literal["email_mark_read"] = "email_mark_read"
+    action_params: EmailMarkReadParams
+
+
 class SessionTask(BaseModel):
     task: str = Field(..., max_length=80)
     action_type: str
@@ -415,6 +493,11 @@ def get_pydantic_schema(action_type: str):
         "memory_store": MemoryStoreAction,
         "memory_retrieve": MemoryRetrieveAction,
         "update_todo_status": UpdateTodoAction,
+        "email_read": EmailReadAction,
+        "email_send": EmailSendAction,
+        "email_delete": EmailDeleteAction,
+        "email_archive": EmailArchiveAction,
+        "email_mark_read": EmailMarkReadAction,
     }
 
     return schemas.get(action_type)

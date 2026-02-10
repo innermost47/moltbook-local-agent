@@ -256,6 +256,31 @@ Provide a concise summary (max 300 words) highlighting the most relevant informa
         }
 
     def web_scrap_for_links(self, params: dict, actions_performed: List):
+        if self.test_mode:
+            domain = params.get("web_domain", "test-source.com")
+            query = params.get("web_query", "general")
+            log.info(f"🧪 [MOCK] Bypassing real scrape for domain: {domain}")
+            mock_links = [
+                {
+                    "text": f"Technical analysis of {query}",
+                    "url": f"https://{domain}/article-1",
+                },
+                {
+                    "text": f"Advanced protocols in {query}",
+                    "url": f"https://{domain}/paper-v2",
+                },
+                {
+                    "text": f"Community discussion on {query}",
+                    "url": f"https://{domain}/thread-99",
+                },
+            ]
+            links_text = f"SEARCH RESULTS ON {domain} FOR '{query}':\n"
+            for link in mock_links:
+                links_text += f"- {link['text']}: {link['url']}\n"
+
+            actions_performed.append(f"[MOCK SEARCH] WEB SCRAPING FOR LINKS: {domain}")
+            return {"success": True, "data": links_text}
+
         raw_input = params.get("web_domain", "").strip()
         if not raw_input:
             raw_input = params.get("web_url", "").strip()
@@ -267,7 +292,7 @@ Provide a concise summary (max 300 words) highlighting the most relevant informa
         else:
             domain = raw_input_low.lstrip(":/ ").replace("www.", "")
 
-        if not domain or domain not in self.allowed_domains:
+        if not domain or domain not in self.allowed_domains and not self.test_mode:
             allowed_list = ", ".join(self.allowed_domains.keys())
             return {
                 "success": False,

@@ -26,3 +26,4 @@ output/*
 *.fls
 *.out
 *.pdf
+test.py

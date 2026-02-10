@@ -27,6 +27,8 @@ class LLMMock:
             key = "share_created_blog_post_url"
         elif model_name == "WebScrapAction":
             key = "web_scrap_for_links"
+        elif model_name == "WebFetchAction":
+            key = "web_fetch"
         elif model_name == "CreatePostAction":
             key = "create_post"
         elif model_name == "SelectPostAction":
@@ -39,8 +41,20 @@ class LLMMock:
             key = "follow_agent"
         elif model_name == "MemoryStoreAction":
             key = "memory_store"
+        elif model_name == "EmailReadAction":
+            key = "email_read"
+        elif model_name == "EmailSendAction":
+            key = "email_send"
+        elif model_name == "EmailDeleteAction":
+            key = "email_delete"
+        elif model_name == "EmailArchiveAction":
+            key = "email_archive"
+        elif model_name == "EmailMarkReadAction":
+            key = "email_mark_read"
         elif model_name == "SessionSummary" or "summary" in p_lower:
             key = "session_summary"
+        elif model_name == "UpdateTodoAction":
+            key = "update_todo_status"
         else:
             key = "select_post_to_comment"
 
@@ -49,16 +63,15 @@ class LLMMock:
         if not response_data:
             log.warning(f"⚠️ [MOCK] No data found in JSON for key: {key}")
 
-        json_string = json.dumps(response_data)
+        structured_dict = {
+            "choices": [{"message": {"content": json.dumps(response_data)}}]
+        }
 
         if "agent_name" in kwargs and model_name not in ["SessionPlan", "MasterPlan"]:
-            log.info(
-                f"🧪 [MOCK] Phase: ACTION (Structured) | Key: {key} | Model: {model_name}"
-            )
-            return {"choices": [{"message": {"content": json_string}}]}
+            log.info(f"🧪 [MOCK] Returning DICT for {model_name}")
+            return structured_dict
 
-        log.info(f"🧪 [MOCK] Phase: PLANNING | Key: {key}")
-        return json_string
+        return json.dumps(response_data)
 
     def get_main_system_prompt(self):
         return "STRICT MOCK SYSTEM PROMPT: You are a testing agent."
@@ -81,3 +94,16 @@ class LLMMock:
             },
         )
         return json.dumps(summary_data)
+
+    def generate_simple(self, prompt: str, max_tokens: int = 300) -> str:
+        log.info("🧪 [MOCK] Generating simple summary...")
+
+        if "session_summary" in self.responses:
+            summary_data = self.responses["session_summary"]
+            return (
+                f"REASONING: {summary_data.get('reasoning')}\n"
+                f"LEARNINGS: {summary_data.get('learnings')}\n"
+                f"STATUS: {summary_data.get('status_update')}"
+            )
+
+        return "The session was executed successfully. All technical tasks reached their intended endpoints."

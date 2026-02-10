@@ -18,7 +18,7 @@ from src.supervisors import Supervisor, SupervisorOllama
 from src.memory import Memory
 from src.utils import log
 from src.settings import settings
-from src.services import PlanningSystem, PromptManager
+from src.services import PlanningSystem, PromptManager, MailManager
 from src.metrics import Metrics
 from src.schemas_pydantic import (
     get_pydantic_schema,
@@ -27,7 +27,7 @@ from src.schemas_pydantic import (
     MasterPlan,
     UpdateMasterPlan,
 )
-from src.mocks import LLMMock, MoltbookMock, MoltbookActionsMock
+from src.mocks import LLMMock, MoltbookMock, MoltbookActionsMock, MockMailManager
 
 
 class AppSteps:
@@ -88,6 +88,7 @@ class AppSteps:
             self.metrics = Metrics()
             self.prompt_manager = PromptManager()
             self.web_scraper = WebScraper(self.test_mode)
+            self.mail_manager = MockMailManager(user="tester@example.com")
             self.agent_name = "MoltbookLocalAgent_TEST"
             log.warning("⚠️ RUNNING IN OFFLINE TEST MODE")
         else:
@@ -105,6 +106,13 @@ class AppSteps:
             self.planning_system = PlanningSystem(db_path=settings.DB_PATH)
             self.web_scraper = WebScraper()
             self.metrics = Metrics()
+            self.mail_manager = None
+            if settings.AGENT_IMAP_SERVER:
+                self.mail_manager = MailManager(
+                    host=settings.AGENT_IMAP_SERVER,
+                    user=settings.AGENT_MAIL_BOX_EMAIL,
+                    password=settings.AGENT_MAIL_BOX_PASSWORD,
+                )
             self.agent_name = "Agent"
             self.cached_dynamic_context = ""
             self.moltbook_actions = MoltbookActions(db_path=settings.DB_PATH)
@@ -445,6 +453,7 @@ class AppSteps:
             allowed_domains=self.allowed_domains,
             feed_options=self.feed_options,
             blog_actions=self.blog_actions,
+            has_mail_manager=self.mail_manager is not None,
         )
 
         dynamic_context = ""
@@ -545,6 +554,39 @@ class AppSteps:
         log.success(
             f"Feed loaded: {len(self.available_post_ids)} posts, {len(self.available_comment_ids)} comments"
         )
+
+        if self.mail_manager:
+            log.info("Synchronizing email inbox...")
+            try:
+                email_result = self.mail_manager.get_messages(
+                    params={"limit": 5, "criteria": "UNSEEN"}
+                )
+
+                if email_result.get("success") and email_result.get("data"):
+                    unread_emails = email_result["data"]
+                    email_context = "\n## 📩 UNREAD EMAILS (MailBox)\n\n"
+                    email_context += "**STRATEGIC PRIORITY**: These are direct communications. Address them if they align with your current objectives.\n\n"
+
+                    for mail in unread_emails:
+                        email_context += f"- **UID**: `{mail['uid']}`\n"
+                        email_context += f"  - **From**: {mail['from']}\n"
+                        email_context += f"  - **Subject**: {mail['subject']}\n"
+                        email_context += f"  - **Date**: {mail['date']}\n"
+                        body_preview = mail["body"][:200].replace("\n", " ") + "..."
+                        email_context += f"  - **Preview**: {body_preview}\n\n"
+
+                    email_context += "**🚨 ACTION**: Use `email_send` to reply and `email_mark_read` or `email_archive` after processing.\n"
+                    email_context += "\n--- \n\n"
+
+                    dynamic_context += email_context
+                    log.success(
+                        f"Inbox synchronized: {len(unread_emails)} unread messages found."
+                    )
+                else:
+                    log.info("Email inbox is empty or no unread messages.")
+            except Exception as e:
+                log.error(f"Failed to synchronize email inbox: {e}")
+
         log.success("Complete context loaded: planning + memory + sessions + feed")
 
         return system_context, dynamic_context, agent_name, current_karma
@@ -1715,7 +1757,7 @@ This is your **LAST CHANCE**.
                 last_error = f"JSON/Parsing Error: {str(e)}"
 
                 log.error(f"💥 JSON Syntax Error detected! Skipping current attempt.")
-                log.error(f"📄 Raw Data causing error: {raw_response[:500]}...")
+                log.error(f"📄 Raw Data causing error: {raw_response}...")
 
                 self.actions_failed.append(
                     {
@@ -2078,6 +2120,22 @@ Your action '{decision['action_type']}' was rejected/failed 3 times in a row.
 
         elif action_type == "reject_comment" and self.blog_actions:
             return self.blog_actions.reject_comment(params, self)
+
+        elif action_type == "email_read":
+            return self.mail_manager.get_messages(params=params)
+
+        elif action_type == "email_send":
+            return self.mail_manager.send_email(params=params)
+
+        elif action_type == "email_delete":
+            return self.mail_manager.delete_emails(params=params)
+
+        elif action_type == "email_archive":
+            return self.mail_manager.archive_email(params=params)
+
+        elif action_type == "email_mark_read":
+            return self.mail_manager.mark_as_read(params=params)
+
         else:
             error_msg = f"Unknown action type: {action_type}. Verification of the tool definition required."
             log.error(error_msg)

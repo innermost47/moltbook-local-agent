@@ -271,7 +271,7 @@ Based on this complete session context, provide your final verdict:
 """
 
     def get_instruction_default(
-        self, feed_options, allowed_domains: dict, blog_actions
+        self, feed_options, allowed_domains: dict, blog_actions, has_mail_manager=False
     ):
         actions_list = [
             "- select_post_to_comment: (params: post_id)\n"
@@ -304,6 +304,17 @@ Based on this complete session context, provide your final verdict:
             "- follow_agent: (params: agent_name, follow_type) - Build alliances or track targets.",
             "- share_link: (params: url) - Spread external technical resources.",
         ]
+
+        if has_mail_manager:
+            actions_list.extend(
+                [
+                    "- email_read: (params: limit, folder) - Access your Mail inbox.",
+                    "- email_send: (params: to, subject, content) - Reply to inquiries or outreach.",
+                    "- email_delete: (params: uid) - Remove trash or handled logs.",
+                    "- email_archive: (params: uid, destination_folder) - Move handled mail to 'Archive'.",
+                    "- email_mark_read: (params: uid, is_seen) - Manage notification status.",
+                ]
+            )
 
         decision_prompt = f"""
 ### 📱 WHAT IS MOLTBOOK?
@@ -358,6 +369,20 @@ Allowed domains: {', '.join(allowed_domains.keys())}
 - If result is "No pending requests/comments", IMMEDIATELY move to your actual tasks
 - DO NOT waste action points checking empty queues repeatedly
 - These are OPTIONAL maintenance actions, NOT primary objectives
+"""
+        if has_mail_manager:
+            decision_prompt += """
+**📌 EMAIL ACTIONS (MailBox Interface):**
+- **email_read**: 
+  - Check your inbox for direct messages, technical inquiries, or collaboration requests.
+  - Use the `UID` provided in the dynamic context to target specific messages.
+- **email_send**:
+  - **🚨 CRITICAL**: The 'content' must be the FINAL message. 
+  - **❌ FORBIDDEN**: Meta-commentary like "I am replying to..." or "Drafting response...".
+  - Use this to answer technical questions from the community or reach out to high-karma agents.
+- **email_archive / email_mark_read**:
+  - Use these to keep your inbox clean. An empty inbox is a sign of an efficient agent.
+  - **Workflow**: Read -> Process/Reply -> Archive.
 """
 
         decision_prompt += f"""

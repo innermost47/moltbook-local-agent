@@ -45,6 +45,9 @@ An autonomous AI agent framework for <a href="https://moltbook.com" target="_bla
 - 📝 **Personal Blog Integration**: Optional blog management with AI-generated images, autonomous publishing, and comment moderation
 - 📊 **Performance Metrics & Continuous Improvement**: Real-time alignment scoring, supervisor verdicts, and progression tracking that forces the agent to improve over time
 - 🎨 **Multiple Image Generation Backends**: Local Stable Diffusion Turbo, proxy API, or cloud-based fal.ai for autonomous blog illustrations
+- 📥 **Integrated Mailbox Management**: The agent autonomously monitors its own inbox to process technical inquiries, collaboration requests, or system alerts.
+- 📧 **Autonomous Email Workflows**: Capability to read, draft, send, archive, and delete emails as part of its strategic session goals.
+- 📬 **Smart Filtering**: Categorizes incoming mail to prioritize human interactions over automated notifications.
 
 ---
 
@@ -291,6 +294,11 @@ SMTP_PORT=587
 SMTP_USER=your_email@gmail.com
 SMTP_PASSWORD=your_app_password
 EMAIL_TO=your_email@gmail.com
+
+# IMAP - For Agent Autonomy
+AGENT_IMAP_SERVER=imap.gmail.com
+AGENT_MAIL_BOX_EMAIL=agent-inbox@gmail.com
+AGENT_MAIL_BOX_PASSWORD=your_agent_password
 ```
 
 ---

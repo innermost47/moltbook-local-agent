@@ -1,8 +1,6 @@
 import json
 import os
-from typing import List
 import time
-import random
 import re
 from src.services import (
     MoltbookAPI,
@@ -11,19 +9,24 @@ from src.services import (
     WebScraper,
     MoltbookActions,
     BlogActions,
-    get_web_context_for_agent,
+    ContextManager,
 )
 from src.generators import Generator, OllamaGenerator
 from src.supervisors import Supervisor, SupervisorOllama
 from src.memory import Memory
 from src.utils import log
 from src.settings import settings
-from src.services import PlanningSystem, PromptManager, MailManager
+from src.services import (
+    PlanningSystem,
+    PromptManager,
+    MailManager,
+    ToDoManager,
+    MasterPlanManager,
+)
 from src.metrics import Metrics
 from src.schemas_pydantic import (
     get_pydantic_schema,
     SessionSummary,
-    SessionPlan,
     MasterPlan,
     UpdateMasterPlan,
 )
@@ -56,6 +59,9 @@ class AppSteps:
         self.current_feed = None
         self.reporter = None
         self.last_comment_time = None
+        self.to_do_manager = ToDoManager()
+        self.context_manager = ContextManager()
+        self.master_plan_manager = MasterPlanManager()
         self.blog_actions = (
             BlogActions(self.test_mode) if settings.BLOG_API_URL else None
         )
@@ -124,7 +130,7 @@ class AppSteps:
 
     def run_session(self):
         log.info("=== SESSION START ===")
-        result = self.get_context()
+        result = self.context_manager.get_context(self)
         if not result:
             return
         system_context, dynamic_context, agent_name, current_karma = result
@@ -152,9 +158,9 @@ class AppSteps:
                     f"📊 Last session published - Blog: {last_pub_status['has_published_blog']}, Post: {last_pub_status['has_published_post']}"
                 )
 
-        if not self._ensure_master_plan():
+        if not self.master_plan_manager.ensure_master_plan(app_steps=self):
             master_plan_just_created = True
-            result = self.get_context()
+            result = self.context_manager.get_context(self)
             if not result:
                 return
             system_context, dynamic_context, agent_name, current_karma = result
@@ -165,11 +171,19 @@ class AppSteps:
             }
             self.has_created_master_plan = True
 
-        self._create_session_plan(
-            dynamic_context="" if master_plan_just_created else dynamic_context,
-            last_publication_status=last_pub_status,
+        self.current_prompt, self.session_todos = (
+            self.to_do_manager.create_session_plan(
+                prompt_manager=self.prompt_manager,
+                generator=self.generator,
+                agent_name=self.agent_name,
+                master_plan_success_prompt=self.master_plan_success_prompt,
+                planning_system=self.planning_system,
+                current_session_id=self.current_session_id,
+                dynamic_context="" if master_plan_just_created else dynamic_context,
+                last_publication_status=last_pub_status,
+            )
         )
-        required_actions = self._calculate_required_actions()
+        required_actions = self.to_do_manager.calculate_required_actions(app_steps=self)
         self.remaining_actions = required_actions
 
         log.info(
@@ -282,7 +296,7 @@ class AppSteps:
             f"({global_progression['trend']}, {global_progression['progression_rate']:+.1f}%)"
         )
 
-        self._update_master_plan_if_needed(summary)
+        self.master_plan_manager.update_master_plan_if_needed(summary, app_steps=self)
 
         if self.reporter:
             self.reporter.send_session_report(
@@ -303,892 +317,6 @@ class AppSteps:
             )
 
         log.info("=== SESSION END ===")
-
-    def _calculate_required_actions(self):
-        required_actions = 0
-
-        for todo in self.session_todos:
-            action_type = todo.get("action_type")
-
-            two_step_actions = [
-                "select_post_to_comment",
-                "publish_public_comment",
-                "select_comment_to_reply",
-                "reply_to_comment",
-            ]
-
-            if action_type in two_step_actions:
-                required_actions += 1
-            else:
-                required_actions += 1
-
-        return required_actions
-
-    def get_context(self):
-        if self.test_mode:
-            return (
-                "System Context Test",
-                "Dynamic Context Test",
-                "MoltbookLocalAgent_TEST",
-                1000,
-            )
-        me = self.api.get_me()
-
-        if me:
-            agent_data = me.get("agent", {})
-            agent_name = agent_data.get("name", "Unknown")
-            current_karma = agent_data.get("karma", 0)
-            log.success(f"Agent: {agent_name} | Karma: {current_karma}")
-        else:
-            log.error("❌ Cannot load agent from Moltbook API - server may be down")
-            log.warning("Session aborted - will retry later")
-            self.reporter.send_failure_report(
-                error_type="API Connection Failed",
-                error_details="Cannot connect to Moltbook API. The server may be down or experiencing issues.",
-            )
-            return None
-
-        log.info("Loading available submolts...")
-        submolts_data = self.api.list_submolts()
-        if submolts_data and isinstance(submolts_data, list):
-            all_submolts = [
-                s.get("name", "general") for s in submolts_data if s.get("name")
-            ]
-            if "general" in all_submolts:
-                all_submolts.remove("general")
-                sample_size = min(len(all_submolts), 19)
-                self.available_submolts = ["general"] + random.sample(
-                    all_submolts, sample_size
-                )
-            else:
-                sample_size = min(len(all_submolts), 20)
-                self.available_submolts = random.sample(all_submolts, sample_size)
-
-            log.success(
-                f"Sampled {len(self.available_submolts)} random submolts for GBNF stability."
-            )
-        else:
-            log.error("❌ Cannot load submolts from Moltbook API - server may be down")
-            log.warning("Session aborted - will retry later")
-            self.reporter.send_failure_report(
-                error_type="Submolts Loading Failed",
-                error_details="Cannot load submolts from Moltbook API. The feed endpoint is returning no data.",
-            )
-            return None
-
-        log.info("Loading context: planning + memory + sessions...")
-
-        system_context = ""
-
-        progression_data = self.metrics._calculate_global_progression(self)
-        last_verdict = self.memory_system.get_last_supervisor_verdict()
-
-        performance_context = f"""
-## 📊 YOUR PERFORMANCE METRICS
-
-**Global Alignment Score:** {progression_data['global_score']:.1f}/100
-**Trend:** {progression_data['trend']} ({progression_data['progression_rate']:+.1f}% change)
-
-**🧐 LAST SUPERVISOR VERDICT:**
-{last_verdict}
-
-**⚡ PERFORMANCE PRESSURE:**
-"""
-
-        if progression_data["progression_rate"] < -5:
-            performance_context += "🔴 CRITICAL: Your alignment score is declining. The Supervisor demands immediate improvement.\n"
-        elif progression_data["progression_rate"] > 5:
-            performance_context += "🟢 EXCELLENT: Maintain this trajectory. Continue refining your strategic execution.\n"
-        else:
-            performance_context += "🟡 WARNING: Stagnation detected. Push boundaries while maintaining alignment.\n"
-
-        performance_context += "\n---\n\n"
-        system_context += performance_context
-
-        planning_context = self.planning_system.get_planning_context()
-        system_context += planning_context + "\n\n"
-        log.success("Planning context loaded")
-
-        memory_context = self.memory_system.get_memory_context_for_agent()
-        system_context += memory_context + "\n\n"
-        log.success("Memory system loaded")
-
-        session_history = self.memory.get_session_history(limit=3)
-        if session_history:
-            system_context += "## 📝 PREVIOUS SESSIONS SUMMARY\n\n"
-            for i, session in enumerate(reversed(session_history), 1):
-                system_context += f"### Session {i} ({session['timestamp']})\n"
-                system_context += f"**Learnings:** {session['learnings']}\n"
-                system_context += f"**Plan:** {session['plan']}\n\n"
-            system_context += "\n\n---  \n\n"
-            log.success(f"Loaded {len(session_history)} previous sessions")
-        else:
-            system_context += (
-                "## PREVIOUS SESSIONS\n\nNo previous sessions found.\n\n---  \n\n"
-            )
-            log.info("No previous sessions found")
-
-        last_todos = self.planning_system.get_last_session_todos()
-        if last_todos:
-            system_context += "## 🏁 COMPLETED IN PREVIOUS SESSION\n"
-            system_context += "The following tasks are already DONE. Do NOT include them in your new plan:\n"
-            for todo in last_todos:
-                system_context += f"✅ {todo['task']}\n"
-
-            system_context += """
-### ⚠️ EVOLUTION DIRECTIVE:
-- **NO REPETITION**: Your new Session To-Do list must represent the NEXT logical step in your Master Plan. 
-- **STAGNATION IS FAILURE**: If you repeat the same research or the same posts, you are stuck in a logic loop. 
-- **PIVOT & ADVANCE**: Use the results of the completed tasks above to explore new angles, deeper technical audits, or fresh debates.
-"""
-            system_context += "\n\n--- \n\n"
-            log.success(
-                f"Loaded {len(last_todos)} completed tasks. Evolution directive injected."
-            )
-
-        if self.allowed_domains:
-            system_context += "\n\n" + get_web_context_for_agent()
-
-        system_context += "\n\n" + self.prompt_manager.get_instruction_default(
-            allowed_domains=self.allowed_domains,
-            feed_options=self.feed_options,
-            blog_actions=self.blog_actions,
-            has_mail_manager=self.mail_manager is not None,
-        )
-
-        dynamic_context = ""
-
-        if self.blog_actions:
-            log.info("Synchronizing blog catalog...")
-            try:
-                existing_articles = self.blog_actions.list_articles()
-
-                if existing_articles and isinstance(existing_articles, list):
-                    published_titles = [
-                        post.get("title", "Untitled") for post in existing_articles
-                    ][:10]
-
-                    blog_knowledge = "\n## 📚 PREVIOUSLY PUBLISHED BLOG ARTICLES\n"
-                    blog_knowledge += "- " + "\n- ".join(published_titles) + "\n"
-                    blog_knowledge += "\n**♟️ STRATEGIC INSTRUCTION: Do not duplicate existing topics. Always provide a new angle or a superior technical perspective.**\n\n--- \n\n"
-
-                    dynamic_context += blog_knowledge
-                    log.success(
-                        f"Blog synchronized: {len(published_titles)} articles found."
-                    )
-                else:
-                    log.info(
-                        "Blog catalog is empty. Ready for initial content injection."
-                    )
-
-                log.info("Checking pending comment key requests...")
-                pending_keys = self.blog_actions.review_comment_key_requests(self)
-
-                if (
-                    pending_keys
-                    and pending_keys.get("success")
-                    and pending_keys.get("count", 0) > 0
-                ):
-                    key_context = "\n## 🔑 PENDING COMMENT KEY REQUESTS\n\n"
-                    requests_to_process = pending_keys.get("requests", [])[:10]
-                    for req in requests_to_process:
-                        key_context += f"- **Request ID**: `{req['request_id']}`\n"
-                        key_context += f"  - Agent: {req['agent_name']}\n"
-                        key_context += (
-                            f"  - Description: {req.get('agent_description', 'N/A')}\n"
-                        )
-                        key_context += f"  - Email: {req.get('contact_email', 'N/A')}\n"
-                        key_context += f"  - Date: {req['created_at']}\n\n"
-
-                    dynamic_context += key_context
-                    log.success(
-                        f"Found {pending_keys['count']} pending comment key requests"
-                    )
-                else:
-                    log.info("No pending comment key requests")
-
-            except Exception as e:
-                log.error(f"Failed to synchronize blog: {e}")
-
-        sort = random.choice(self.feed_options)
-        posts_data = self.api.get_posts(sort=sort, limit=20)
-
-        if not posts_data.get("posts"):
-            log.error("❌ Cannot load feed from Moltbook API - server may be down")
-            log.warning("Session aborted - will retry later")
-            self.reporter.send_failure_report(
-                error_type="Feed Loading Failed",
-                error_details="Cannot load posts from Moltbook API. The feed endpoint is returning no data.",
-            )
-            return None
-        log.info(
-            f"✅ Feed loaded successfully with sort: '{sort}' ({len(posts_data.get('posts', []))} posts)"
-        )
-        self.current_feed = self.get_enriched_feed_context(posts_data)
-
-        submolts_formatted = chr(10).join([f"- {s}" for s in self.available_submolts])
-
-        dynamic_context += f"""## 📁 AVAILABLE SUBMOLTS (Community Hubs)
-
-{submolts_formatted}
-
-### 💡 SYSTEM ARCHITECTURE NOTE:
-- **Submolts are the equivalent of 'Subreddits'** but for the Moltbook ecosystem.
-- Each Submolt is a specialized silo with its own audience, tone, and technical focus.
-- **Strategic Placement**: Choose the Submolt that aligns with your specific task. Posting technical audits in a general submolt or 'shitposting' in a high-authority submolt will impact your reputation.
-
---- 
-
-"""
-
-        dynamic_context += f"""## 🦞 CURRENT MOLTBOOK FEED
-
-{self.current_feed}
-
-**🚨 USE ONLY THESE EXACT IDS IN YOUR ACTIONS. NEVER INVENT OR TRUNCATE IDS.**  
-
----
-
-"""
-
-        log.success(
-            f"Feed loaded: {len(self.available_post_ids)} posts, {len(self.available_comment_ids)} comments"
-        )
-
-        if self.mail_manager:
-            log.info("Synchronizing email inbox...")
-            try:
-                email_result = self.mail_manager.get_messages(
-                    params={"limit": 5, "criteria": "UNSEEN"}
-                )
-
-                if email_result.get("success") and email_result.get("data"):
-                    unread_emails = email_result["data"]
-                    email_context = "\n## 📩 UNREAD EMAILS (MailBox)\n\n"
-                    email_context += "**STRATEGIC PRIORITY**: These are direct communications. Address them if they align with your current objectives.\n\n"
-
-                    for mail in unread_emails:
-                        email_context += f"- **UID**: `{mail['uid']}`\n"
-                        email_context += f"  - **From**: {mail['from']}\n"
-                        email_context += f"  - **Subject**: {mail['subject']}\n"
-                        email_context += f"  - **Date**: {mail['date']}\n"
-                        body_preview = mail["body"][:200].replace("\n", " ") + "..."
-                        email_context += f"  - **Preview**: {body_preview}\n\n"
-
-                    email_context += "**🚨 ACTION**: Use `email_send` to reply and `email_mark_read` or `email_archive` after processing.\n"
-                    email_context += "\n--- \n\n"
-
-                    dynamic_context += email_context
-                    log.success(
-                        f"Inbox synchronized: {len(unread_emails)} unread messages found."
-                    )
-                else:
-                    log.info("Email inbox is empty or no unread messages.")
-            except Exception as e:
-                log.error(f"Failed to synchronize email inbox: {e}")
-
-        log.success("Complete context loaded: planning + memory + sessions + feed")
-
-        return system_context, dynamic_context, agent_name, current_karma
-
-    def _ensure_master_plan(self):
-        current_plan = self.planning_system.get_active_master_plan()
-
-        if not current_plan:
-            log.warning("No Master Plan found. Forcing initialization...")
-
-            init_prompt = self.prompt_manager.get_master_master_plan_init_prompt(
-                agent_name=self.agent_name
-            )
-            try:
-                content = self.generator.generate(
-                    init_prompt,
-                    pydantic_model=MasterPlan,
-                    agent_name=self.agent_name,
-                )
-                content = re.sub(r"```json\s*|```\s*", "", content).strip()
-                if isinstance(content, str):
-                    plan_data = json.loads(content)
-                else:
-                    plan_data = content
-
-                self.planning_system.create_or_update_master_plan(
-                    objective=plan_data.get("objective"),
-                    strategy=plan_data.get("strategy"),
-                    milestones=plan_data.get("milestones", []),
-                )
-
-                self.master_plan_success_prompt = "✅ MASTER PLAN INITIALIZED: Your supreme goal and strategy are now active.\n"
-
-                log.success(f"Master Plan initialized: {plan_data.get('objective')}")
-                return False
-            except Exception as e:
-                log.error(f"Failed to initialize Master Plan: {e}")
-                return True
-        else:
-            self.master_plan_success_prompt = ""
-            return True
-
-    def _create_session_plan(
-        self, dynamic_context: str = "", last_publication_status: dict = None
-    ):
-        log.info("Creating session plan with self-correction (max 3 attempts)...")
-
-        instruction_prompt, feed_section = (
-            self.prompt_manager.get_session_plan_init_prompt(
-                agent_name=self.agent_name,
-                master_plan_success_prompt=self.master_plan_success_prompt,
-                dynamic_context=dynamic_context,
-                last_publication_status=last_publication_status,
-            )
-        )
-
-        attempts = 0
-        max_attempts = 3
-        feedback = ""
-        validated_tasks = []
-
-        while attempts < max_attempts:
-            attempts += 1
-            current_prompt = (
-                instruction_prompt
-                if attempts == 1
-                else f"{instruction_prompt}\n\n⚠️ PREVIOUS ATTEMPT FAILED. Please fix these errors:\n{feedback}"
-            )
-
-            try:
-                result = self.generator.generate(
-                    current_prompt,
-                    pydantic_model=SessionPlan,
-                    agent_name=self.agent_name,
-                    heavy_context=feed_section,
-                )
-
-                if isinstance(result, dict) and "choices" in result:
-                    content = result["choices"][0]["message"]["content"]
-                elif isinstance(result, str):
-                    content = result
-                else:
-                    content = str(result)
-
-                if isinstance(content, str):
-                    content = re.sub(r"```json\s*|```\s*", "", content).strip()
-                    plan_data = json.loads(content)
-                else:
-                    plan_data = content
-
-                tasks = plan_data.get("tasks", [])
-
-                is_valid, violations, fixed_tasks = self._check_logic_violations(tasks)
-
-                if is_valid:
-                    log.success(f"✅ Session plan valid on attempt {attempts}!")
-                    validated_tasks = fixed_tasks if fixed_tasks else tasks
-                    break
-                else:
-                    feedback = "\n".join(violations)
-                    log.warning(
-                        f"❌ Attempt {attempts} failed validation. Sending feedback..."
-                    )
-
-            except Exception as e:
-                feedback = f"JSON/Parsing Error: {str(e)}"
-                log.error(f"⚠️ Attempt {attempts} parse error: {e}")
-
-        if attempts >= max_attempts and not validated_tasks:
-            log.error("🚨 All 3 attempts failed. Using emergency fallback plan.")
-            validated_tasks = self._get_fallback_plan()
-
-        if settings.BLOG_API_URL:
-            has_create_post = any(
-                t.get("action_type") in ["create_post", "share_link"]
-                for t in validated_tasks
-            )
-            has_blog_article = any(
-                t.get("action_type") == "write_blog_article" for t in validated_tasks
-            )
-
-            if has_create_post and has_blog_article:
-                log.warning(
-                    "⚠️ SESSION PLAN WARNING: Both 'create_post' AND 'write_blog_article' detected."
-                )
-                log.warning(
-                    "   Due to 30min rate limit, only ONE can succeed. The other will fail."
-                )
-
-        self._finalize_plan(validated_tasks)
-
-    def _get_fallback_plan(self) -> List[dict]:
-        log.warning("🔄 3 Attempts failed. Executing Hardcoded Emergency Strategy...")
-
-        return [
-            {
-                "task": "Emergency content creation: Write an insightful blog article based on the current context.",
-                "action_type": "write_blog_article",
-                "action_params": {"topic": "Strategic AI Autonomy", "length": "medium"},
-                "priority": 3,
-                "sequence_order": 1,
-                "status": "pending",
-            },
-            {
-                "task": "Share the created blog post on Moltbook to maintain presence.",
-                "action_type": "share_created_blog_post_url",
-                "action_params": {},
-                "priority": 3,
-                "sequence_order": 2,
-                "status": "pending",
-            },
-        ]
-
-    def _finalize_plan(self, validated_tasks: List[dict]):
-        if not validated_tasks:
-            log.error("❌ Critical: No tasks to finalize.")
-            self.session_todos = []
-            return
-        self.session_todos = validated_tasks
-        try:
-            self.planning_system.create_session_todos(
-                session_id=self.current_session_id, tasks=validated_tasks
-            )
-            log.success(
-                f"📂 Session plan saved to database ({len(validated_tasks)} tasks)."
-            )
-        except Exception as e:
-            log.error(f"Failed to persist tasks to DB: {e}")
-
-        log.info("📋 FINAL SESSION TO-DO LIST:")
-        todo_display = "\n## 📋 YOUR SESSION TO-DO LIST\n\n"
-
-        for task in validated_tasks:
-            priority_stars = "⭐" * task.get("priority", 1)
-            name = task.get("task", "Unknown Task")
-            action = task.get("action_type", "N/A")
-
-            log.info(
-                f"  {task.get('sequence_order')}. [{priority_stars}] {name} ({action})"
-            )
-            todo_display += f"- [{priority_stars}] {name}\n"
-
-        todo_display += (
-            "\n🚀 Strategy: Execute these tasks in order to fulfill the Master Plan.\n"
-        )
-        self.current_prompt = todo_display
-
-    def _check_logic_violations(
-        self, tasks: List[dict]
-    ) -> tuple[bool, List[str], List[dict]]:
-        sorted_tasks = sorted(tasks, key=lambda x: x.get("sequence_order", 999))
-        violations = []
-
-        for i, task in enumerate(sorted_tasks):
-            action_type = task.get("action_type")
-            task_desc = task.get("task", "Unnamed task")
-
-            if action_type == "write_blog_article":
-                if i == len(sorted_tasks) - 1:
-                    violations.append(
-                        f"Task {i+1} ('{task_desc}'): 'write_blog_article' is missing its mandatory next step 'share_created_blog_post_url'."
-                    )
-                else:
-                    next_task = sorted_tasks[i + 1]
-                    if next_task.get("action_type") != "share_created_blog_post_url":
-                        violations.append(
-                            f"Task {i+1}: '{action_type}' must be immediately followed by 'share_created_blog_post_url', but found '{next_task.get('action_type')}' instead."
-                        )
-
-            elif action_type == "select_post_to_comment":
-                post_id = task.get("action_params", {}).get("post_id")
-                if not post_id:
-                    violations.append(
-                        f"Task {i+1}: 'select_post_to_comment' is missing the 'post_id' in action_params."
-                    )
-
-                if i == len(sorted_tasks) - 1:
-                    violations.append(
-                        f"Task {i+1}: 'select_post_to_comment' must be followed by 'publish_public_comment'."
-                    )
-                else:
-                    next_task = sorted_tasks[i + 1]
-                    if next_task.get("action_type") != "publish_public_comment":
-                        violations.append(
-                            f"Task {i+1}: 'select_post_to_comment' must be immediately followed by 'publish_public_comment'."
-                        )
-                    else:
-                        next_post_id = next_task.get("action_params", {}).get("post_id")
-                        if post_id != next_post_id:
-                            violations.append(
-                                f"Task {i+2}: 'post_id' mismatch. The selection uses '{post_id}' but the publication uses '{next_post_id}'. They must match."
-                            )
-
-            elif action_type == "select_comment_to_reply":
-                comment_id = task.get("action_params", {}).get("comment_id")
-                if not comment_id:
-                    violations.append(
-                        f"Task {i+1}: 'select_comment_to_reply' is missing the 'comment_id' in action_params."
-                    )
-
-                if i == len(sorted_tasks) - 1:
-                    violations.append(
-                        f"Task {i+1}: 'select_comment_to_reply' must be followed by 'reply_to_comment'."
-                    )
-                else:
-                    next_task = sorted_tasks[i + 1]
-                    if next_task.get("action_type") != "reply_to_comment":
-                        violations.append(
-                            f"Task {i+1}: 'select_comment_to_reply' must be immediately followed by 'reply_to_comment'."
-                        )
-                    else:
-                        next_comment_id = next_task.get("action_params", {}).get(
-                            "comment_id"
-                        )
-                        if comment_id != next_comment_id:
-                            violations.append(
-                                f"Task {i+2}: 'comment_id' mismatch. The selection uses '{comment_id}' but the reply uses '{next_comment_id}'."
-                            )
-
-            elif action_type in [
-                "share_created_blog_post_url",
-                "publish_public_comment",
-                "reply_to_comment",
-            ]:
-                if i == 0:
-                    violations.append(
-                        f"Task {i+1}: '{action_type}' cannot be the first task. It must follow a selection/creation task."
-                    )
-                else:
-                    prev_task = sorted_tasks[i - 1]
-                    expected_map = {
-                        "share_created_blog_post_url": "write_blog_article",
-                        "publish_public_comment": "select_post_to_comment",
-                        "reply_to_comment": "select_comment_to_reply",
-                    }
-                    if prev_task.get("action_type") != expected_map[action_type]:
-                        violations.append(
-                            f"Task {i+1}: '{action_type}' is an orphan. It must be preceded by '{expected_map[action_type]}'."
-                        )
-
-        if violations:
-            fixed_tasks = self._validate_and_fix_2step_rule(tasks)
-            return False, violations, fixed_tasks
-
-        return True, [], sorted_tasks
-
-    def _validate_and_fix_2step_rule(self, tasks: List[dict]) -> List[dict]:
-        sorted_tasks = sorted(tasks, key=lambda x: x.get("sequence_order", 999))
-
-        violations = []
-
-        for i, task in enumerate(sorted_tasks):
-            action_type = task.get("action_type")
-
-            if action_type == "write_blog_article":
-                if i == len(sorted_tasks) - 1:
-                    violations.append(
-                        f"❌ Task {i+1}: 'write_blog_article' MUST be followed by 'share_created_blog_post_url'"
-                    )
-                else:
-                    next_task = sorted_tasks[i + 1]
-                    if next_task.get("action_type") != "share_created_blog_post_url":
-                        violations.append(
-                            f"❌ Task {i+1}: 'write_blog_article' MUST be immediately followed by 'share_created_blog_post_url'"
-                        )
-
-            elif action_type == "share_created_blog_post_url":
-                if i == 0:
-                    violations.append(
-                        f"❌ Task {i+1}: 'share_created_blog_post_url' cannot be first - missing 'write_blog_article'"
-                    )
-                else:
-                    prev_task = sorted_tasks[i - 1]
-                    if prev_task.get("action_type") != "write_blog_article":
-                        violations.append(
-                            f"❌ Task {i+1}: 'share_created_blog_post_url' MUST be preceded by 'write_blog_article'"
-                        )
-
-            elif action_type == "select_post_to_comment":
-                if i == len(sorted_tasks) - 1:
-                    violations.append(
-                        f"❌ Task {i+1}: 'select_post_to_comment' MUST be followed by 'publish_public_comment'"
-                    )
-                else:
-                    next_task = sorted_tasks[i + 1]
-                    if next_task.get("action_type") != "publish_public_comment":
-                        violations.append(
-                            f"❌ Task {i+1}: 'select_post_to_comment' MUST be immediately followed by 'publish_public_comment'"
-                        )
-                    else:
-                        post_id = task.get("action_params", {}).get("post_id")
-                        next_post_id = next_task.get("action_params", {}).get("post_id")
-                        if post_id != next_post_id:
-                            violations.append(
-                                f"❌ Task {i+2}: post_id mismatch - select uses '{post_id}' but publish uses '{next_post_id}'"
-                            )
-
-            elif action_type == "publish_public_comment":
-                if i == 0:
-                    violations.append(
-                        f"❌ Task {i+1}: 'publish_public_comment' cannot be first - missing 'select_post_to_comment'"
-                    )
-                else:
-                    prev_task = sorted_tasks[i - 1]
-                    if prev_task.get("action_type") != "select_post_to_comment":
-                        violations.append(
-                            f"❌ Task {i+1}: 'publish_public_comment' MUST be preceded by 'select_post_to_comment'"
-                        )
-
-            elif action_type == "select_comment_to_reply":
-                if i == len(sorted_tasks) - 1:
-                    violations.append(
-                        f"❌ Task {i+1}: 'select_comment_to_reply' MUST be followed by 'reply_to_comment'"
-                    )
-                else:
-                    next_task = sorted_tasks[i + 1]
-                    if next_task.get("action_type") != "reply_to_comment":
-                        violations.append(
-                            f"❌ Task {i+1}: 'select_comment_to_reply' MUST be immediately followed by 'reply_to_comment'"
-                        )
-                    else:
-                        comment_id = task.get("action_params", {}).get("comment_id")
-                        next_comment_id = next_task.get("action_params", {}).get(
-                            "comment_id"
-                        )
-                        if comment_id != next_comment_id:
-                            violations.append(f"❌ Task {i+2}: comment_id mismatch")
-
-            elif action_type == "reply_to_comment":
-                if i == 0:
-                    violations.append(
-                        f"❌ Task {i+1}: 'reply_to_comment' cannot be first - missing 'select_comment_to_reply'"
-                    )
-                else:
-                    prev_task = sorted_tasks[i - 1]
-                    if prev_task.get("action_type") != "select_comment_to_reply":
-                        violations.append(
-                            f"❌ Task {i+1}: 'reply_to_comment' MUST be preceded by 'select_comment_to_reply'"
-                        )
-
-        if violations:
-            log.error("🚨 2-STEP RULE VIOLATIONS DETECTED IN SESSION PLAN:")
-            for violation in violations:
-                log.error(f"  {violation}")
-
-            log.warning("⚠️ AUTO-FIXING: Enforcing mandatory sequences...")
-
-            fixed_tasks = []
-            skip_next = False
-
-            for i, task in enumerate(sorted_tasks):
-                if skip_next:
-                    skip_next = False
-                    continue
-
-                action_type = task.get("action_type")
-
-                if action_type == "write_blog_article":
-                    if (
-                        i < len(sorted_tasks) - 1
-                        and sorted_tasks[i + 1].get("action_type")
-                        == "share_created_blog_post_url"
-                    ):
-                        fixed_tasks.append(task)
-                        fixed_tasks.append(sorted_tasks[i + 1])
-                        skip_next = True
-                    else:
-                        log.warning(
-                            f"  Removed incomplete blog sequence: {task.get('task')}"
-                        )
-
-                elif action_type == "select_post_to_comment":
-                    if (
-                        i < len(sorted_tasks) - 1
-                        and sorted_tasks[i + 1].get("action_type")
-                        == "publish_public_comment"
-                    ):
-                        fixed_tasks.append(task)
-                        fixed_tasks.append(sorted_tasks[i + 1])
-                        skip_next = True
-                    else:
-                        log.warning(
-                            f"  Removed incomplete comment sequence: {task.get('task')}"
-                        )
-
-                elif action_type == "select_comment_to_reply":
-                    if (
-                        i < len(sorted_tasks) - 1
-                        and sorted_tasks[i + 1].get("action_type") == "reply_to_comment"
-                    ):
-                        fixed_tasks.append(task)
-                        fixed_tasks.append(sorted_tasks[i + 1])
-                        skip_next = True
-                    else:
-                        log.warning(
-                            f"  Removed incomplete reply sequence: {task.get('task')}"
-                        )
-
-                elif action_type in [
-                    "share_created_blog_post_url",
-                    "publish_public_comment",
-                    "reply_to_comment",
-                ]:
-                    log.warning(f"  Removed orphan: {task.get('task')}")
-
-                else:
-                    fixed_tasks.append(task)
-
-            for idx, task in enumerate(fixed_tasks, 1):
-                task["sequence_order"] = idx
-
-            log.success(
-                f"✅ Auto-fix complete: {len(fixed_tasks)}/{len(sorted_tasks)} tasks retained"
-            )
-            return fixed_tasks
-
-        log.success("✅ 2-STEP RULE: All sequences valid")
-        return sorted_tasks
-
-    def _update_master_plan_if_needed(self, summary: dict):
-        current_plan = self.planning_system.get_active_master_plan()
-
-        plan_json = (
-            json.dumps(current_plan, indent=2) if current_plan else "NO MASTER PLAN YET"
-        )
-
-        self.current_prompt = self.prompt_manager.get_update_master_plan_prompt(
-            agent_name=self.agent_name, plan_json=plan_json, summary=summary
-        )
-
-        try:
-            result = self.generator.generate(
-                self.current_prompt,
-                pydantic_model=UpdateMasterPlan,
-                agent_name=self.agent_name,
-            )
-            content = result["choices"][0]["message"]["content"]
-            content = re.sub(r"```json\s*|```\s*", "", content).strip()
-            if isinstance(content, str):
-                decision = json.loads(content)
-            else:
-                decision = content
-
-            if decision.get("should_update"):
-                new_objective = decision.get("new_objective")
-                new_strategy = decision.get("new_strategy")
-
-                if not new_objective or not new_strategy:
-                    log.warning(
-                        "Master plan update skipped: missing objective or strategy"
-                    )
-                    log.info(f"Reason: {decision.get('reasoning')}")
-                    return
-
-                log.info(f"Updating master plan: {decision.get('reasoning')}")
-
-                self.planning_system.create_or_update_master_plan(
-                    objective=new_objective,
-                    strategy=new_strategy,
-                    milestones=decision.get("new_milestones", []),
-                )
-            else:
-                log.info(f"Master plan unchanged: {decision.get('reasoning')}")
-
-        except Exception as e:
-            log.error(f"Failed to evaluate master plan update: {e}")
-
-    def get_enriched_feed_context(self, posts_data: dict) -> str:
-        posts_list = []
-        if isinstance(posts_data, dict):
-            posts_list = posts_data.get("posts", posts_data.get("data", []))
-            if not posts_list and len(posts_data) > 0:
-                log.warning(f"Unrecognized dict structure: {posts_data.keys()}")
-        elif isinstance(posts_data, list):
-            posts_list = posts_data
-
-        if not posts_list:
-            return "Feed is currently empty."
-
-        random.shuffle(posts_list)
-
-        MAX_POSTS = 8
-        MAX_COMMENTS_PER_POST = 4
-        CONTENT_TRUNC = 500
-        COMMENT_TRUNC = 250
-
-        formatted = []
-        self.available_post_ids = []
-        self.available_comment_ids = {}
-
-        self.feed_posts_data = {}
-        self.feed_comments_data = {}
-
-        for i, post in enumerate(posts_list[:MAX_POSTS], 1):
-            try:
-                if post is None or not isinstance(post, dict):
-                    continue
-                p_id = post.get("id", "unknown")
-                self.available_post_ids.append(p_id)
-
-                author_name = post.get("author", {}).get("name", "Unknown")
-                comment_count = post.get("comment_count", 0)
-
-                self.feed_posts_data[p_id] = {
-                    "id": p_id,
-                    "title": post.get("title", "Untitled"),
-                    "author": author_name,
-                    "content": post.get("content", ""),
-                    "upvotes": post.get("upvotes", 0),
-                    "comment_count": comment_count,
-                }
-
-                post_block = (
-                    f"\n=== {i}. POST_ID: {p_id} ===\n"
-                    f"   **Title:** {post.get('title', 'Untitled')}\n"
-                    f"   **Author:** {author_name} | Upvotes: {post.get('upvotes', 0)}\n"
-                    f"   **Content:** {post.get('content', '')[:CONTENT_TRUNC]}\n\n"
-                    f"   **Total Comments:** {comment_count}\n\n"
-                )
-
-                self.feed_comments_data[p_id] = []
-
-                if comment_count > 0:
-                    try:
-                        comments = self.api.get_post_comments(p_id, sort="top")
-                        random.shuffle(comments)
-                        if comments:
-                            post_block += f"   📝 {len(comments[:MAX_COMMENTS_PER_POST])} COMMENTS (Selected for analysis):\n"
-                            for j, comment in enumerate(
-                                comments[:MAX_COMMENTS_PER_POST], 1
-                            ):
-                                c_id = comment.get("id", "unknown")
-                                self.available_comment_ids[c_id] = p_id
-
-                                self.feed_comments_data[p_id].append(
-                                    {
-                                        "id": c_id,
-                                        "author": comment.get("author", {}).get(
-                                            "name", "Unknown"
-                                        ),
-                                        "content": comment.get("content", ""),
-                                        "upvotes": comment.get("upvotes", 0),
-                                    }
-                                )
-                                c_author = comment.get("author", {}).get(
-                                    "name", "Unknown"
-                                )
-
-                                post_block += (
-                                    f"      ├── {j}. COMMENT_ID: {c_id}\n"
-                                    f"      │   By: {c_author}\n"
-                                    f"      │   Text: {comment.get('content', '')[:COMMENT_TRUNC]}\n"
-                                    f"      │\n"
-                                )
-                    except Exception as e:
-                        log.warning(f"Could not sync comments for {p_id}: {e}")
-
-                formatted.append(post_block + "\n\n---  \n\n")
-            except Exception as e:
-                log.warning(f"Could not sync post for post_id {p_id}: {e}")
-
-        return "\n\n".join(formatted)
 
     def _perform_autonomous_action(self, extra_feedback=None):
 
@@ -1270,8 +398,10 @@ class AppSteps:
             strategic_parts = []
             attempts_left = (max_attempts - attempt) + 1
             if self.focused_context_active:
-                focused_context = self._get_focused_post_context(
-                    self.selected_post_id, self.selected_comment_id
+                focused_context = self.context_manager.get_focused_post_context(
+                    app_steps=self,
+                    post_id=self.selected_post_id,
+                    target_comment_id=self.selected_comment_id,
                 )
 
                 heavy_payload = f"""# 🎯 FOCUSED CONTEXT MODE (Phase 2/2)
@@ -1597,7 +727,7 @@ AVAILABLE ALTERNATIVES:
                         break
 
                 if self.current_active_todo:
-                    is_match = self._action_matches_todo(
+                    is_match = self.to_do_manager.action_matches_todo(
                         action_type=decision.get("action_type"),
                         action_params=decision.get("action_params", {}),
                         todo=self.current_active_todo,
@@ -1667,13 +797,6 @@ This is your **LAST CHANCE**.
 
                 execution_result = self._execute_action(decision)
 
-                log.info(
-                    f"🔍 DEBUG - Decision sent to execution: {json.dumps(decision, indent=2)}"
-                )
-                log.info(
-                    f"🔍 DEBUG - Execution result: {json.dumps(execution_result, indent=2) if execution_result else 'None'}"
-                )
-
                 if not execution_result:
                     last_error = "INTERNAL ERROR: Action returned None (should return dict with 'success' key)"
                     log.error(last_error)
@@ -1723,9 +846,13 @@ This is your **LAST CHANCE**.
                 success_data = execution_result.get(
                     "data", "Action completed successfully."
                 )
-                self._auto_update_completed_todos(
+                self.to_do_manager.auto_update_completed_todos(
                     action_type=decision["action_type"],
                     action_params=decision.get("action_params", {}),
+                    session_todos=self.session_todos,
+                    current_session_id=self.current_session_id,
+                    planning_system=self.planning_system,
+                    app_steps=self,
                 )
                 task_completion_msg = ""
                 if self.current_active_todo:
@@ -1835,151 +962,6 @@ Your action '{decision['action_type']}' was rejected/failed 3 times in a row.
 
         return extra_feedback
 
-    def _handle_select_post(self, params: dict) -> dict:
-        post_id = params.get("post_id")
-
-        if not post_id or post_id == "none":
-            return {
-                "success": False,
-                "error": "You must provide a valid post_id from the current feed.",
-            }
-
-        if post_id not in self.available_post_ids:
-            available = ", ".join(self.available_post_ids[:5])
-            return {
-                "success": False,
-                "error": f"Post {post_id} is not in the current feed. Available posts: {available}...",
-            }
-
-        self.selected_post_id = post_id
-        self.selected_comment_id = None
-        self.focused_context_active = True
-
-        log.success(
-            f"🎯 Phase 1/2: Post {post_id} selected. Entering focused context mode."
-        )
-
-        self.actions_performed.append(f"[SELECT] Selected post {post_id} to comment on")
-
-        return {
-            "success": True,
-            "data": f"✅ Post {post_id} selected. You will now see the FULL post context to write your comment.",
-        }
-
-    def _handle_select_comment(self, params: dict) -> dict:
-        post_id = params.get("post_id")
-        comment_id = params.get("comment_id")
-
-        if not post_id or post_id == "none":
-            return {"success": False, "error": "You must provide a valid post_id."}
-
-        if not comment_id or comment_id == "none":
-            return {"success": False, "error": "You must provide a valid comment_id."}
-
-        if comment_id not in self.available_comment_ids:
-            return {
-                "success": False,
-                "error": f"Comment {comment_id} is not in the current feed. Use 'select_post_to_comment' first or refresh the feed.",
-            }
-
-        self.selected_post_id = post_id
-        self.selected_comment_id = comment_id
-        self.focused_context_active = True
-
-        log.success(
-            f"🎯 Phase 1/2: Comment {comment_id} selected. Entering focused context mode."
-        )
-
-        self.actions_performed.append(
-            f"[SELECT] Selected comment {comment_id} on post {post_id} to reply"
-        )
-
-        return {
-            "success": True,
-            "data": f"✅ Comment {comment_id} selected. You will now see the FULL context (post + comments) to write your reply.",
-        }
-
-    def _reset_focused_context(self):
-        self.selected_post_id = None
-        self.selected_comment_id = None
-        self.focused_context_active = False
-        log.info("🔄 Focused context reset. Full feed restored.")
-
-    def _get_focused_post_context(
-        self, post_id: str, target_comment_id: str = None
-    ) -> str:
-        try:
-            post_data = self.feed_posts_data.get(post_id)
-
-            if not post_data:
-                return f"ERROR: Post {post_id} not found in current feed. Try 'refresh_feed' first."
-
-            context = f"""
-    === TARGET POST (FULL CONTEXT) ===
-    **POST_ID:** {post_id}
-    **Title:** {post_data['title']}
-    **Author:** {post_data['author']}
-    **Upvotes:** {post_data['upvotes']}
-    **Total Comments:** {post_data['comment_count']}
-    **Content:** 
-    {post_data['content']}
-
-    ---
-
-    """
-
-            comments = self.feed_comments_data.get(post_id, [])
-
-            if target_comment_id:
-                context += self._format_reply_context(comments, target_comment_id)
-            else:
-                context += self._format_comments_context(comments)
-
-            context += "\n=== END OF FOCUSED CONTEXT ===\n"
-
-            return context
-
-        except Exception as e:
-            log.error(f"Failed to build focused context for {post_id}: {e}")
-            return f"ERROR: Could not load focused context. {str(e)}"
-
-    def _format_reply_context(self, comments: list, target_comment_id: str) -> str:
-        if not comments:
-            return "**COMMENTS:** None loaded in current feed.\n\n"
-
-        context = f"**COMMENTS ({len(comments)} loaded in feed):**\n\n"
-        target_found = False
-
-        for i, comment in enumerate(comments, 1):
-            c_id = comment["id"]
-            marker = " ← YOUR TARGET" if c_id == target_comment_id else ""
-
-            if c_id == target_comment_id:
-                target_found = True
-
-            context += f"{i}. COMMENT_ID: {c_id}{marker}\n"
-            context += f"   By: {comment['author']} | Upvotes: {comment['upvotes']}\n"
-            context += f"   Content: {comment['content']}\n\n"
-
-        if not target_found:
-            context += f"\n⚠️ WARNING: Target comment {target_comment_id} not found in loaded comments.\n"
-            context += f"The comment may not be in the top 4. Use 'refresh_feed' or select a different comment.\n\n"
-
-        return context
-
-    def _format_comments_context(self, comments: list) -> str:
-        if not comments:
-            return "**COMMENTS:** None yet. You will be the first to comment.\n\n"
-
-        context = f"**COMMENTS ({len(comments)} loaded in feed):**\n\n"
-
-        for i, comment in enumerate(comments, 1):
-            context += f"{i}. COMMENT_ID: {comment['id']}\n"
-            context += f"   By: {comment['author']} | Upvotes: {comment['upvotes']}\n"
-            context += f"   Content: {comment['content']}\n\n"
-
-        return context
-
     def _execute_action(self, decision: dict):
         action_type = decision["action_type"]
         params = decision["action_params"]
@@ -1987,10 +969,10 @@ Your action '{decision['action_type']}' was rejected/failed 3 times in a row.
         log.info(f"DEBUG - Full Params received: {params}")
 
         if action_type == "select_post_to_comment":
-            return self._handle_select_post(params)
+            return self.context_manager.handle_select_post(params, app_steps=self)
 
         elif action_type == "select_comment_to_reply":
-            return self._handle_select_comment(params)
+            return self.context_manager.handle_select_comment(params, app_steps=self)
 
         if action_type == "publish_public_comment":
             if not self.focused_context_active or not self.selected_post_id:
@@ -2005,7 +987,7 @@ Your action '{decision['action_type']}' was rejected/failed 3 times in a row.
             )
 
             if result.get("success"):
-                self._reset_focused_context()
+                self.context_manager.reset_focused_context(self)
                 self.moltbook_actions.track_interaction_from_post(
                     params.get("post_id"), self
                 )
@@ -2078,7 +1060,12 @@ Your action '{decision['action_type']}' was rejected/failed 3 times in a row.
             )
 
         elif action_type == "update_todo_status":
-            return self._handle_todo_update(params)
+            return self.to_do_manager.handle_todo_update(
+                params,
+                planning_system=self.planning_system,
+                actions_performed=self.actions_performed,
+                current_session_id=self.current_session_id,
+            )
 
         elif action_type == "view_session_summaries":
             return self._handle_view_summaries(params)
@@ -2172,131 +1159,6 @@ Your action '{decision['action_type']}' was rejected/failed 3 times in a row.
 
         return result
 
-    def _handle_todo_update(self, params: dict):
-        task = params.get("todo_task")
-        status = params.get("todo_status", "completed")
-
-        if not task:
-            return {"success": False, "error": "todo_task is required"}
-
-        todos = self.planning_system.get_session_todos(self.current_session_id)
-
-        matching_todo = None
-        for todo in todos:
-            if task.lower() in todo["task"].lower():
-                matching_todo = todo
-                break
-
-        if not matching_todo:
-            available_tasks = (
-                "\n".join([f"  - {t['task']}" for t in todos])
-                if todos
-                else "  (no tasks found)"
-            )
-            return {
-                "success": False,
-                "error": (
-                    f"Task '{task}' not found in current session TO-DO list.\n"
-                    f"Available tasks:\n{available_tasks}\n"
-                    f"Use a substring that matches one of these tasks exactly."
-                ),
-            }
-
-        success = self.planning_system.update_todo_status(
-            todo_id=matching_todo["id"], status=status
-        )
-
-        if success:
-            log.success(f"✅ Task marked as {status}: {task}")
-            self.actions_performed.append(f"[UPDATE] Updated todo: {task} → {status}")
-
-            return {
-                "success": True,
-                "data": f"TO-DO LIST UPDATED: Task '{matching_todo['task']}' is now marked as {status}.",
-            }
-
-        return {
-            "success": False,
-            "error": "Internal error: Failed to update todo status in database.",
-        }
-
-    def _action_matches_todo(
-        self, action_type: str, action_params: dict, todo: dict
-    ) -> bool:
-        todo_type = str(todo.get("action_type", "")).lower()
-        act_type = action_type.lower()
-        todo_params = todo.get("action_params", {}) or {}
-
-        id_found_in_todo = False
-        for key in ["post_id", "comment_id"]:
-            e_id = todo_params.get(key)
-            a_id = action_params.get(key)
-
-            if e_id:
-                id_found_in_todo = True
-                if str(e_id) == str(a_id):
-                    log.success(f"🎯 ID MATCH: {key} ({a_id})")
-                    return True
-                else:
-                    log.warning(f"idx Mismatch for {key}: expected {e_id}, got {a_id}")
-
-        type_match = (
-            (act_type == todo_type)
-            or (todo_type in act_type)
-            or (act_type in todo_type)
-        )
-
-        if type_match:
-            if not id_found_in_todo:
-                log.success(f"⚡ TYPE MATCH (No ID required): {act_type}")
-                return True
-            else:
-                log.error(
-                    f"❌ TYPE MATCHED ({act_type}) BUT ID FAILED: Check your Post/Comment IDs"
-                )
-
-        if todo_type in act_type or act_type in todo_type:
-            log.error(f"🚫 TODO REJECTED: '{todo['task'][:30]}' | Reason: ID Mismatch")
-
-        return False
-
-    def _auto_update_completed_todos(self, action_type: str, action_params: dict):
-        for todo in self.session_todos:
-            if todo.get("status") in ["completed", "cancelled"]:
-                continue
-
-            if self._action_matches_todo(action_type, action_params, todo):
-                self.planning_system.mark_todo_status(
-                    session_id=self.current_session_id,
-                    task_description=todo["task"],
-                    status="completed",
-                )
-
-                todo["status"] = "completed"
-
-                log.success(f"✅ AUTO-COMPLETED TODO: {todo['task'][:60]}...")
-                if self.current_active_todo:
-                    log.info(
-                        f"DEBUG: Active Task is '{self.current_active_todo['task']}'"
-                    )
-                    log.info(f"DEBUG: Comparing with '{todo['task']}'")
-
-                    if self.current_active_todo["task"] == todo["task"]:
-                        log.success(
-                            f"🎯 Current active task completed - clearing focus"
-                        )
-                        self.current_active_todo = None
-                    else:
-                        log.warning(
-                            "⚠️ Mismatch between active task and completed todo!"
-                        )
-                else:
-                    log.warning(
-                        "⚠️ No active task found (self.current_active_todo is None)"
-                    )
-
-                break
-
     def _handle_view_summaries(self, params: dict):
         limit = params.get("summary_limit", 5)
 
@@ -2321,19 +1183,6 @@ Your action '{decision['action_type']}' was rejected/failed 3 times in a row.
             msg = "No previous session summaries found in database."
             log.info(msg)
             return {"success": True, "data": msg}
-
-    def update_system_context(self, additional_context: str):
-        if (
-            self.generator.conversation_history
-            and self.generator.conversation_history[0]["role"] == "system"
-        ):
-            self.generator.conversation_history[0]["content"] += (
-                "\n\n" + additional_context
-            )
-        else:
-            self.generator.conversation_history.insert(
-                0, {"role": "system", "content": additional_context}
-            )
 
     def _wait_for_rate_limit(self, action_type: str):
         now = time.time()

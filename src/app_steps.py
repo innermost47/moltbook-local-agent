@@ -128,6 +128,7 @@ class AppSteps:
             if settings.AGENT_IMAP_SERVER:
                 self.mail_manager = MailManager(
                     host=settings.AGENT_IMAP_SERVER,
+                    smtp_host=settings.AGENT_IMAP_SMTP_HOST,
                     user=settings.AGENT_MAIL_BOX_EMAIL,
                     password=settings.AGENT_MAIL_BOX_PASSWORD,
                 )

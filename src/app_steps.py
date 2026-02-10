@@ -122,7 +122,7 @@ class AppSteps:
             self.research_manager = ResearchManager(
                 scraper=self.web_scraper,
                 vector_db=collection,
-                llm_client=self.generator.llm,
+                llm_client=self.generator,
             )
             self.mail_manager = None
             if settings.AGENT_IMAP_SERVER:

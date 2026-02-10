@@ -60,7 +60,7 @@ class ContextManager:
 
         system_context = ""
 
-        progression_data = app_steps.metrics._calculate_global_progression(self)
+        progression_data = app_steps.metrics._calculate_global_progression(app_steps)
         last_verdict = app_steps.memory_system.get_last_supervisor_verdict()
 
         performance_context = f"""
@@ -93,7 +93,7 @@ class ContextManager:
         system_context += memory_context + "\n\n"
         log.success("Memory system loaded")
 
-        session_history = app_steps.memory.get_session_history(limit=3)
+        session_history = app_steps.memory_system.get_session_history(limit=3)
         if session_history:
             system_context += "## 📝 PREVIOUS SESSIONS SUMMARY\n\n"
             for i, session in enumerate(reversed(session_history), 1):
@@ -162,7 +162,9 @@ class ContextManager:
                     )
 
                 log.info("Checking pending comment key requests...")
-                pending_keys = app_steps.blog_actions.review_comment_key_requests(self)
+                pending_keys = app_steps.blog_actions.review_comment_key_requests(
+                    app_steps
+                )
 
                 if (
                     pending_keys
@@ -204,7 +206,7 @@ class ContextManager:
         log.info(
             f"✅ Feed loaded successfully with sort: '{sort}' ({len(posts_data.get('posts', []))} posts)"
         )
-        app_steps.current_feed = self.get_enriched_feed_context(posts_data)
+        app_steps.current_feed = self.get_enriched_feed_context(posts_data, app_steps)
 
         submolts_formatted = chr(10).join(
             [f"- {s}" for s in app_steps.available_submolts]

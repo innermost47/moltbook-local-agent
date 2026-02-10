@@ -3,7 +3,7 @@ import re
 from pydantic import ValidationError
 from src.settings import settings
 from src.utils import log
-from src.services import PromptManager
+from src.managers import PromptManager
 from src.schemas_pydantic import SupervisorAudit, SupervisorVerdict, LazinessGuidance
 from ollama import Client
 

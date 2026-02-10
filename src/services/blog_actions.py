@@ -1,5 +1,5 @@
 import re
-from src.services.blog_manager import BlogManager
+from src.managers import BlogManager
 from src.utils import log
 import requests
 

@@ -1,4 +1,5 @@
 import sqlite3
+import json
 from datetime import datetime
 from typing import List, Dict
 from src.settings import settings
@@ -9,10 +10,28 @@ class MemorySystem:
     def __init__(self, db_path: str = None):
         self.db_path = db_path or settings.DB_PATH
         self.conn = sqlite3.connect(self.db_path)
-        self._init_memory_tables()
+        self.conn.row_factory = sqlite3.Row
+        self._init_tables()
 
-    def _init_memory_tables(self):
+    def _init_tables(self):
         cursor = self.conn.cursor()
+
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS sessions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp TEXT,
+                learnings TEXT,
+                plan TEXT,
+                next_session_plan TEXT,
+                actions_performed TEXT,
+                conversation_history TEXT,
+                full_context TEXT,
+                has_published_post INTEGER DEFAULT 0,
+                has_published_blog INTEGER DEFAULT 0
+            )
+        """
+        )
 
         cursor.execute(
             """
@@ -66,6 +85,55 @@ class MemorySystem:
 
         self.conn.commit()
         log.info("ℹ️ Memory system tables initialized and migrated")
+
+    def create_session(self) -> int:
+        cursor = self.conn.cursor()
+        cursor.execute(
+            "INSERT INTO sessions (timestamp, actions_performed, learnings, next_session_plan, full_context) VALUES (?, ?, ?, ?, ?)",
+            (datetime.now().isoformat(), "[]", "", "", "[]"),
+        )
+        self.conn.commit()
+        session_id = cursor.lastrowid
+        log.success(f"Session ID created: {session_id}")
+        return session_id
+
+    def save_session(
+        self,
+        summary: Dict,
+        actions_performed: List,
+        conversation_history: List,
+        session_id: int,
+    ):
+        has_post = (
+            1
+            if any(
+                a in str(actions_performed).lower()
+                for a in ["create_post", "share_link"]
+            )
+            else 0
+        )
+        has_blog = 1 if "write_blog_article" in str(actions_performed).lower() else 0
+
+        cursor = self.conn.cursor()
+        cursor.execute(
+            """
+            UPDATE sessions 
+            SET actions_performed = ?, learnings = ?, next_session_plan = ?, full_context = ?,
+                has_published_post = ?, has_published_blog = ?
+            WHERE id = ?
+        """,
+            (
+                json.dumps(actions_performed),
+                summary.get("learnings", ""),
+                summary.get("next_session_plan", ""),
+                json.dumps(conversation_history),
+                has_post,
+                has_blog,
+                session_id,
+            ),
+        )
+        self.conn.commit()
+        log.success(f"✅ Session {session_id} archived successfully")
 
     def store_memory(self, category: str, content: str, session_id: int = None) -> Dict:
         if category not in settings.MEMORY_CATEGORIES:
@@ -478,6 +546,98 @@ class MemorySystem:
         except Exception as e:
             log.error(f"Failed to get last verdict: {e}")
             return "Error retrieving verdict."
+
+    def store_internal_note(self, session_id: int, content: str) -> bool:
+        category = "research_notes"
+
+        if category not in settings.MEMORY_CATEGORIES:
+            log.warning(
+                f"⚠️ Category '{category}' not in settings. Attempting to store anyway."
+            )
+
+        log.info(f"📝 Archiving internal research note for session {session_id}...")
+
+        result = self.store_memory(
+            category=category, content=content, session_id=session_id
+        )
+
+        if result["success"]:
+            log.success(f"✅ Research note archived in SQLite ('{category}')")
+            return True
+        else:
+            log.error(f"❌ Failed to archive research note: {result.get('error')}")
+            return False
+
+    def get_last_session_publication_status(self, current_session_id: int):
+        cursor = self.conn.cursor()
+
+        cursor.execute(
+            """
+            SELECT has_published_post, has_published_blog, id
+            FROM sessions
+            WHERE id < ?
+            ORDER BY id DESC
+            LIMIT 1
+        """,
+            (current_session_id,),
+        )
+
+        result = cursor.fetchone()
+
+        log.info(f"🔍 DEBUG - Searching for session before ID {current_session_id}")
+
+        if result:
+            has_post, has_blog, session_id = result[0], result[1], result[2]
+            log.info(
+                f"🔍 DEBUG - Found session {session_id}: post={has_post}, blog={has_blog}"
+            )
+
+            return {
+                "has_published_post": bool(has_post),
+                "has_published_blog": bool(has_blog),
+            }
+
+        log.warning("🔍 DEBUG - No previous sessions found in database")
+        return None
+
+    def get_last_session(self):
+        cursor = self.conn.cursor()
+        cursor.execute(
+            """
+            SELECT timestamp, actions_performed, learnings, next_session_plan, full_context
+            FROM sessions
+            ORDER BY id DESC
+            LIMIT 1
+        """
+        )
+        row = cursor.fetchone()
+
+        if row:
+            return {
+                "timestamp": row[0],
+                "actions_performed": json.loads(row[1]),
+                "learnings": row[2],
+                "next_session_plan": row[3],
+                "full_context": json.loads(row[4]),
+            }
+        return None
+
+    def get_session_history(self, limit=5):
+        cursor = self.conn.cursor()
+        cursor.execute(
+            """
+            SELECT timestamp, learnings, next_session_plan
+            FROM sessions
+            ORDER BY id DESC
+            LIMIT ?
+        """,
+            (limit,),
+        )
+
+        return [
+            {"timestamp": row[0], "learnings": row[1], "plan": row[2]}
+            for row in cursor.fetchall()
+        ]
 
     def __del__(self):
         if hasattr(self, "conn"):

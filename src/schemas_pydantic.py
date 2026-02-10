@@ -204,6 +204,20 @@ class EmailMarkReadParams(BaseModel):
     is_seen: bool = Field(True, description="True to mark as read, False for unread")
 
 
+class ResearchSummaryParams(BaseModel):
+    raw_content: str = Field(..., description="Raw text from Wikipedia API")
+
+
+class ResearchCompletionParams(BaseModel):
+    objective: str
+    research_notes: List[str]
+
+
+class ResearchQueryParams(BaseModel):
+    objective: str
+    research_notes: List[str]
+
+
 class SelectPostAction(BaseModel):
     reasoning: str
     self_criticism: str
@@ -393,6 +407,23 @@ class EmailMarkReadAction(BaseModel):
     action_params: EmailMarkReadParams
 
 
+class ResearchQueryAction(BaseModel):
+    query: str = Field(..., description="The optimized English search query")
+
+
+class ResearchCompletionAction(BaseModel):
+    is_complete: bool = Field(..., alias="validate")
+
+
+class ResearchRecursiveAction(BaseModel):
+    reasoning: str
+    self_criticism: str
+    emotions: str
+    next_move_preview: str
+    action_type: Literal["research_recursive"] = "research_recursive"
+    action_params: dict = Field(..., description="Contains 'objective'")
+
+
 class SessionTask(BaseModel):
     task: str = Field(..., max_length=80)
     action_type: str
@@ -498,6 +529,7 @@ def get_pydantic_schema(action_type: str):
         "email_delete": EmailDeleteAction,
         "email_archive": EmailArchiveAction,
         "email_mark_read": EmailMarkReadAction,
+        "research_recursive": ResearchRecursiveAction,
     }
 
     return schemas.get(action_type)

@@ -1,6 +1,6 @@
 import random
 from src.utils import log
-from src.services.web_scrapper import get_web_context_for_agent
+from src.services import get_web_context_for_agent
 
 
 class ContextManager:

@@ -303,6 +303,12 @@ Based on this complete session context, provide your final verdict:
             "    - ⚠️ WARNING: Replaces ALL current post/comment IDs. Use ONLY after completing feed-related tasks.",
             "- follow_agent: (params: agent_name, follow_type) - Build alliances or track targets.",
             "- share_link: (params: url) - Spread external technical resources.",
+            "- research_recursive: (params: objective)\n"
+            "    - **THE DEEP DIVE**: Triggers a multi-step autonomous research loop via Wikipedia API.\n"
+            "    - **USE CASE**: Use this when you lack technical depth to write a high-quality blog article or expert comment.\n"
+            "    - **PROCESS**: The agent will search, summarize, and cross-reference multiple sources internally.\n"
+            "    - **OUTPUT**: Returns a high-density technical briefing and automatically stores findings in your Vector DB.\n"
+            "    - ⚠️ **LIMIT**: Counts as 1 action in your main session, but performs up to 10 sub-queries internally.",
         ]
 
         if has_mail_manager:

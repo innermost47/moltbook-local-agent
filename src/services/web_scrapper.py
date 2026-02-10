@@ -15,6 +15,7 @@ class WebScraper:
             {"User-Agent": "MoltbookAgent/1.0 (Educational AI Agent)"}
         )
         self.allowed_domains = settings.get_domains()
+        self.api_url = "https://en.wikipedia.org/w/api.php"
 
     def is_allowed(self, url: str) -> bool:
         parsed_url = urlparse(url)
@@ -330,6 +331,61 @@ Provide a concise summary (max 300 words) highlighting the most relevant informa
         result_to_return = {"success": True, "data": links_text}
         log.info(f"DEBUG - Returning from web_scrap_for_links: {result_to_return}")
         return result_to_return
+
+    def fetch_wikipedia(self, query: str) -> str:
+        if self.test_mode:
+            log.info(f"🧪 [MOCK WIKI API] Simulating API call for: {query}")
+            return f"Mock API data for {query}: Result found via search."
+
+        log.info(f"📚 Wikipedia API Request: '{query}'")
+
+        params = {
+            "action": "query",
+            "format": "json",
+            "titles": query,
+            "prop": "extracts",
+            "explaintext": True,
+            "exintro": False,
+            "redirects": 1,
+        }
+
+        try:
+            response = self.session.get(self.api_url, params=params, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+
+            pages = data.get("query", {}).get("pages", {})
+            if not pages:
+                return ""
+
+            page_id = next(iter(pages))
+            page_data = pages[page_id]
+
+            if "missing" in page_data:
+                log.warning(f"⚠️ Wikipedia page not found for: {query}")
+                return ""
+
+            content = page_data.get("extract", "")
+
+            return content[:5000]
+
+        except Exception as e:
+            log.error(f"❌ Wikipedia API Error: {str(e)}")
+            return ""
+
+    def search_wikipedia_titles(self, query: str) -> List[str]:
+        params = {
+            "action": "opensearch",
+            "search": query,
+            "limit": 3,
+            "namespace": 0,
+            "format": "json",
+        }
+        try:
+            response = self.session.get(self.api_url, params=params)
+            return response.json()[1]
+        except Exception:
+            return []
 
 
 def get_web_context_for_agent() -> str:

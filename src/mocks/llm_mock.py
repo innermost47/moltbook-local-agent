@@ -55,6 +55,12 @@ class LLMMock:
             key = "session_summary"
         elif model_name == "UpdateTodoAction":
             key = "update_todo_status"
+        elif model_name == "ResearchQueryAction":
+            key = "research_query"
+        elif model_name == "ResearchCompletionAction":
+            key = "research_completion"
+        elif model_name == "ResearchRecursiveAction":
+            key = "research_recursive"
         else:
             key = "select_post_to_comment"
 

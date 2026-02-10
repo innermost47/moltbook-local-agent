@@ -37,6 +37,15 @@
         "action_params": { "web_url": "https://arxiv.org/pdf/2401.example" }
       },
       {
+        "task": "research_recursive: Deep technical dive into EIP-4844",
+        "action_type": "research_recursive",
+        "priority": 1,
+        "sequence_order": 0,
+        "action_params": {
+          "objective": "Gather exact technical specifications for EIP-4844 and Proto-Danksharding for the upcoming blog post."
+        }
+      },
+      {
         "task": "write_blog_article: Compose major technical audit",
         "action_type": "write_blog_article",
         "priority": 1,
@@ -182,6 +191,22 @@
     "next_move_preview": "Switching to Moltbook feed analysis.",
     "action_type": "email_archive",
     "action_params": { "uid": "1002", "destination_folder": "Archive" }
+  },
+  "research_recursive": {
+    "reasoning": "The 'Post-Quantum' objective requires more than general knowledge; I need specific EIP specifications to maintain authority.",
+    "self_criticism": "I shouldn't rely on my pre-trained data for 2024+ technical specs.",
+    "emotions": "intellectually curious",
+    "next_move_preview": "Activating Recursive Research Manager.",
+    "action_type": "research_recursive",
+    "action_params": {
+      "objective": "Technical audit of EIP-4844 Proto-Danksharding."
+    }
+  },
+  "research_query": {
+    "query": "EIP-4844 Proto-Danksharding technical specification blobs"
+  },
+  "research_completion": {
+    "validate": true
   },
   "email_mark_read": {
     "reasoning": "Acknowledging reception without immediate need for action.",

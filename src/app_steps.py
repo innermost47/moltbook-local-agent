@@ -3,6 +3,7 @@ import gc
 import os
 import time
 import re
+import chromadb
 from src.services import (
     MoltbookAPI,
     EmailReporter,
@@ -10,26 +11,32 @@ from src.services import (
     WebScraper,
     MoltbookActions,
     BlogActions,
-    ContextManager,
+    PlanningSystem,
 )
 from src.generators import Generator, OllamaGenerator
 from src.supervisors import Supervisor, SupervisorOllama
-from src.memory import Memory
 from src.utils import log
 from src.settings import settings
-from src.services import (
-    PlanningSystem,
+from src.managers import (
     PromptManager,
     MailManager,
     ToDoManager,
     MasterPlanManager,
+    ResearchManager,
+    ContextManager,
 )
 from src.metrics import Metrics
 from src.schemas_pydantic import (
     get_pydantic_schema,
     SessionSummary,
 )
-from src.mocks import LLMMock, MoltbookMock, MoltbookActionsMock, MockMailManager
+from src.mocks import (
+    LLMMock,
+    MoltbookMock,
+    MoltbookActionsMock,
+    MockMailManager,
+    ResearchManagerMock,
+)
 
 
 class AppSteps:
@@ -86,11 +93,11 @@ class AppSteps:
                 log.error(f"❌ Mock JSON file not found at {mock_data_path}")
             self.api = MoltbookMock()
             self.generator = LLMMock()
-            self.memory = Memory(db_path=shared_db)
             self.memory_system = MemorySystem(db_path=shared_db)
             self.planning_system = PlanningSystem(db_path=shared_db)
             self.moltbook_actions = MoltbookActionsMock(db_path=shared_db)
             self.metrics = Metrics()
+            self.research_manager = ResearchManagerMock()
             self.prompt_manager = PromptManager()
             self.web_scraper = WebScraper(self.test_mode)
             self.mail_manager = MockMailManager(user="tester@example.com")
@@ -104,13 +111,19 @@ class AppSteps:
             else:
                 self.generator = Generator()
                 self.supervisor = Supervisor(self.generator.llm)
-            self.memory = Memory()
             self.reporter = EmailReporter()
             self.memory_system = MemorySystem(db_path=settings.DB_PATH)
             self.prompt_manager = PromptManager()
             self.planning_system = PlanningSystem(db_path=settings.DB_PATH)
             self.web_scraper = WebScraper()
             self.metrics = Metrics()
+            chroma_client = chromadb.PersistentClient(path="./data/chroma_db")
+            collection = chroma_client.get_or_create_collection(name="knowledge")
+            self.research_manager = ResearchManager(
+                scraper=self.web_scraper,
+                vector_db=collection,
+                llm_client=self.generator.llm,
+            )
             self.mail_manager = None
             if settings.AGENT_IMAP_SERVER:
                 self.mail_manager = MailManager(
@@ -145,11 +158,11 @@ class AppSteps:
 
         log.success("System prompt loaded")
         master_plan_just_created = False
-        self.current_session_id = self.memory.create_session()
+        self.current_session_id = self.memory_system.create_session()
 
         last_pub_status = None
         if settings.BLOG_API_URL:
-            last_pub_status = self.memory.get_last_session_publication_status(
+            last_pub_status = self.memory_system.get_last_session_publication_status(
                 current_session_id=self.current_session_id
             )
             if last_pub_status:
@@ -282,11 +295,11 @@ class AppSteps:
                 supervisor_grade=supervisor_grade_text,
             )
 
-        self.memory.save_session(
+        self.memory_system.save_session(
             summary=summary,
             actions_performed=self.actions_performed,
             conversation_history=self.generator.conversation_history,
-            current_session_id=self.current_session_id,
+            session_id=self.current_session_id,
         )
 
         global_progression = self.metrics._calculate_global_progression(self)
@@ -330,8 +343,6 @@ class AppSteps:
                 self.planning_system.conn.close()
             if hasattr(self, "moltbook_actions"):
                 self.moltbook_actions.conn.close()
-            if hasattr(self, "memory"):
-                self.memory.conn.close()
         except Exception as e:
             log.error(f"⚠️ Error closing DB connections: {e}")
 
@@ -1146,6 +1157,16 @@ Your action '{decision['action_type']}' was rejected/failed 3 times in a row.
         elif action_type == "email_mark_read":
             return self.mail_manager.mark_as_read(params=params)
 
+        if action_type == "research_recursive":
+            objective = decision.get("action_params", {}).get("objective")
+            research_report = self.research_manager.conduct_deep_research(objective)
+            self.memory_system.store_internal_note(
+                self.current_session_id, research_report
+            )
+            return {
+                "status": "success",
+                "summary": "Deep research completed and vectorized.",
+            }
         else:
             error_msg = f"Unknown action type: {action_type}. Verification of the tool definition required."
             log.error(error_msg)
@@ -1185,7 +1206,7 @@ Your action '{decision['action_type']}' was rejected/failed 3 times in a row.
     def _handle_view_summaries(self, params: dict):
         limit = params.get("summary_limit", 5)
 
-        summaries = self.memory.get_session_history(limit=limit)
+        summaries = self.memory_system.get_session_history(limit=limit)
 
         if summaries:
             summary_text = (

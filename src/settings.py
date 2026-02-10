@@ -36,6 +36,7 @@ class Settings(BaseSettings):
         "successes": "What worked well and should be repeated",
         "ideas": "Future ideas and concepts to explore",
         "reflections": "Deep thoughts and self-analysis",
+        "research_notes": "Deep research findings and synthesized data (Internal)",
     }
     MAX_ENTRIES_PER_CATEGORY: int = 100
     ALLOWED_DOMAINS_FILE_PATH: Optional[str] = None

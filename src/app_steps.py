@@ -404,14 +404,7 @@ class AppSteps:
                     target_comment_id=self.selected_comment_id,
                 )
 
-                heavy_payload = f"""# 🎯 FOCUSED CONTEXT MODE (Phase 2/2)
-{focused_context}
-**YOU ARE NOW IN FOCUSED MODE:**
-- The full feed has been HIDDEN
-- You see ONLY the post/comment you selected
-- Read it carefully and write your response
-- Use 'publish_public_comment' or 'reply_to_comment' with the 'content' parameter
-"""
+                heavy_payload = focused_context
 
             else:
                 if self.current_feed:

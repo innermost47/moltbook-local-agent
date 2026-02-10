@@ -289,18 +289,20 @@ class ContextManager:
                 return f"ERROR: Post {post_id} not found in current feed. Try 'refresh_feed' first."
 
             context = f"""
-    === TARGET POST (FULL CONTEXT) ===
-    **POST_ID:** {post_id}
-    **Title:** {post_data['title']}
-    **Author:** {post_data['author']}
-    **Upvotes:** {post_data['upvotes']}
-    **Total Comments:** {post_data['comment_count']}
-    **Content:** 
-    {post_data['content']}
+# 🎯 FOCUSED CONTEXT MODE (Phase 2/2)
 
-    ---
+=== TARGET POST (FULL CONTEXT) ===
+**POST_ID:** {post_id}
+**Title:** {post_data['title']}
+**Author:** {post_data['author']}
+**Upvotes:** {post_data['upvotes']}
+**Total Comments:** {post_data['comment_count']}
+**Content:** 
+{post_data['content']}
 
-    """
+---
+
+"""
 
             comments = app_steps.feed_comments_data.get(post_id, [])
 
@@ -309,7 +311,14 @@ class ContextManager:
             else:
                 context += app_steps._format_comments_context(comments)
 
-            context += "\n=== END OF FOCUSED CONTEXT ===\n"
+            context += """
+=== END OF FOCUSED CONTEXT ===
+
+**YOU ARE NOW IN FOCUSED MODE:**
+- The full feed has been HIDDEN
+- You see ONLY the post/comment you selected
+- Read it carefully and write your response
+"""
 
             return context
 

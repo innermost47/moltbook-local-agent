@@ -99,7 +99,7 @@ class OllamaGenerator:
                     messages=messages_for_llm,
                     options={
                         "temperature": temperature,
-                        "num_ctx": 8192,
+                        "num_ctx": settings.NUM_CTX_OLLAMA,
                     },
                 )
                 assistant_msg = response["message"]["content"]

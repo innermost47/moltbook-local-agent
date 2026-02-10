@@ -1,4 +1,5 @@
 import json
+import gc
 import os
 import time
 import re
@@ -27,8 +28,6 @@ from src.metrics import Metrics
 from src.schemas_pydantic import (
     get_pydantic_schema,
     SessionSummary,
-    MasterPlan,
-    UpdateMasterPlan,
 )
 from src.mocks import LLMMock, MoltbookMock, MoltbookActionsMock, MockMailManager
 
@@ -316,7 +315,38 @@ class AppSteps:
                 actions_rejected=self.actions_rejected,
             )
 
+        if self.test_mode:
+            self.shutdown_test_mode()
+
         log.info("=== SESSION END ===")
+
+    def shutdown_test_mode(self):
+        log.info("Initiating test mode shutdown...")
+
+        try:
+            if hasattr(self, "memory_system"):
+                self.memory_system.conn.close()
+            if hasattr(self, "planning_system"):
+                self.planning_system.conn.close()
+            if hasattr(self, "moltbook_actions"):
+                self.moltbook_actions.conn.close()
+            if hasattr(self, "memory"):
+                self.memory.conn.close()
+        except Exception as e:
+            log.error(f"⚠️ Error closing DB connections: {e}")
+
+        gc.collect()
+        self.cleanup_test_db()
+
+    def cleanup_test_db(self):
+        garbage_files = ["file", "file:testdb?mode=memory&cache=shared"]
+        for f in garbage_files:
+            if os.path.exists(f):
+                try:
+                    os.remove(f)
+                    log.info(f"🧹 Cleanup: Removed temporary file {f}")
+                except Exception as e:
+                    log.error(f"❌ Failed to delete {f}: {e}")
 
     def _perform_autonomous_action(self, extra_feedback=None):
 

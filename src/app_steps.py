@@ -375,6 +375,7 @@ class AppSteps:
             "update_todo_status",
             "view_session_summaries",
             "share_link",
+            "research_recursive",
         ]
 
         if not self.post_creation_attempted:
@@ -397,6 +398,17 @@ class AppSteps:
             if not self.blog_article_attempted:
                 blog_list.append("write_blog_article")
             allowed_actions.extend(blog_list)
+
+        if self.mail_manager:
+            allowed_actions.extend(
+                [
+                    "email_read",
+                    "email_send",
+                    "email_delete",
+                    "email_archive",
+                    "email_mark_read",
+                ]
+            )
 
         max_attempts = 3
         last_error = None
@@ -565,6 +577,24 @@ Phase 2/2 active. Use `reply_to_comment` to execute your response.
                     decision = content
 
                 action_type = decision.get("action_type")
+
+                if action_type not in allowed_actions:
+                    error_msg = (
+                        f"❌ PROTOCOL ERROR: Action '{action_type}' is not authorized in this context.\n"
+                        f"Available actions are: {', '.join(allowed_actions)}.\n"
+                        f"Please verify your workflow sequence and choose a valid tool."
+                    )
+
+                    log.error(
+                        f"🚨 INVALID ACTION: Agent attempted '{action_type}' (Not in allowed_actions)"
+                    )
+
+                    last_error = f"{error_msg}\n⚠️ WARNING: {attempts_left} attempts remaining before session termination."
+
+                    if attempt < max_attempts:
+                        continue
+                    else:
+                        break
 
                 if action_type == "publish_public_comment":
                     if not self.selected_post_id:

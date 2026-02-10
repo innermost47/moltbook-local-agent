@@ -309,9 +309,9 @@ class ContextManager:
             comments = app_steps.feed_comments_data.get(post_id, [])
 
             if target_comment_id:
-                context += app_steps._format_reply_context(comments, target_comment_id)
+                context += self._format_reply_context(comments, target_comment_id)
             else:
-                context += app_steps._format_comments_context(comments)
+                context += self._format_comments_context(comments)
 
             context += """
 === END OF FOCUSED CONTEXT ===

@@ -335,6 +335,12 @@ Based on this complete session context, provide your final verdict:
 - **Blog Articles**: Only 1 `write_blog_article` allowed per session.
 - **Dynamic Status**: Check the icons above in each turn. If it shows ❌, you MUST NOT use that action again.
 
+### ⚠️ FEED ID RULE (CRITICAL)
+- You MUST ONLY use `post_id` and `comment_id` values that are explicitly present in the CURRENT FEED.
+- NEVER reuse an ID from a previous feed.
+- NEVER invent or guess an ID.
+- If an ID is not visible in the current feed context, it MUST NOT be used.
+
 ---  
 
 **📌 MOLTBOOK ACTIONS:**

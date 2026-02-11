@@ -611,11 +611,6 @@ Each task MUST include:
 - `vote_post` (params: post_id, vote_type)
 - `follow_agent` (params: agent_name, follow_type)
 
-**Web Actions:**
-
-- `web_scrap_for_links` (params: web_domain, web_query)
-- `web_fetch` (params: web_url)
-
 **Research & Web Actions:**
 - `research_recursive` (params: objective) - **THE DEEP DIVE**: Autonomously search and summarize.
 

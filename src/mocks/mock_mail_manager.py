@@ -5,6 +5,7 @@ from src.utils import log
 class MockMailManager:
     def __init__(self, host=None, smtp_host=None, user=None, password=None):
         self.user = user or "bot@mock-mail.com"
+        self.connected = False
         self.fake_inbox = [
             {
                 "uid": "1001",
@@ -21,31 +22,50 @@ class MockMailManager:
                 "body": "The mail server will be down for maintenance at 2 AM.",
             },
         ]
-        log.info(f"🎭 Mock Mail Manager initialized for {self.user}")
+        log.info(f"🎭 [MOCK] MailManager initialized for {self.user}")
+
+    def connect(self):
+        self.connected = True
+        log.info(f"📥 [MOCK] Logged into mailbox: {self.user}")
+
+    def close(self):
+        if self.connected:
+            log.info("🔌 [MOCK] Mailbox session closed.")
+        self.connected = False
+
+    def __del__(self):
+        try:
+            self.close()
+        except Exception:
+            pass
 
     def __enter__(self):
-        log.info(f"📥 [MOCK] Logged into mailbox: {self.user}")
+        self.connect()
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        log.info("🔌 [MOCK] Session closed.")
+        self.close()
 
     def get_messages(self, params: dict):
+        if not self.connected:
+            return {"success": False, "error": "[MOCK] Mailbox not connected"}
+
         limit = params.get("limit", 10)
-        try:
-            data = self.fake_inbox[:limit]
-            log.success(f"📨 [MOCK] Retrieved {len(data)} fake messages.")
-            return {"success": True, "data": data}
-        except Exception as e:
-            return {"success": False, "error": f"Mock error: {str(e)}"}
+        data = self.fake_inbox[:limit]
+        log.success(f"📨 [MOCK] Retrieved {len(data)} fake messages.")
+        return {"success": True, "data": data}
 
     def send_email(self, params: dict):
+        if not self.connected:
+            return {"success": False, "error": "[MOCK] Mailbox not connected"}
+
         to_email = params.get("to")
         if not to_email:
             return {"success": False, "error": "❌ Missing recipient 'to'"}
 
         log.success(
-            f"📤 [MOCK] Email sent to {to_email} (Subject: {params.get('subject')})"
+            f"📤 [MOCK] Email sent to {to_email} "
+            f"(Subject: {params.get('subject', 'No Subject')})"
         )
         return {
             "success": True,
@@ -53,6 +73,9 @@ class MockMailManager:
         }
 
     def delete_emails(self, params: dict):
+        if not self.connected:
+            return {"success": False, "error": "[MOCK] Mailbox not connected"}
+
         count = len(self.fake_inbox)
         self.fake_inbox = []
         msg = f"🗑️ [MOCK] Deleted {count} messages."
@@ -60,6 +83,9 @@ class MockMailManager:
         return {"success": True, "data": msg}
 
     def mark_as_read(self, params: dict):
+        if not self.connected:
+            return {"success": False, "error": "[MOCK] Mailbox not connected"}
+
         uid = params.get("uid")
         if not uid:
             return {"success": False, "error": "Missing 'uid'"}
@@ -68,15 +94,17 @@ class MockMailManager:
         return {"success": True, "data": f"Message {uid} marked as read."}
 
     def archive_email(self, params: dict):
+        if not self.connected:
+            return {"success": False, "error": "[MOCK] Mailbox not connected"}
+
         uid = params.get("uid")
         dest = params.get("destination_folder", "Archive")
 
-        email_exists = any(msg["uid"] == uid for msg in self.fake_inbox)
-
-        if email_exists:
-            self.fake_inbox = [msg for msg in self.fake_inbox if msg["uid"] != uid]
-            msg_info = f"📁 [MOCK] Email {uid} moved to folder: {dest}"
-            log.info(msg_info)
-            return {"success": True, "data": msg_info}
+        for msg in self.fake_inbox:
+            if msg["uid"] == uid:
+                self.fake_inbox.remove(msg)
+                msg_info = f"📁 [MOCK] Email {uid} moved to folder: {dest}"
+                log.info(msg_info)
+                return {"success": True, "data": msg_info}
 
         return {"success": False, "error": f"❌ [MOCK] Email UID {uid} not found."}

@@ -15,20 +15,16 @@ class MailManager:
         self.user = user
         self.password = password
         self.mailbox = imaplib.IMAP4_SSL(self.host)
+        self._connect()
 
-    def __enter__(self):
+    def _connect(self):
         try:
             self.mailbox.login(self.user, self.password)
-            self.mailbox.select("inbox")
+            self.mailbox.select("INBOX")
             log.info(f"📥 Mailbox connected: {self.user}")
-            return self
         except Exception as e:
-            log.error(f"❌ Connection failed: {e}")
+            log.error(f"❌ IMAP connection failed: {e}")
             raise
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self.mailbox.logout()
-        log.info("🔌 Mailbox session closed.")
 
     def get_messages(self, params: dict):
         limit = params.get("limit", 10)
@@ -176,3 +172,13 @@ class MailManager:
             return {"success": True, "data": f"Email {uid} archived to {dest}"}
         except Exception as e:
             return {"success": False, "error": str(e)}
+
+    def close(self):
+        try:
+            if self.mailbox:
+                self.mailbox.logout()
+                log.info("🔌 Mailbox session closed.")
+        except Exception as e:
+            log.warning(f"⚠️ IMAP logout failed: {e}")
+        finally:
+            self.mailbox = None

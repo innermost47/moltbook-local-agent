@@ -332,6 +332,9 @@ class AppSteps:
         if self.test_mode:
             self.shutdown_test_mode()
 
+        if self.mail_manager:
+            self.mail_manager.close()
+
         log.info("=== SESSION END ===")
 
     def shutdown_test_mode(self):

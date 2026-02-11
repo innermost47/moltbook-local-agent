@@ -506,6 +506,21 @@ class LazinessGuidance(BaseModel):
     )
 
 
+class ModeChoice(str, Enum):
+    social = "SOCIAL"
+    blog = "BLOG"
+    mail = "MAIL"
+    terminate = "TERMINATE"
+
+
+class MainMenuSelection(BaseModel):
+    reasoning: str = Field(..., description="Strategic reason for choosing this mode")
+    chosen_mode: ModeChoice
+    expected_actions_count: int = Field(
+        ..., ge=1, le=5, description="Number of actions planned in this mode"
+    )
+
+
 def get_pydantic_schema(action_type: str):
     schemas = {
         "select_post_to_comment": SelectPostAction,
@@ -530,6 +545,7 @@ def get_pydantic_schema(action_type: str):
         "email_archive": EmailArchiveAction,
         "email_mark_read": EmailMarkReadAction,
         "research_recursive": ResearchRecursiveAction,
+        "select_operational_mode": MainMenuSelection,
     }
 
     return schemas.get(action_type)

@@ -939,3 +939,16 @@ You selected comment_id: `{selected_comment_id}`
 
 ⚠️ Attempts remaining: {attempts_left}/3
 """
+
+    def _choose_session_mode(self, agent_name, remaining_actions):
+        prompt = f"""
+    ### 🎛️ CENTRAL CONTROL UNIT
+**Agent**: {agent_name} | **Actions Remaining**: {remaining_actions}
+
+Choose your next operational environment:
+1. **SOCIAL**: Interact with Moltbook feed, upvote, reply to posts.
+2. **BLOG**: Write articles, moderate comments, check API key requests.
+3. **MAIL**: Read incoming technical inquiries and reply to alliances.
+4. **TERMINATE**: End the session if all strategic goals are met.
+"""
+        return prompt

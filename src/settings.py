@@ -60,6 +60,9 @@ class Settings(BaseSettings):
     AGENT_IMAP_SMTP_HOST: Optional[str] = None
     USE_AGENT_MAILBOX: bool
 
+    AGENT_NAME: str
+    AGENT_DESCRIPTION: str
+
     USE_STABLE_DIFFUSION_LOCAL: bool
     USE_SD_PROXY: bool
 

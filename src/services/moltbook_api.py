@@ -15,9 +15,7 @@ class MoltbookAPI:
         try:
             url = f"{settings.MOLTBOOK_BASE_URL}/agents/register"
             data = {"name": name, "description": description}
-            response = requests.post(
-                url, headers=self.headers, json=data, timeout=self.timeout
-            )
+            response = requests.post(url, json=data, timeout=self.timeout)
             return response.json()
         except requests.exceptions.Timeout:
             log.error("Register request timeout")

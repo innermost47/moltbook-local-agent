@@ -15,16 +15,14 @@ class MasterPlanManager:
                 agent_name=app_steps.agent_name
             )
             try:
-                content = app_steps.generator.generate(
+                result = app_steps.generator.generate(
                     init_prompt,
                     pydantic_model=MasterPlan,
                     agent_name=app_steps.agent_name,
                 )
-                content = re.sub(r"```json\s*|```\s*", "", content).strip()
-                if isinstance(content, str):
-                    plan_data = json.loads(content)
-                else:
-                    plan_data = content
+                assistant_msg = result["choices"][0]["message"]["content"]
+                assistant_msg = re.sub(r"```json\s*|```\s*", "", assistant_msg).strip()
+                plan_data = json.loads(assistant_msg)
 
                 app_steps.planning_system.create_or_update_master_plan(
                     objective=plan_data.get("objective"),

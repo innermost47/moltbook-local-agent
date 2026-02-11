@@ -163,6 +163,7 @@ class ToDoManager:
             master_plan_success_prompt=master_plan_success_prompt,
             dynamic_context=dynamic_context,
             last_publication_status=last_publication_status,
+            has_mail_manager=settings.USE_AGENT_MAILBOX,
         )
 
         attempts = 0

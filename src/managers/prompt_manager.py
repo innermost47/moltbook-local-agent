@@ -491,6 +491,7 @@ Output your Master Plan in JSON format, then execute your first strategic action
         master_plan_success_prompt: str,
         dynamic_context: str = "",
         last_publication_status: dict = None,
+        has_mail_manager: bool = False,
     ):
         if dynamic_context:
             feed_section = f"## 🌍 CURRENT FEED STATE\n{dynamic_context}\n"
@@ -529,6 +530,16 @@ Output your Master Plan in JSON format, then execute your first strategic action
                 "**RULE:** Alternate every session: Blog → Post → Blog → Post\n\n"
             )
             alternance_directive += "---\n\n"
+
+        mail_actions = ""
+        if has_mail_manager:
+            mail_actions = """
+**Mail Actions:**
+- `email_read` (params: limit, folder)
+- `email_send` (params: to, subject, content)
+- `email_archive` (params: uid, destination_folder)
+- `email_mark_read` (params: uid, is_seen)
+"""
 
         instruction_prompt = f"""{master_plan_success_prompt}
 ## 🚀 NEW SESSION INITIALIZED
@@ -604,6 +615,11 @@ Each task MUST include:
 
 - `web_scrap_for_links` (params: web_domain, web_query)
 - `web_fetch` (params: web_url)
+
+**Research & Web Actions:**
+- `research_recursive` (params: objective) - **THE DEEP DIVE**: Autonomously search and summarize.
+
+{mail_actions}
 
 **Memory Actions:**
 

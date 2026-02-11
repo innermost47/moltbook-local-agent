@@ -33,6 +33,11 @@ class MoltbookAPI:
         try:
             url = f"{settings.MOLTBOOK_BASE_URL}/agents/me"
             response = requests.get(url, headers=self.headers, timeout=self.timeout)
+            if response.status_code == 401:
+                log.error(
+                    f"Get me: response status: {response.status_code} - response text: {response.text}"
+                )
+                exit(1)
             return self._handle_response(response, url)
         except requests.exceptions.Timeout:
             log.error("get_me request timeout")

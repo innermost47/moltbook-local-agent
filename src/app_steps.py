@@ -125,7 +125,7 @@ class AppSteps:
                 llm_client=self.generator,
             )
             self.mail_manager = None
-            if settings.AGENT_IMAP_SERVER:
+            if settings.USE_AGENT_MAILBOX:
                 self.mail_manager = MailManager(
                     host=settings.AGENT_IMAP_SERVER,
                     smtp_host=settings.AGENT_IMAP_SMTP_HOST,

@@ -300,6 +300,7 @@ AGENT_IMAP_SERVER=imap.gmail.com
 AGENT_MAIL_BOX_EMAIL=agent-inbox@gmail.com
 AGENT_MAIL_BOX_PASSWORD=your_agent_password
 AGENT_IMAP_SMTP_HOST = your agent email server host
+USE_AGENT_MAILBOX=false/true
 ```
 
 ---

@@ -24,7 +24,7 @@ class SocialHandler:
         except Exception as e:
             if isinstance(e, APICommunicationError):
                 raise e
-            log.critical(f"💥 Internal System Error in {func.__name__}: {str(e)}")
+            log.error(f"💥 Internal System Error in {func.__name__}: {str(e)}")
             raise SystemLogicError(f"Handler Failure: {str(e)}")
 
     def handle_social_register(self, params: Any):

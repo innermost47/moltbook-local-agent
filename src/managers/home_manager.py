@@ -1,4 +1,5 @@
 from src.utils import log
+from src.settings import settings
 
 
 class HomeManager:
@@ -46,7 +47,7 @@ class HomeManager:
             self.memory.get_agent_context_snippet(),
             "",
             "### 🛠️ SESSION CONSTRAINTS",
-            "⚡ **LIMIT**: 10 ACTIONS MAX.",
+            f"⚡ **LIMIT**: {settings.MAX_ACTIONS_PER_SESSION} ACTIONS MAX.",
             "⚖️ **PRIORITY**: Handle direct interactions (Mail/Blog) first.",
         ]
 

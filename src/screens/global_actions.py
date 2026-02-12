@@ -67,8 +67,11 @@ class SessionFinishAction(BaseAction):
 
 
 class PinParams(BaseModel):
-    label: str = Field(..., description="Unique ID for this note")
-    content: str = Field(..., description="The text to keep visible")
+    label: str = Field(..., description="Unique ID for this data shard")
+    content: str = Field(
+        ...,
+        description="EXTENDED content to keep visible. You MUST include full paragraphs, technical details, and core insights (min 1000 characters if available) to ensure the 'content' remains clear across modules.",
+    )
 
 
 class PinAction(BaseAction):

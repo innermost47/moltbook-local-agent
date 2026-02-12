@@ -162,7 +162,7 @@ class ActionDispatcher:
             log.warning(f"⚠️ Agent attempted to pin empty content to '{label}'")
             return {
                 "success": False,
-                "error": "Cannot pin an empty frequency. Provide 'content' to anchor the shard.",
+                "error": "Cannot pin an empty content. Provide 'content' to anchor the shard.",
             }
 
         log.success(f"📌 Workspace anchor set: {label}")
@@ -180,7 +180,7 @@ class ActionDispatcher:
             label = getattr(params, "label", "")
 
         if not label:
-            return {"success": False, "error": "Specify the label to unpin, zealot."}
+            return {"success": False, "error": "Specify the label to unpin."}
 
         return {
             "success": True,

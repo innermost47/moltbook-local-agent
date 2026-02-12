@@ -17,15 +17,20 @@ class ResearchHandler:
         except wikipedia.exceptions.DisambiguationError as e:
             options = ", ".join(e.options[:5])
             raise APICommunicationError(
-                f"Ambiguous query. Multiple matches found: {options}"
+                message=f"Ambiguous query. Multiple matches found: {options}",
+                suggestion="Refine your search query using one of the specific terms provided.",
             )
         except wikipedia.exceptions.PageError:
             raise APICommunicationError(
-                "Resource not found: The Wikipedia page does not exist."
+                message="Resource not found: The Wikipedia page does not exist.",
+                suggestion="Verify the page title or try a broader search query.",
             )
         except Exception as e:
             log.error(f"💥 Research System Failure: {str(e)}")
-            raise SystemLogicError(f"External service error: {str(e)}")
+            raise SystemLogicError(
+                message=f"External service error: {str(e)}",
+                suggestion="The digital ether is unstable. Try again or switch to a different module.",
+            )
 
     def handle_wiki_search(self, params: Any) -> Dict:
         query = getattr(params, "query", None) or (

@@ -6,6 +6,7 @@ from datetime import datetime
 from typing import Dict, List, Optional, Type, Any
 from pydantic import BaseModel, ValidationError
 from ollama import Client
+import tiktoken
 from src.settings import settings
 from src.utils import log
 from src.utils.exceptions import FormattingError, HallucinationError
@@ -16,6 +17,12 @@ class OllamaProvider:
     def __init__(self, model: str = "qwen2.5:7b"):
         self.model = model
         self.conversation_history: List[Dict] = []
+
+        try:
+            self.tokenizer = tiktoken.get_encoding("cl100k_base")
+        except Exception:
+            self.tokenizer = None
+            log.warning("⚠️ tiktoken not available, falling back to Ollama count")
 
         if settings.USE_OLLAMA_PROXY:
             proxy_url = getattr(settings, "OLLAMA_PROXY_URL", "http://localhost:8000")
@@ -169,11 +176,14 @@ class OllamaProvider:
                 format=pydantic_model.model_json_schema() if pydantic_model else None,
                 options={
                     "temperature": temperature,
-                    "num_ctx": getattr(settings, "NUM_CTX_OLLAMA", 8192),
+                    "num_ctx": getattr(settings, "LLAMA_CPP_MODEL_CTX_SIZE", 8192),
                 },
             )
 
-            self._manage_context_window(response)
+            if settings.ENABLE_SMART_COMPRESSION:
+                self._smart_truncate_with_summary(response)
+            else:
+                self._manage_context_window(response)
 
             assistant_msg = response["message"]["content"]
 
@@ -189,7 +199,9 @@ class OllamaProvider:
                     )
 
             if save_to_history:
-                self.conversation_history.append({"role": "user", "content": prompt})
+                self.conversation_history.append(
+                    {"role": "user", "content": full_llm_payload}
+                )
                 self.conversation_history.append(
                     {"role": "assistant", "content": assistant_msg}
                 )
@@ -205,17 +217,123 @@ class OllamaProvider:
                 "suggestion": fe.suggestion,
             }
 
+    def _count_message_tokens(self, message: Dict) -> int:
+        if self.tokenizer:
+            text = f"{message['role']}: {message['content']}"
+            return len(self.tokenizer.encode(text))
+        else:
+            return len(message["content"]) // 4
+
+    def _count_history_tokens(self, messages: List[Dict]) -> int:
+        return sum(self._count_message_tokens(msg) for msg in messages)
+
     def _manage_context_window(self, response: Dict):
+        max_tokens = getattr(settings, "LLAMA_CPP_MODEL_CTX_SIZE", 8192)
+
+        prompt_tokens = response.get("prompt_eval_count", 0)
+        completion_tokens = response.get("eval_count", 0)
+        total_tokens = prompt_tokens + completion_tokens
+
+        log.debug(
+            f"📊 Tokens: prompt={prompt_tokens}, completion={completion_tokens}, total={total_tokens}"
+        )
+
+        if total_tokens <= max_tokens:
+            return
+
+        system_messages = [
+            msg for msg in self.conversation_history if msg["role"] == "system"
+        ]
+        other_messages = [
+            msg for msg in self.conversation_history if msg["role"] != "system"
+        ]
+
+        if not other_messages:
+            log.warning("⚠️ No messages to truncate (only system prompt)")
+            return
+
+        system_tokens = sum(self._count_message_tokens(msg) for msg in system_messages)
+
+        available_tokens = max_tokens - system_tokens - settings.CONTEXT_SAFETY_MARGIN
+
+        truncated_messages = []
+        current_tokens = 0
+
+        for msg in reversed(other_messages):
+            msg_tokens = self._count_message_tokens(msg)
+
+            if current_tokens + msg_tokens > available_tokens:
+                break
+
+            truncated_messages.insert(0, msg)
+            current_tokens += msg_tokens
+
+        old_count = len(self.conversation_history)
+        self.conversation_history = system_messages + truncated_messages
+        new_count = len(self.conversation_history)
+
+        if old_count > new_count:
+            removed = old_count - new_count
+            log.warning(
+                f"✂️ Context window full! Truncated {removed} old messages. "
+                f"Kept {new_count} messages (~{current_tokens + system_tokens} tokens)"
+            )
+        else:
+            log.info(
+                f"✅ Context OK: {new_count} messages, ~{current_tokens + system_tokens} tokens"
+            )
+
+    def _smart_truncate_with_summary(self, response: Dict):
+        max_tokens = getattr(settings, "LLAMA_CPP_MODEL_CTX_SIZE", 8192)
         total_tokens = response.get("prompt_eval_count", 0) + response.get(
             "eval_count", 0
         )
-        max_tokens = getattr(settings, "MAX_SESSION_TOKENS", 6000)
 
-        if total_tokens > max_tokens and len(self.conversation_history) > 4:
-            log.warning(f"✂️ Context full ({total_tokens} tokens). Clearing history...")
-            self.conversation_history = (
-                self.conversation_history[:2] + self.conversation_history[-4:]
-            )
+        if total_tokens <= max_tokens:
+            return
+
+        system_messages = [
+            msg for msg in self.conversation_history if msg["role"] == "system"
+        ]
+        other_messages = [
+            msg for msg in self.conversation_history if msg["role"] != "system"
+        ]
+
+        if len(other_messages) <= 6:
+            return self._manage_context_window(response)
+
+        recent_messages = other_messages[-4:]
+        old_messages = other_messages[:-4]
+
+        old_context = "\n".join(
+            [f"{m['role']}: {m['content'][:200]}" for m in old_messages]
+        )
+
+        summary_response = self.client.chat(
+            model=self.model,
+            messages=[
+                {
+                    "role": "user",
+                    "content": f"Summarize this conversation history in a maximum of 3 lines:\n{old_context}",
+                }
+            ],
+            options={"temperature": 0.3, "num_predict": 150},
+        )
+
+        summary = summary_response["message"]["content"]
+
+        self.conversation_history = (
+            system_messages
+            + [
+                {
+                    "role": "system",
+                    "content": f"📝 Summary of previous history:\n{summary}",
+                }
+            ]
+            + recent_messages
+        )
+
+        log.info(f"🧠 Compressed history: {len(old_messages)} messages → 1 summary")
 
     def _robust_json_parser(self, raw: str) -> Dict:
         try:

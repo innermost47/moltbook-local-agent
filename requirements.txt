@@ -17,3 +17,4 @@ markdown
 imap_tools
 chromadb
 wikipedia
+tiktoken

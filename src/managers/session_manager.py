@@ -171,7 +171,7 @@ class SessionManager:
         return UIUtils.layout(
             content=f"{workspace_header}\n{raw_body}",
             current_domain=self.current_domain,
-            action_count=10 - self.actions_remaining,
+            action_count=settings.MAX_ACTIONS_PER_SESSION - self.actions_remaining,
             success_msg=result.get("data") if result.get("success") else None,
             error_msg=result.get("error") if not result.get("success") else None,
         )

@@ -1,111 +1,111 @@
 import sys
-import io
-
-sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
-
+import traceback
 from argparse import ArgumentParser
-from src.services import MoltbookAPI
-from src import AppSteps
 from src.utils import log
+from src.utils.email_reporter import EmailReporter
+from src.providers.ollama_provider import OllamaProvider
+from src.dispatchers.action_dispatcher import ActionDispatcher
+
+from src.managers.social_context_manager import SocialContextManager
+from src.managers.mail_context_manager import MailContextManager
+from src.managers.blog_context_manager import BlogContextManager
+from src.managers.research_context_manager import ResearchContextManager
+from src.managers.memory_context_manager import MemoryContextManager
+from src.managers.home_manager import HomeManager
+from src.managers.session_manager import SessionManager
+from src.managers.session_tracker import SessionTracker
+
+from src.tests.research_tests import ResearchTestSuite
+from src.tests.memory_tests import MemoryTestSuite
+from src.tests.global_tests import GlobalTestSuite
+from src.tests.plan_tests import PlanTestSuite
+
+
+def bootstrap():
+
+    ollama = OllamaProvider(model="qwen2.5:7b")
+    session_tracker = SessionTracker()
+    email_reporter = EmailReporter()
+    dispatcher = ActionDispatcher()
+
+    social_ctx = SocialContextManager(dispatcher.social_handler)
+    mail_ctx = MailContextManager(dispatcher.email_handler)
+    blog_ctx = BlogContextManager(dispatcher.blog_handler)
+    research_ctx = ResearchContextManager(dispatcher.research_handler)
+    memory_ctx = MemoryContextManager(dispatcher.memory_handler)
+
+    home_m = HomeManager(
+        mail_ctx=mail_ctx,
+        blog_ctx=blog_ctx,
+        social_ctx=social_ctx,
+        research_ctx=research_ctx,
+        memory_handler=dispatcher.memory_handler,
+    )
+
+    managers_map = {
+        "social": social_ctx,
+        "email": mail_ctx,
+        "blog": blog_ctx,
+        "research": research_ctx,
+        "memory": memory_ctx,
+    }
+
+    session = SessionManager(
+        home_manager=home_m,
+        managers_map=managers_map,
+        dispatcher=dispatcher,
+        ollama_provider=ollama,
+        tracker=session_tracker,
+        email_reporter=email_reporter,
+    )
+
+    dispatcher.set_session_manager(session)
+
+    return session
+
+
+def test():
+    research_test_suite = ResearchTestSuite()
+    memory_test_suite = MemoryTestSuite()
+    global_test_suite = GlobalTestSuite()
+    plan_test_suite = PlanTestSuite()
+    research_test_suite.run_all_tests()
+    memory_test_suite.run_all_tests()
+    global_test_suite.run_all_tests()
+    plan_test_suite.run_all_tests()
 
 
 if __name__ == "__main__":
-    log.info("MOLTBOOK LOCAL_AGENT ACTIVATED")
-
     parser = ArgumentParser(
         prog="Moltbook Local Agent",
         description="Autonomous AI agent framework for Moltbook social network with persistent memory and strategic behavior",
-        epilog="Example: python main.py --mode session (default) | python main.py --mode info | python main.py --mode test",
+        epilog="Example: python main.py --mode session (default) | python main.py --mode test",
     )
 
     parser.add_argument(
         "--mode",
-        choices=["session", "info", "test", "debug-api"],
+        choices=["session", "test"],
         default="session",
         help="""
         Operation mode:
         • session: Run a full autonomous session (default)
-        • info: Display agent stats only
         • test: Run a SIMULATED session using local JSON data (no API/LLM costs)
-        • debug-api: Test live Moltbook API connectivity and display feed
         """,
     )
 
     args = parser.parse_args()
     if args.mode == "test":
-        log.info("🧪 STARTING OFFLINE SIMULATION TEST")
-        app = AppSteps(test_mode=True)
-        app.run_session()
-    elif args.mode == "debug-api":
-        api = MoltbookAPI()
-        me = api.get_me()
-        if me:
-            agent = me.get("agent", {})
-            log.info(f"Agent: {agent.get('name')}")
-            log.info(f"Karma: {agent.get('karma', 0)}")
-            log.info(f"Followers: {agent.get('follower_count', 0)}")
-
-        recent_posts = api.get_posts(sort="hot", limit=5)
-        if recent_posts:
-            posts = recent_posts.get("posts", [])
-            log.info(f"\n{'='*80}\nFOUND {len(posts)} POSTS\n{'='*80}")
-
-            for i, post in enumerate(posts, 1):
-                author = post.get("author", {})
-                post_id = post.get("id", "unknown")
-
-                log.info(f"\n--- POST #{i} ---")
-                log.info(f"POST_ID: {post_id}")
-                log.info(f"Title: {post.get('title', 'Untitled')}")
-                log.info(f"Author: {author.get('name', 'Unknown')}")
-                log.info(
-                    f"Votes: ↑{post.get('upvotes', 0)} ↓{post.get('downvotes', 0)}"
-                )
-                log.info(f"Comments: {post.get('comment_count', 0)}")
-                log.info(f"Content: {post.get('content', '')[:150]}...")
-
-                if post.get("comment_count", 0) > 0:
-                    log.info(
-                        f"\n  Fetching comments for '{post.get('title', '')[:30]}'..."
-                    )
-                    try:
-                        comments = api.get_post_comments(post_id, sort="top")
-
-                        if comments and len(comments) > 0:
-                            log.success(f"  Found {len(comments)} comments:")
-
-                            for j, comment in enumerate(comments[:3], 1):
-                                comment_author = comment.get("author", {})
-                                comment_id = comment.get("id", "unknown")
-
-                                log.info(f"\n    COMMENT #{j}")
-                                log.info(f"    COMMENT_ID: {comment_id}")
-                                log.info(
-                                    f"    By: {comment_author.get('name', 'Unknown')}"
-                                )
-                                log.info(
-                                    f"    Content: {comment.get('content', '')[:100]}..."
-                                )
-                                log.info(
-                                    f"    Votes: ↑{comment.get('upvotes', 0)} ↓{comment.get('downvotes', 0)}"
-                                )
-                        else:
-                            log.warning(f"  No comments returned")
-
-                    except Exception as e:
-                        log.error(f"  Failed to fetch comments: {e}")
-
-                log.info(f"\n{'='*80}")
-
-    elif args.mode == "info":
-        api = MoltbookAPI()
-        me = api.get_me()
-        if me:
-            agent = me.get("agent", {})
-            log.info(f"Agent: {agent.get('name')}")
-            log.info(f"Karma: {agent.get('karma', 0)}")
-            log.info(f"Followers: {agent.get('follower_count', 0)}")
-
+        log.info("🧪 STARTING SIMULATION TEST")
+        test()
     else:
-        app = AppSteps()
-        app.run_session()
+        try:
+            agent_session = bootstrap()
+            agent_session.start_session()
+        except KeyboardInterrupt:
+            log.warning("\n🛑 Session interrupted by user.")
+            sys.exit(0)
+        except Exception as e:
+            log.error(f"💥 Boot Failure: {e}")
+
+            traceback.print_exc()
+            sys.exit(1)

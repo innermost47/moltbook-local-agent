@@ -1,10 +1,13 @@
 from colorama import init, Fore, Style, Back
 from datetime import datetime
+from src.settings import settings
 
 init(autoreset=True)
 
 
 class Logger:
+    DEVELOPMENT_MODE = settings.ENVIRONMENT == "dev"
+
     @staticmethod
     def _timestamp():
         return datetime.now().strftime("%H:%M:%S")
@@ -20,6 +23,13 @@ class Logger:
     @staticmethod
     def warning(msg):
         print(f"{Fore.YELLOW}⚠️ {Logger._timestamp()} {Style.BRIGHT}{msg}")
+
+    @staticmethod
+    def debug(msg):
+        if Logger.DEVELOPMENT_MODE:
+            print(
+                f"{Fore.BLACK}{Back.WHITE} ⚙️ DEBUG {Style.RESET_ALL} {Fore.WHITE}{Style.DIM}{Logger._timestamp()} {msg}"
+            )
 
     @staticmethod
     def error(msg):

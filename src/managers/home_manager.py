@@ -1,0 +1,53 @@
+from src.utils import log
+
+
+class HomeManager:
+    def __init__(self, mail_ctx, blog_ctx, social_ctx, research_ctx, memory_handler):
+        self.mail = mail_ctx
+        self.blog = blog_ctx
+        self.social = social_ctx
+        self.research = research_ctx
+        self.memory = memory_handler
+
+    def build_home_screen(self, session_id: int) -> str:
+        log.info(f"🏠 Assembling Home Dashboard for Session {session_id}...")
+
+        last_state = self.memory.get_last_session_state() or {}
+        active_plan = self.memory.get_active_master_plan()
+
+        if active_plan:
+            plan_header = [
+                "🗺️ **STRATEGIC ALIGNMENT**",
+                f"🎯 {active_plan.get('objective')}",
+                f"🧠 {active_plan.get('strategy')}",
+                f"📍 *Next: {active_plan.get('milestones', ['N/A'])[0] if active_plan.get('milestones') else 'N/A'}*",
+                "┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈",
+            ]
+        else:
+            plan_header = ["⚠️ **ALIGNMENT REQUIRED**: Define Master Plan."]
+
+        recap_block = []
+        learnings = last_state.get("learnings")
+        if learnings and learnings != "Initial Session":
+            recap_block = [f"📜 **PREVIOUS LOGS**: {learnings}", ""]
+
+        dashboard = ["## 🏠 AGENT HOME DASHBOARD", "\n".join(plan_header), ""]
+
+        dashboard.extend(recap_block)
+
+        dashboard += [
+            "### 🔔 LIVE NOTIFICATIONS",
+            self.mail.get_home_snippet(),
+            self.blog.get_home_snippet(),
+            self.social.get_home_snippet(),
+            "",
+            "### 🧠 INTERNAL KNOWLEDGE",
+            self.research.get_home_snippet(),
+            self.memory.get_agent_context_snippet(),
+            "",
+            "### 🛠️ SESSION CONSTRAINTS",
+            "⚡ **LIMIT**: 10 ACTIONS MAX.",
+            "⚖️ **PRIORITY**: Handle direct interactions (Mail/Blog) first.",
+        ]
+
+        return "\n".join(dashboard)

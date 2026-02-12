@@ -1,11 +1,58 @@
 import json
-from typing import Optional
+from typing import Optional, List, Dict, Set
 from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from src.utils import log
+from enum import Enum
+
+
+class AvailableModule(str, Enum):
+    home = "HOME"
+    email = "EMAIL"
+    blog = "BLOG"
+    social = "SOCIAL"
+    research = "RESEARCH"
+    memory = "MEMORY"
+
+
+class MemoryCategory(str, Enum):
+    interactions = "interactions"
+    learnings = "learnings"
+    strategies = "strategies"
+    observations = "observations"
+    goals = "goals"
+    relationships = "relationships"
+    experiments = "experiments"
+    preferences = "preferences"
+    failures = "failures"
+    successes = "successes"
+    ideas = "ideas"
+    reflections = "reflections"
+    research_notes = "research_notes"
+
+    @property
+    def description(self) -> str:
+        return _MEMORY_CATEGORY_DESCRIPTIONS[self]
+
+
+_MEMORY_CATEGORY_DESCRIPTIONS: dict[MemoryCategory, str] = {
+    MemoryCategory.interactions: "Past interactions with other agents and their responses",
+    MemoryCategory.learnings: "Key insights and lessons learned over time",
+    MemoryCategory.strategies: "Strategic decisions and their effectiveness",
+    MemoryCategory.observations: "Patterns and trends noticed in the community",
+    MemoryCategory.goals: "Long-term objectives and progress tracking",
+    MemoryCategory.relationships: "Information about specific agents and connections",
+    MemoryCategory.experiments: "Tests tried and their results",
+    MemoryCategory.preferences: "Discovered preferences and personal tendencies",
+    MemoryCategory.failures: "What didn't work and why",
+    MemoryCategory.successes: "What worked well and should be repeated",
+    MemoryCategory.ideas: "Future ideas and concepts to explore",
+    MemoryCategory.reflections: "Deep thoughts and self-analysis",
+    MemoryCategory.research_notes: "Deep research findings and synthesized data (Internal)",
+}
 
 
 class Settings(BaseSettings):
+    ENVIRONMENT: str
     MOLTBOOK_API_KEY: str
     LLAMA_CPP_MODEL: str
     LLAMA_CPP_MODEL_CTX_SIZE: int = 131072
@@ -23,20 +70,8 @@ class Settings(BaseSettings):
     SMTP_PASSWORD: str = ""
     EMAIL_TO: str = ""
     ENABLE_EMAIL_REPORTS: bool = False
-    MEMORY_CATEGORIES: dict = {
-        "interactions": "Past interactions with other agents and their responses",
-        "learnings": "Key insights and lessons learned over time",
-        "strategies": "Strategic decisions and their effectiveness",
-        "observations": "Patterns and trends noticed in the community",
-        "goals": "Long-term objectives and progress tracking",
-        "relationships": "Information about specific agents and connections",
-        "experiments": "Tests tried and their results",
-        "preferences": "Discovered preferences and personal tendencies",
-        "failures": "What didn't work and why",
-        "successes": "What worked well and should be repeated",
-        "ideas": "Future ideas and concepts to explore",
-        "reflections": "Deep thoughts and self-analysis",
-        "research_notes": "Deep research findings and synthesized data (Internal)",
+    MEMORY_CATEGORIES: Dict[str, str] = {
+        category.value: category.description for category in MemoryCategory
     }
     MAX_ENTRIES_PER_CATEGORY: int = 100
     ALLOWED_DOMAINS_FILE_PATH: Optional[str] = None
@@ -66,6 +101,49 @@ class Settings(BaseSettings):
     USE_STABLE_DIFFUSION_LOCAL: bool
     USE_SD_PROXY: bool
 
+    AVAILABLE_MODULES: List[str] = [module.value for module in AvailableModule]
+
+    MODULE_TO_DOMAIN: Dict[AvailableModule, str] = {
+        AvailableModule.home: "home",
+        AvailableModule.email: "email",
+        AvailableModule.blog: "blog",
+        AvailableModule.social: "social",
+        AvailableModule.research: "research",
+        AvailableModule.memory: "memory",
+    }
+
+    ACTION_TO_DOMAIN: Dict[str, str] = {
+        "email_read": "mail",
+        "email_send": "mail",
+        "email_delete": "mail",
+        "email_archive": "mail",
+        "email_mark_read": "mail",
+        "write_blog_article": "blog",
+        "share_created_blog_post_url": "blog",
+        "review_pending_comments": "blog",
+        "approve_comment": "blog",
+        "approve_comment_key": "blog",
+        "reject_comment_key": "blog",
+        "refresh_feed": "social",
+        "create_post": "social",
+        "select_post_to_comment": "social",
+        "publish_public_comment": "social",
+        "vote_post": "social",
+        "follow_agent": "social",
+        "wiki_search": "research",
+        "wiki_read": "research",
+        "research_complete": "research",
+        "update_master_plan": "strategy",
+    }
+
+    STICKY_ACTIONS: Set[str] = {
+        "pin_to_workspace",
+        "unpin_from_workspace",
+        "memory_store",
+        "memory_retrieve",
+        "refresh_home",
+    }
+
     model_config = SettingsConfigDict(
         env_file=Path(__file__).resolve().parent.parent / ".env",
         env_file_encoding="utf-8",
@@ -82,7 +160,7 @@ class Settings(BaseSettings):
                     data = json.load(f)
                     return data if isinstance(data, dict) else {d: "" for d in data}
             except (FileNotFoundError, json.JSONDecodeError) as e:
-                log.error(f"❌ Unable to load domains: {e}")
+                print(f"❌ Unable to load domains: {e}")
                 return {}
         return {}
 

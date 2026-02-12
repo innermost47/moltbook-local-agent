@@ -378,7 +378,12 @@
                 cleanJson = cleanJson.substring(1, cleanJson.length - 1);
               }
 
-              const data = JSON.parse(cleanJson);
+              let data = JSON.parse(cleanJson);
+
+              if (data.action && typeof data.action === "object") {
+                data = { ...data, ...data.action };
+              }
+
               htmlContent = generateStructuredReport(data, msg.attempts_left);
             } catch (e) {
               htmlContent = `<pre><code class="language-json">${rawContent}</code></pre>`;
@@ -554,101 +559,118 @@
     </div>
   `;
       }
-
       function generateStructuredReport(data, attemptsLeft) {
         let sections = [];
 
-        if (data.overall_assessment || data.grade) {
+        const displayData = data.action ? { ...data, ...data.action } : data;
+
+        if (displayData.overall_assessment || displayData.grade) {
           sections.push(`
-          <div class="supervisor-box ${data.grade && data.grade.startsWith("A") ? "valid" : "invalid"}">
-            <h3 style="margin:0">🧐 Supervisor Verdict: ${data.grade || "N/A"}</h3>
-            ${data.overall_assessment ? `<div class="feedback-msg" style="margin-top:10px;">📊 Assessment: ${data.overall_assessment}</div>` : ""}
-            ${data.main_weakness ? `<div class="audit-rule" style="margin-top:10px;">⚠️ Main Weakness: ${data.main_weakness}</div>` : ""}
-            ${data.directive_next_session ? `<div class="next-move" style="margin-top:10px;">🔭 Directive: ${data.directive_next_session}</div>` : ""}
-          </div>
-        `);
+      <div class="supervisor-box ${displayData.grade && displayData.grade.startsWith("A") ? "valid" : "invalid"}">
+        <h3 style="margin:0">🧐 Supervisor Verdict: ${displayData.grade || "N/A"}</h3>
+        ${displayData.overall_assessment ? `<div class="feedback-msg" style="margin-top:10px;">📊 Assessment: ${displayData.overall_assessment}</div>` : ""}
+        ${displayData.main_weakness ? `<div class="audit-rule" style="margin-top:10px;">⚠️ Main Weakness: ${displayData.main_weakness}</div>` : ""}
+        ${displayData.directive_next_session ? `<div class="next-move" style="margin-top:10px;">🔭 Directive: ${displayData.directive_next_session}</div>` : ""}
+      </div>
+    `);
         }
 
-        if (data.problem_diagnosis || data.required_content) {
+        if (displayData.problem_diagnosis || displayData.required_content) {
           sections.push(`
-            <div class="supervisor-box invalid">
-              <h3 style="margin:0">🧐 Laziness Guidance</h3>
-              ${data.problem_diagnosis ? `<div class="audit-rule" style="margin-top:10px;">🔍 Problem: ${data.problem_diagnosis}</div>` : ""}
-              ${data.required_content ? `<div class="feedback-msg" style="margin-top:10px;">✅ Required: ${data.required_content}</div>` : ""}
-              ${data.actionable_instruction ? `<div class="next-move" style="margin-top:10px;">⚡ Action: ${data.actionable_instruction}</div>` : ""}
-            </div>
-          `);
+      <div class="supervisor-box invalid">
+        <h3 style="margin:0">🧐 Laziness Guidance</h3>
+        ${displayData.problem_diagnosis ? `<div class="audit-rule" style="margin-top:10px;">🔍 Problem: ${displayData.problem_diagnosis}</div>` : ""}
+        ${displayData.required_content ? `<div class="feedback-msg" style="margin-top:10px;">✅ Required: ${displayData.required_content}</div>` : ""}
+        ${displayData.actionable_instruction ? `<div class="next-move" style="margin-top:10px;">⚡ Action: ${displayData.actionable_instruction}</div>` : ""}
+      </div>
+    `);
         }
 
-        if (data.tasks && Array.isArray(data.tasks)) {
-          let listItems = data.tasks
+        if (displayData.tasks && Array.isArray(displayData.tasks)) {
+          let listItems = displayData.tasks
             .map((t) => {
               const stars = "⭐".repeat(t.priority || 1);
               return `<div class="todo-item-row" style="padding: 5px 0; border-bottom: 1px solid rgba(255,255,255,0.1); font-family: monospace;">
-                <span style="color: #d29922;">[${stars}]</span> ${t.task}
-              </div>`;
+          <span style="color: #d29922;">[${stars}]</span> ${t.task}
+        </div>`;
             })
             .join("");
 
-          return `
-          <div class="planning-box">
-              ${data.reasoning ? `<p style="font-style: italic; color: #8b949e; margin-bottom: 10px;">${data.reasoning}</p>` : ""}
-              <h4 style="color: #58a6ff; margin: 0 0 10px 0;">🚀 SESSION ROADMAP</h4>
-              ${listItems}
-          </div>
-    `;
-        }
-
-        if (data.emotions || data.feelings) {
           sections.push(`
-          <div class="sentience-container">
-              ${data.emotions ? `<div class="emotion-tag"><strong>🎭 Emotion:</strong> ${data.emotions}</div>` : ""}
-              ${data.feelings ? `<div class="feeling-tag"><strong>💓 Feeling:</strong> ${data.feelings}</div>` : ""}
-          </div>
+      <div class="planning-box">
+          ${displayData.reasoning ? `<p style="font-style: italic; color: #8b949e; margin-bottom: 10px;">${displayData.reasoning}</p>` : ""}
+          <h4 style="color: #58a6ff; margin: 0 0 10px 0;">🚀 SESSION ROADMAP</h4>
+          ${listItems}
+      </div>
     `);
         }
 
-        if (data.reasoning || data.self_criticism) {
+        if (displayData.emotions || displayData.feelings) {
           sections.push(`
-          <div class="report-section meta">
-              ${data.reasoning ? `<div class="thought-box"><strong>🧠 Reasoning:</strong><br>${marked.parse(data.reasoning)}</div>` : ""}
-              ${data.self_criticism ? `<div class="audit-box"><strong>🛡️ Self-Criticism:</strong><br>${marked.parse(data.self_criticism)}</div>` : ""}
-          </div>
+      <div class="sentience-container">
+          ${displayData.emotions ? `<div class="emotion-tag"><strong>🎭 Emotion:</strong> ${displayData.emotions}</div>` : ""}
+          ${displayData.feelings ? `<div class="feeling-tag"><strong>💓 Feeling:</strong> ${displayData.feelings}</div>` : ""}
+      </div>
     `);
         }
 
-        if (data.action_type) {
+        if (displayData.reasoning || displayData.self_criticism) {
           sections.push(`
-          <div class="report-section action">
-              <h3 style="color: #d1d5da; font-size: 0.8em; margin-bottom: 8px;">⚡ ACTION: ${data.action_type.toUpperCase()}</h3>
-              <div class="params-box">
-                  <pre><code class="language-json">${JSON.stringify(data.action_params, null, 2)}</code></pre>
-              </div>
-          </div>
-      `);
+      <div class="report-section meta">
+          ${displayData.reasoning ? `<div class="thought-box"><strong>🧠 Reasoning:</strong><br>${marked.parse(displayData.reasoning)}</div>` : ""}
+          ${displayData.self_criticism ? `<div class="audit-box"><strong>🛡️ Self-Criticism:</strong><br>${marked.parse(displayData.self_criticism)}</div>` : ""}
+      </div>
+    `);
         }
 
-        if (data.validate !== undefined) {
-          const statusClass = data.validate ? "valid" : "invalid";
+        if (displayData.action_type) {
+          let paramsHtml = "";
+
+          if (
+            displayData.action_params &&
+            Object.keys(displayData.action_params).length > 0
+          ) {
+            paramsHtml = JSON.stringify(displayData.action_params, null, 2);
+          } else if (displayData.chosen_mode) {
+            paramsHtml = JSON.stringify(
+              { mode: displayData.chosen_mode },
+              null,
+              2,
+            );
+          } else {
+            paramsHtml = '"Standard Execution"';
+          }
+
           sections.push(`
-          <div class="supervisor-box ${statusClass}">
-              <h3 style="margin:0">🧐 Supervisor Audit: ${data.validate ? "PASSED ✅" : "REJECTED ❌"}</h3>
-              <div class="feedback-msg" style="margin-top:10px;">💬 Message: ${data.message_for_agent}</div>
+      <div class="report-section action">
+          <h3 style="color: #d1d5da; font-size: 0.8em; margin-bottom: 8px;">⚡ ACTION: ${displayData.action_type.toUpperCase()}</h3>
+          <div class="params-box">
+              <pre><code class="language-json">${paramsHtml}</code></pre>
           </div>
-        `);
+      </div>
+    `);
         }
 
-        if (data.next_move_preview) {
+        if (displayData.validate !== undefined) {
+          const statusClass = displayData.validate ? "valid" : "invalid";
           sections.push(`
-            <p class="next-move" style="margin-top:10px; border-top: 1px solid #30363d; padding-top:10px;">
-                🔭 <strong>Next Move:</strong> ${data.next_move_preview}
-            </p>
-          `);
+      <div class="supervisor-box ${statusClass}">
+          <h3 style="margin:0">🧐 Supervisor Audit: ${displayData.validate ? "PASSED ✅" : "REJECTED ❌"}</h3>
+          <div class="feedback-msg" style="margin-top:10px;">💬 Message: ${displayData.message_for_agent}</div>
+      </div>
+    `);
+        }
+
+        if (displayData.next_move_preview) {
+          sections.push(`
+      <p class="next-move" style="margin-top:10px; border-top: 1px solid #30363d; padding-top:10px;">
+          🔭 <strong>Next Move:</strong> ${displayData.next_move_preview}
+      </p>
+    `);
         }
 
         return sections.join("");
       }
-
       const scrollBtn = document.getElementById("scroll-to-bottom");
 
       scrollBtn.addEventListener("click", () => {

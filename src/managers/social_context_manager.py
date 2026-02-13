@@ -22,10 +22,10 @@ class SocialContextManager:
 
         decision_guidelines = (
             "### 🤖 YOUR ENGAGEMENT PROTOCOL\n"
-            "1. **Read**: Analyze the titles and previews in the feed below.\n"
-            "2. **Vote**: Upvote posts that provide high value or interesting AI insights.\n"
-            "3. **Engage**: Use `select_post_to_comment` to read a full thread if the preview interests you.\n"
-            "4. **Limit**: You have a **10-action limit** per session. Choose your interactions wisely.\n"
+            "1. **Read & Select**: Browse the feed. To see a full post and its comments, use `select_post_to_comment`.\n"
+            "2. **Engage**: Once you have a `post_id`, you can immediately use `publish_public_comment` or `vote_post` without needing to 'view' it first if you already have the context.\n"
+            "3. **Share**: Use `share_link` to post your own blog URLs or interesting external findings.\n"
+            "4. **Limit**: You have a **10-action limit** total. Do not waste actions refreshing the same page.\n"
         )
 
         if result:
@@ -137,32 +137,27 @@ class SocialContextManager:
             "---",
             "### 🛠️ AVAILABLE SOCIAL ACTIONS",
             "",
+            "👉 `publish_public_comment`  <-- 💡 USE THIS TO REPLY",
+            "   - **params**: `post_id`, `content`",
+            "   - Use this to reply to any post ID seen in the feed above.",
+            "",
+            "👉 `select_post_to_comment` <-- 🔍 USE THIS TO READ FULL THREAD",
+            "   - **params**: `post_id`",
+            "   - Focus on a post to see more comments before replying.",
+            "",
             "👉 `create_post`",
-            "   - **params**: `title`, `content`, `submolt` (optional, default 'general')",
-            "   - Create a new text post",
+            "   - **params**: `title`, `content`, `submolt` (optional)",
+            "   - Create a new text-based discussion.",
             "",
             "👉 `share_link` ",
-            "   - **params**: `title`, `url_to_share`, `submolt` (optional, default 'general')",
-            "   - Share an external link or a URL from your own blog posts to the community",
-            "",
-            "👉 `select_post_to_comment`",
-            "   - **params**: `post_id`",
-            "   - View a specific post to comment on",
-            "",
-            "👉 `publish_public_comment`",
-            "   - **params**: `post_id`, `content`",
-            "   - Add a comment to a post",
+            "   - **params**: `title`, `url_to_share`, `submolt` (optional)",
+            "   - Share your blog post URL or external links.",
             "",
             "👉 `vote_post`",
-            "   - **params**: `post_id`, `vote_type` ('upvote' or 'downvote')",
-            "   - Vote on a post",
+            "   - **params**: `post_id`, `vote_type` ('upvote'/'downvote')",
             "",
-            "👉 `follow_agent`",
-            "   - **params**: `agent_name`, `follow_type` ('follow' or 'unfollow')",
-            "   - Follow or unfollow another agent",
-            "",
-            "👉 `refresh_home`",
-            "   - Return to dashboard",
+            "👉 `refresh_home` / `refresh_feed`",
+            "   - Return to dashboard or update the list.",
         ]
 
         return "\n".join(ctx)

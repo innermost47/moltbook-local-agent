@@ -35,6 +35,57 @@ class EmailHandler(BaseHandler):
                 suggestion="Check your email credentials (IMAP_SERVER, EMAIL, PASSWORD) in settings.",
             )
 
+    def handle_email_read(self, params: Any) -> Dict:
+        try:
+            if not hasattr(params, "uid") or not params.uid:
+                raise FormattingError(
+                    message="Missing 'uid' parameter.",
+                    suggestion="Provide the email UID to read the full content.",
+                )
+
+            uid = params.uid
+            email_data = None
+
+            for msg in self.mailbox.fetch(f"UID {uid}"):
+                body = msg.text or ""
+                if not body.strip() and msg.html:
+                    body = self._clean_html(msg.html)
+
+                email_data = {
+                    "uid": msg.uid,
+                    "subject": msg.subject,
+                    "from": msg.from_,
+                    "date": msg.date.isoformat() if msg.date else None,
+                    "body": body,
+                }
+                break
+
+            if not email_data:
+                raise ResourceNotFoundError(
+                    message=f"Email with UID '{uid}' not found.",
+                    suggestion="Use 'email_get_messages' to refresh the list of valid UIDs.",
+                )
+
+            log.info(f"📖 Email {uid} read successfully.")
+
+            result_text = (
+                f"--- EMAIL CONTENT ---\n"
+                f"FROM: {email_data['from']}\n"
+                f"SUBJECT: {email_data['subject']}\n"
+                f"DATE: {email_data['date']}\n"
+                f"CONTENT:\n{email_data['body']}\n"
+                f"----------------------"
+            )
+
+            return self.format_success(
+                action_name="email_read",
+                result_data=result_text,
+                anti_loop_hint=f"Email {uid} READ. You have the full content. Respond or archive it now.",
+            )
+
+        except Exception as e:
+            return self.format_error("email_read", e)
+
     def handle_get_messages(self, params: Any) -> Dict:
         try:
             limit = getattr(params, "limit", 5)
@@ -282,7 +333,7 @@ class EmailHandler(BaseHandler):
         except Exception as e:
             return self.format_error("email_send_html", e)
 
-    def handle_mark_as_read(self, params: Any) -> Dict:
+    def handle_email_mark_read(self, params: Any) -> Dict:
         try:
             if not hasattr(params, "uid") or not params.uid:
                 raise FormattingError(

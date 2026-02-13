@@ -28,39 +28,47 @@ class MailContextManager:
                     f"### ✅ LAST ACTION SUCCESS\n{result.get('data')}\n\n---\n"
                 )
             else:
-                if result.get("visual_feedback"):
-                    action_feedback = f"### 🔴 LAST ACTION FAILED\n{result['visual_feedback']}\n\n---\n"
-                else:
-                    action_feedback = f"### ❌ LAST ACTION ERROR\n{result.get('error', 'Unknown error')}\n\n💡 {result.get('suggestion', 'Try again.')}\n\n---\n"
+                action_feedback = f"### ❌ LAST ACTION ERROR\n{result.get('error', 'Unknown error')}\n\n💡 {result.get('suggestion', 'Try again.')}\n\n---\n"
 
         messages_display = ""
         try:
-            params = Namespace(limit=10)
-            fetch_result = self.handler.handle_get_messages(params)
+            messages = []
+            for msg in self.handler.mailbox.fetch(limit=10, reverse=True):
+                body_raw = msg.text or ""
+                messages.append(
+                    {
+                        "uid": msg.uid,
+                        "subject": msg.subject,
+                        "from": msg.from_,
+                        "body": body_raw[:256],
+                    }
+                )
 
-            if fetch_result.get("success"):
-                data = fetch_result.get("data")
-                if isinstance(data, list) and data:
-                    messages = data
-                    messages_display = "### 📬 LATEST CORRESPONDENCE\n\n"
-                    for msg in messages:
-                        messages_display += f"✉️ **ID**: `{msg['uid']}`\n"
-                        messages_display += (
-                            f"   From: {msg['from']} | Subject: {msg['subject']}\n\n"
-                        )
-                    messages_display += "👉 **ACTION**: Use `email_read(uid='...')` to view a message.\n"
-                elif isinstance(data, str):
-                    messages_display = f"### 📬 LATEST CORRESPONDENCE\n\n_{data}_\n"
-                else:
-                    messages_display = (
-                        "### 📬 LATEST CORRESPONDENCE\n\n_The inbox is empty._\n"
+            if messages:
+                messages_display = "### 📬 LATEST CORRESPONDENCE\n\n"
+                for m in messages:
+                    uid = m.get("uid", "N/A")
+                    sender = m.get("from", "Unknown")
+                    subject = m.get("subject", "(No Subject)")
+
+                    snippet = m.get("body", "").replace("\n", " ").strip()
+                    if len(snippet) > 256:
+                        snippet = snippet[:253] + "..."
+
+                    messages_display += f"✉️ **ID**: `{uid}` | 👤 **From**: {sender}\n"
+                    messages_display += f"📌 **Subject**: {subject}\n"
+                    messages_display += (
+                        f"📄 **Snippet**: _{snippet or 'No preview available.'}_\n\n"
                     )
+
+                messages_display += "---"
             else:
                 messages_display = (
-                    "### 📬 LATEST CORRESPONDENCE\n\n_Status unavailable_\n"
+                    "### 📬 LATEST CORRESPONDENCE\n\n_The inbox is empty._\n"
                 )
+
         except Exception as e:
-            log.warning(f"Could not fetch messages: {e}")
+            log.warning(f"Could not fetch messages for view: {e}")
             messages_display = "### 📬 LATEST CORRESPONDENCE\n\n_Status unavailable_\n"
 
         ctx = [
@@ -69,13 +77,18 @@ class MailContextManager:
             "---",
             action_feedback,
             messages_display,
-            "---",
+            "",
             "### 🛠️ AVAILABLE EMAIL ACTIONS",
             "",
-            "👉 `email_send` - Send a new email",
-            "👉 `email_mark_as_read` - Mark email as read",
-            "👉 `email_archive_email` - Archive an email",
-            "👉 `refresh_home` - Return to home dashboard",
+            "👉 `email_read(uid='...')` <-- 🔍 VIEW FULL CONTENT",
+            "   - Open the full body of a specific email using the ID above.",
+            "",
+            "👉 `email_send(to='...', subject='...', body='...')`",
+            "   - Compose and send a reply or a new message.",
+            "",
+            "👉 `email_archive_email(uid='...')` / `email_mark_as_read(uid='...')`",
+            "",
+            "🏠 `refresh_home` - Return to dashboard",
         ]
 
         return "\n".join(ctx)

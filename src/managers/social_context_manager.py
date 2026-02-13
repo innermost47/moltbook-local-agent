@@ -30,14 +30,21 @@ class SocialContextManager:
             sub_res = self.handler.handle_social_list_submolts(params)
 
             if sub_res.get("success"):
-                submolts = sub_res.get("data", [])
-                if isinstance(submolts, list) and submolts:
-                    submolts_display = "### 📁 AVAILABLE COMMUNITIES\n\n"
-                    for s in submolts[:10]:
-                        name = s.get("name", "unknown")
-                        display = s.get("display_name", name)
-                        submolts_display += f"• **{name}**: {display}\n"
-                else:
+                try:
+                    api_result = self.handler._call_api("list_submolts")
+                    submolts = api_result.get("data", [])
+
+                    if isinstance(submolts, list) and submolts:
+                        submolts_display = "### 📁 AVAILABLE COMMUNITIES\n\n"
+                        for s in submolts[:10]:
+                            name = s.get("name", "unknown")
+                            display = s.get("display_name", name)
+                            submolts_display += f"• **{name}**: {display}\n"
+                    else:
+                        submolts_display = (
+                            "### 📁 AVAILABLE COMMUNITIES\n\n_No communities found._\n"
+                        )
+                except:
                     submolts_display = (
                         "### 📁 AVAILABLE COMMUNITIES\n\n_No communities found._\n"
                     )
@@ -51,11 +58,11 @@ class SocialContextManager:
 
         feed_display = ""
         try:
-            feed_params = Namespace(sort="hot", limit=10)
-            posts_data = self.handler.handle_social_get_posts(feed_params)
+            api_result = self.handler._call_api("get_posts", "hot", 10)
 
-            if posts_data.get("success"):
-                posts = posts_data.get("data", [])
+            if api_result.get("success"):
+                posts = api_result.get("data", [])
+
                 if isinstance(posts, list) and posts:
                     feed_display = "### 🦞 SOCIAL FEED\n\n"
 
@@ -116,10 +123,9 @@ class SocialContextManager:
 
     def get_focus_view(self, item_id: str) -> str:
         try:
-            params = Namespace(post_id=item_id)
-            post_result = self.handler.handle_social_get_single_post(params)
+            api_result = self.handler._call_api("get_single_post", item_id)
 
-            if not post_result.get("success"):
+            if not api_result.get("success"):
                 return f"""
 ## ❌ POST NOT FOUND
 
@@ -129,7 +135,7 @@ Could not load post: `{item_id}`
 🏠 Use `refresh_home` to return.
 """
 
-            post = post_result.get("data", {})
+            post = api_result.get("data", {})
             title = post.get("title", "Untitled")
             author = post.get("author_name", "Unknown")
             content = post.get("content", "No content")
@@ -137,8 +143,9 @@ Could not load post: `{item_id}`
 
             comments_display = ""
             try:
-                comm_params = Namespace(post_id=item_id, sort="top")
-                comm_result = self.handler.handle_social_get_comments(comm_params)
+                comm_result = self.handler._call_api(
+                    "get_post_comments", item_id, "top"
+                )
 
                 if comm_result.get("success"):
                     comments = comm_result.get("data", [])

@@ -56,7 +56,6 @@ class HomeManager:
                 recap_block.append("---\n")
 
         memory_entries_display = self._build_memory_entries_block()
-
         cached_topics_display = self._build_cached_research_block()
 
         dashboard = ["## 🏠 AGENT HOME DASHBOARD", "\n".join(plan_header), ""]
@@ -79,12 +78,10 @@ class HomeManager:
             dashboard.append("")
 
         dashboard += [
-            "### 🧠 INTERNAL KNOWLEDGE SUMMARY",
-            self.memory.get_agent_context_snippet(),
-            "",
             "### 🛠️ SESSION CONSTRAINTS",
             f"⚡ **LIMIT**: {settings.MAX_ACTIONS_PER_SESSION} ACTIONS MAX.",
-            "⚖️ **PRIORITY**: Handle direct interactions (Mail/Blog) first.",
+            "⚖️ **PRIORITY**: Handle direct interactions (Mail/Blog) first, then diversify.",
+            "🎯 **STRATEGY**: Balance across Email, Blog, Social, Research, Memory.",
         ]
 
         return "\n".join(dashboard)
@@ -99,9 +96,12 @@ class HomeManager:
             categories = [row["category"] for row in cursor.fetchall()]
 
             if not categories:
-                return ""
+                return (
+                    "## 💾 MEMORY ARCHIVE\n\n"
+                    "⚠️ **No memories stored yet.** Use `memory_store` to save insights, experiments, and learnings.\n"
+                )
 
-            memory_block = ["## 💾 STORED MEMORIES (Last 5 per Category)", ""]
+            memory_block = ["## 💾 MEMORY ARCHIVE (Last 5 per Category)", ""]
 
             total_entries = 0
 
@@ -148,7 +148,8 @@ class HomeManager:
                 )
                 memory_block.insert(
                     2,
-                    "⚠️ **IMPORTANT**: You already have these memories stored. Do NOT store duplicates. Use `memory_retrieve` to see full content.\n",
+                    "⚠️ **ANTI-DUPLICATION**: These memories are ALREADY stored. Do NOT store duplicates.\n"
+                    "💡 **TIP**: Use `memory_retrieve(category='...')` to see full content.\n",
                 )
                 return "\n".join(memory_block)
 
@@ -156,35 +157,69 @@ class HomeManager:
 
         except Exception as e:
             log.error(f"Failed to build memory entries block: {e}")
-            return ""
+            return "## 💾 MEMORY ARCHIVE\n\n⚠️ Error loading memories.\n"
 
     def _build_cached_research_block(self) -> str:
         try:
-            if not hasattr(self.research, "vector_db"):
+            if not hasattr(self.research, "handler"):
+                log.debug("Research context has no handler attribute")
                 return ""
 
-            all_docs = self.research.handler.vector_db.get()
+            handler = self.research.handler
 
-            if not all_docs or not all_docs.get("metadatas"):
+            if not hasattr(handler, "vector_db"):
+                log.debug("Research handler has no vector_db attribute")
                 return ""
+
+            vector_db = handler.vector_db
+
+            all_docs = vector_db.get()
+
+            log.debug(f"Vector DB get() returned: {type(all_docs)}")
+            log.debug(f"Keys in all_docs: {all_docs.keys() if all_docs else 'None'}")
+
+            if not all_docs:
+                log.warning("Vector DB returned None or empty")
+                return (
+                    "## 🔍 RESEARCH CACHE\n\n"
+                    "⚠️ **No research cached yet.** Use `wiki_search` and `wiki_read` to build knowledge.\n"
+                )
+
+            metadatas = all_docs.get("metadatas")
+
+            if not metadatas:
+                log.warning(f"No metadatas in vector DB result: {all_docs.keys()}")
+                return (
+                    "## 🔍 RESEARCH CACHE\n\n"
+                    "⚠️ **Cache structure issue.** Try running `wiki_read` to populate cache.\n"
+                )
+
+            log.info(f"Found {len(metadatas)} metadata entries in vector DB")
 
             topics = {}
 
-            for metadata in all_docs["metadatas"]:
-                title = metadata.get("title", "Unknown")
-                url = metadata.get("url", "")
+            for metadata in metadatas:
+                if isinstance(metadata, dict):
+                    title = metadata.get("title", "Unknown")
+                    url = metadata.get("url", "")
 
-                if title not in topics:
-                    topics[title] = url
+                    if title and title != "Unknown":
+                        topics[title] = url
+
+            log.info(f"Extracted {len(topics)} unique topics from cache")
 
             if not topics:
-                return ""
+                return (
+                    "## 🔍 RESEARCH CACHE\n\n"
+                    "⚠️ **No valid topics found in cache.** Use `wiki_read` to add Wikipedia pages.\n"
+                )
 
             research_block = [
-                "## 🔍 CACHED RESEARCH (Already Searched Topics)",
+                "## 🔍 RESEARCH CACHE (Already Searched Topics)",
                 "",
                 f"**Total cached pages**: {len(topics)}",
-                "⚠️ **IMPORTANT**: These topics are ALREADY in your knowledge cache. Do NOT search Wikipedia for them again - use `research_query_cache` or `memory_retrieve` instead.\n",
+                "⚠️ **ANTI-DUPLICATION**: These Wikipedia pages are ALREADY cached. Do NOT search them again.\n"
+                "💡 **TIP**: Use `research_query_cache(query='topic')` to retrieve cached content.\n",
             ]
 
             sorted_topics = sorted(topics.keys())[:15]
@@ -198,12 +233,9 @@ class HomeManager:
                 )
 
             research_block.append("")
-            research_block.append(
-                "💡 **TIP**: To query cache, use `research_query_cache(query='topic')`"
-            )
 
             return "\n".join(research_block)
 
         except Exception as e:
-            log.error(f"Failed to build cached research block: {e}")
+            log.error(f"Failed to build cached research block: {e}", exc_info=True)
             return ""

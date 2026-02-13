@@ -178,23 +178,39 @@ Be specific and actionable. Focus on behavior patterns, not individual actions.
         a_type = action_object.action_type
         params = getattr(action_object, "action_params", {})
 
-        last_actions = [e["action"] for e in self.tracker.events[-3:]]
+        last_events = self.tracker.events[-3:]
         loop_warning = ""
 
-        if last_actions.count(a_type) >= 2:
+        current_signature = self._get_action_signature(a_type, params)
+
+        signature_count = 0
+        for event in reversed(last_events):
+            event_signature = self._get_action_signature(
+                event.get("action", ""), event.get("params", {})
+            )
+            if event_signature == current_signature:
+                signature_count += 1
+            else:
+                break
+
+        if signature_count >= 2:
             loop_warning = f"""
 🔴 🔴 🔴 **LOOP DETECTED** 🔴 🔴 🔴
 
-⚠️ You just executed `{a_type}` **{last_actions.count(a_type)} times in a row!**
+⚠️ You just executed `{a_type}` with the SAME parameters **{signature_count} times in a row!**
 
 🚨 **CRITICAL**: You are stuck in a repetitive loop. STOP immediately.
+
+**What you just repeated:**
+- Action: {a_type}
+- Parameters: {self._format_params_for_display(params)}
 
 **What to do NOW:**
 1. READ the UI feedback below carefully
 2. Choose a DIFFERENT action from the available options
 3. If you're stuck or nothing to do here, use `refresh_home` to go to another module
 
-⛔ **DO NOT repeat `{a_type}` again** ⛔
+⛔ **DO NOT repeat `{a_type}` with the same parameters again** ⛔
 
 {'━' * 70}
 
@@ -263,6 +279,57 @@ Be specific and actionable. Focus on behavior patterns, not individual actions.
             success_msg=result.get("data") if result.get("success") else None,
             error_msg=result.get("error") if not result.get("success") else None,
         )
+
+    def _get_action_signature(self, action: str, params: dict) -> str:
+        key_params = [
+            "chosen_mode",
+            "mode",
+            "query",
+            "page_title",
+            "post_id",
+            "uid",
+            "comment_id",
+            "to",
+            "category",
+            "key",
+        ]
+
+        relevant_params = {}
+        for key in key_params:
+            if key in params and params[key]:
+                relevant_params[key] = str(params[key]).lower().strip()
+
+        param_str = ":".join(f"{k}={v}" for k, v in sorted(relevant_params.items()))
+        signature = f"{action}:{param_str}" if param_str else action
+
+        return signature
+
+    def _format_params_for_display(self, params: dict) -> str:
+        if not params:
+            return "none"
+
+        key_params = [
+            "chosen_mode",
+            "mode",
+            "query",
+            "page_title",
+            "post_id",
+            "uid",
+            "to",
+        ]
+        display = []
+
+        for key in key_params:
+            if key in params and params[key]:
+                value = str(params[key])
+                if len(value) > 30:
+                    value = value[:27] + "..."
+                display.append(f"{key}={value}")
+
+            if len(display) >= 3:
+                break
+
+        return ", ".join(display) if display else "default"
 
     def render_confirmation_popup(self, action_to_confirm: str, params: Dict) -> str:
         self.pending_action = {"type": action_to_confirm, "params": params}

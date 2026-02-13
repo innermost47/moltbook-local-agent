@@ -95,64 +95,44 @@ class MailContextManager:
 
     def get_focus_view(self, item_id: str) -> str:
         try:
-            params = Namespace(limit=20)
-            result = self.handler.handle_get_messages(params)
+            params = Namespace(uid=item_id)
+            result = self.handler.handle_email_read(params)
 
             if not result.get("success"):
-                return f"❌ **ERROR**: Could not fetch messages.\n👉 Use `refresh_home` to return."
-
-            messages = result.get("data", [])
-            msg = next((m for m in messages if str(m["uid"]) == str(item_id)), None)
-
-            if not msg:
                 return f"""
 ## ❌ EMAIL NOT FOUND
-
-**UID**: `{item_id}` not found in recent messages.
+**UID**: `{item_id}` 
+{result.get('error', 'The email could not be retrieved.')}
 
 👉 Use `email_get_messages` to refresh inbox.
 🏠 Use `refresh_home` to return to dashboard.
 """
 
+            msg_content = result.get("data")
+
             return f"""
 ## 🎯 FOCUSED: EMAIL VIEW
 
-**UID:** `{msg['uid']}`
-**From:** {msg['from']}
-**Date:** {msg['date']}
-**Subject:** {msg['subject']}
-
----
-
-### 📄 CONTENT
-
-{msg['body']}
+{msg_content}
 
 ---
 
 ### 🛠️ AVAILABLE ACTIONS
 
-👉 `email_send_email(to="{msg['from']}", subject="Re: {msg['subject']}", content="...")`
-   - Reply to this email
+👉 `email_send(to="...", subject="Re: ...", content="...")`
+   - 💡 Reply to this sender.
 
-👉 `email_archive_email(uid="{msg['uid']}")`
-   - Move to archive folder
+👉 `email_archive(uid="{item_id}")`
+   - Move to archive folder.
 
-👉 `email_mark_as_read(uid="{msg['uid']}")`
-   - Mark as read
+👉 `email_mark_read(uid="{item_id}")`
+   - Mark as seen.
 
 👉 `email_get_messages`
-   - Return to inbox list
+   - 🔙 Return to inbox list.
 
-🏠 `refresh_home` - Return to dashboard
+🏠 `refresh_home` - Return to dashboard.
 """
         except Exception as e:
             log.error(f"Focus view generation failed: {e}")
-            return f"""
-## ❌ ERROR LOADING EMAIL
-
-Could not load email `{item_id}`.
-
-👉 Use `email_get_messages` to refresh.
-🏠 Use `refresh_home` to return.
-"""
+            return f"## ❌ ERROR LOADING EMAIL\n\nCould not load email `{item_id}`."

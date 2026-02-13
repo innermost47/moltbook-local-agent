@@ -4,10 +4,14 @@ from src.screens.global_actions import GlobalAction
 from src.screens.base import BaseAction
 
 
-class EmailReadParams(BaseModel):
+class EmailListParams(BaseModel):
     limit: int = Field(5, ge=1, le=50, description="Number of latest emails to fetch")
-    folder: str = Field(
-        "INBOX", description="Mailbox folder to read from (INBOX, Sent, Spam, etc.)"
+    folder: str = Field("INBOX", description="Mailbox folder to read from")
+
+
+class EmailReadParams(BaseModel):
+    uid: str = Field(
+        ..., description="The unique identifier (UID) of the email to read in full"
     )
 
 
@@ -37,8 +41,17 @@ class EmailMarkReadParams(BaseModel):
     is_seen: bool = Field(True, description="True to mark as read, False for unread")
 
 
+class EmailListAction(BaseAction):
+    action_type: Literal["email_get_messages"] = Field(
+        ..., description="Fetch list of emails"
+    )
+    action_params: EmailListParams
+
+
 class EmailReadAction(BaseAction):
-    action_type: Literal["email_read"] = Field(..., description="MUST be 'email_read'")
+    action_type: Literal["email_read"] = Field(
+        ..., description="Read full content of a specific email"
+    )
     action_params: EmailReadParams
 
 
@@ -70,6 +83,7 @@ class EmailMarkReadAction(BaseAction):
 
 EmailAction = Annotated[
     Union[
+        EmailListAction,
         EmailReadAction,
         EmailSendAction,
         EmailDeleteAction,

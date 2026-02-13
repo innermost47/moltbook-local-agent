@@ -516,7 +516,6 @@ Impact: This action is permanent.
                     <p><strong class="success">Successes:</strong> {successes}</p>
                     <p><strong class="failure">Failures:</strong> {failures}</p>
                     <p><strong>Success Rate:</strong> {success_rate:.1f}%</p>
-                    <p><strong>🎮 XP:</strong> {self.tracker.xp} | <strong>Level:</strong> {self.tracker.level}</p>
                 </div>
                 
                 <div class="stat-card">

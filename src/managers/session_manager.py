@@ -93,6 +93,7 @@ class SessionManager:
             self.tracker.log_event(
                 domain=self.current_domain,
                 action_type=getattr(action_object, "action_type", "unknown"),
+                params=getattr(action_object, "action_params", {}),
                 result=result,
             )
 
@@ -196,6 +197,11 @@ Be specific and actionable. Focus on behavior patterns, not individual actions.
         current_signature = self._get_action_signature(a_type, params)
         signature_count = 0
 
+        log.warning(f"🔍 LOOP DEBUG - Current signature: {current_signature}")
+        log.warning(
+            f"🔍 LOOP DEBUG - Last 3 events: {[self._get_action_signature(e.get('action', ''), e.get('params', {})) for e in last_events]}"
+        )
+
         for event in reversed(last_events):
             event_signature = self._get_action_signature(
                 event.get("action", ""), event.get("params", {})
@@ -205,7 +211,10 @@ Be specific and actionable. Focus on behavior patterns, not individual actions.
             else:
                 break
 
+        log.warning(f"🔍 LOOP DEBUG - Signature count: {signature_count}")
+
         if signature_count >= 2:
+            log.warning(f"🚨 LOOP DETECTED! Count: {signature_count}")
             if a_type == "navigate_to_mode":
                 target_mode = (
                     params.get("chosen_mode") or params.get("mode") or "UNKNOWN"

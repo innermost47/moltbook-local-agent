@@ -119,6 +119,7 @@ class OllamaProvider:
     ) -> Dict:
         now = datetime.now().strftime("%Y-%m-%d %H:%M")
         is_ok = True
+        assistant_msg = None
         if not self.conversation_history:
             system_content = self.get_system_prompt()
 

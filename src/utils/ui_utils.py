@@ -102,11 +102,8 @@ class UIUtils:
         body_with_location = f"""
 
 🚨 🚨 🚨 **CURRENT LOCATION** 🚨 🚨 🚨
-
 📍 **YOU ARE IN: {current_domain.upper()}**
-
 {f"⛔ DO NOT execute `navigate_to_mode('{current_domain.upper()}')` - you are ALREADY HERE" if current_domain.lower() != 'home' else ""}
-
 {'━' * 70}
 
 {content}

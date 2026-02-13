@@ -131,7 +131,7 @@ class HomeManager:
             f"XP: [{xp_bar}] {current_xp}/{xp_needed} ({progress_pct:.1f}%)",
             f"Total XP Earned: {total_xp:,}",
             badge_display if badge_display else "",
-            "",
+            "\n",
             "💡 **How to Earn XP:**",
             "• Major actions: Write blog (25 XP), Complete research (40 XP)",
             "• Medium actions: Send email (10 XP), Create post (15 XP), Share link (12 XP)",

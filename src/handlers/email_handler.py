@@ -101,7 +101,9 @@ class EmailHandler(BaseHandler):
             messages = []
 
             try:
-                for msg in self.mailbox.fetch(limit=limit, reverse=True):
+                for msg in self.mailbox.fetch(
+                    criteria="UNSEEN", limit=limit, reverse=True
+                ):
                     body = msg.text or ""
 
                     if not body.strip() and msg.html:

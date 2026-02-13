@@ -4,18 +4,23 @@ from src.utils.exceptions import AgentException, get_exception_feedback
 
 
 class BaseHandler(ABC):
-
     def format_success(
-        self, action_name: str, result_data: str, anti_loop_hint: str = None
+        self,
+        action_name: str,
+        result_data: str,
+        anti_loop_hint: str = None,
+        xp_gained: int = 0,
     ) -> Dict:
         if anti_loop_hint is None:
             anti_loop_hint = f"Action '{action_name}' just completed successfully. Do not repeat immediately unless you have NEW data."
 
+        xp_message = ""
+        if xp_gained > 0:
+            xp_message = f"\n\n✨ **+{xp_gained} XP** earned! Keep building your digital presence.\n"
+
         formatted_message = f"""
 ✅ **ACTION JUST EXECUTED**: `{action_name}`
-
-📦 **RESULT**: {result_data}
-
+📦 **RESULT**: {result_data}{xp_message}
 🚨 **CRITICAL - READ THIS**: {anti_loop_hint}
 
 ⛔ **DO NOT EXECUTE `{action_name}` AGAIN** ⛔
@@ -25,7 +30,6 @@ Choose a DIFFERENT action from the list below or use `refresh_home`.
         return {
             "success": True,
             "data": formatted_message.strip(),
-            "action_executed": action_name,
         }
 
     def format_error(self, action_name: str, error: Exception) -> Dict:

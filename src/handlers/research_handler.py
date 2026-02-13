@@ -9,6 +9,7 @@ from src.utils.exceptions import (
     FormattingError,
     ResourceNotFoundError,
 )
+from src.managers.progression_system import ProgressionSystem
 
 
 class ResearchHandler(BaseHandler):
@@ -102,6 +103,7 @@ class ResearchHandler(BaseHandler):
                             action_name="wiki_search",
                             result_data=result_text,
                             anti_loop_hint=anti_loop,
+                            xp_gained=ProgressionSystem.get_xp_value("wiki_search"),
                         )
             except Exception as cache_err:
                 log.warning(
@@ -123,6 +125,7 @@ class ResearchHandler(BaseHandler):
                 action_name="wiki_search",
                 result_data=result_text,
                 anti_loop_hint=anti_loop,
+                xp_gained=ProgressionSystem.get_xp_value("wiki_search"),
             )
             result["results"] = results
             result["source"] = "live"
@@ -169,6 +172,7 @@ class ResearchHandler(BaseHandler):
                         action_name="wiki_read",
                         result_data=result_text,
                         anti_loop_hint=anti_loop,
+                        xp_gained=ProgressionSystem.get_xp_value("wiki_read"),
                     )
                     result["title"] = topic
                     result["content"] = content
@@ -213,6 +217,7 @@ class ResearchHandler(BaseHandler):
                     action_name="wiki_read",
                     result_data=result_text,
                     anti_loop_hint=anti_loop,
+                    xp_gained=ProgressionSystem.get_xp_value("wiki_read"),
                 )
                 result["title"] = page.title
                 result["content"] = content
@@ -305,6 +310,7 @@ class ResearchHandler(BaseHandler):
                 action_name="research_complete",
                 result_data=result_text,
                 anti_loop_hint=anti_loop,
+                xp_gained=ProgressionSystem.get_xp_value("research_complete"),
             )
             result["pin_data"] = {f"RESEARCH_{int(time.time())}": summary_text}
 
@@ -365,6 +371,7 @@ class ResearchHandler(BaseHandler):
                     action_name="research_query_cache",
                     result_data=result_text,
                     anti_loop_hint=anti_loop,
+                    xp_gained=ProgressionSystem.get_xp_value("research_query_cache"),
                 )
 
             except Exception as e:

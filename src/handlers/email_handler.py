@@ -12,6 +12,7 @@ from src.utils.exceptions import (
     ResourceNotFoundError,
     AccessDeniedError,
 )
+from src.managers.progression_system import ProgressionSystem
 
 
 class EmailHandler(BaseHandler):
@@ -81,6 +82,7 @@ class EmailHandler(BaseHandler):
                 action_name="email_read",
                 result_data=result_text,
                 anti_loop_hint=f"Email {uid} READ. You have the full content. Respond or archive it now.",
+                xp_gained=ProgressionSystem.get_xp_value("email_read"),
             )
 
         except Exception as e:
@@ -123,6 +125,7 @@ class EmailHandler(BaseHandler):
                         action_name="email_get_messages",
                         result_data=result_text,
                         anti_loop_hint=anti_loop,
+                        xp_gained=ProgressionSystem.get_xp_value("email_get_messages"),
                     )
 
                 result_text = f"Retrieved {len(messages)} email(s) from inbox."
@@ -132,6 +135,7 @@ class EmailHandler(BaseHandler):
                     action_name="email_get_messages",
                     result_data=result_text,
                     anti_loop_hint=anti_loop,
+                    xp_gained=ProgressionSystem.get_xp_value("email_get_messages"),
                 )
 
             except TimeoutError:
@@ -166,7 +170,7 @@ class EmailHandler(BaseHandler):
             log.warning(f"⚠️ HTML cleaning failed: {e}")
             return "[HTML content - parsing failed]"
 
-    def handle_send_email(self, params: Any) -> Dict:
+    def handle_email_send(self, params: Any) -> Dict:
         try:
             if not hasattr(params, "to") or not params.to:
                 raise FormattingError(
@@ -183,6 +187,7 @@ class EmailHandler(BaseHandler):
             recipient = params.to
             subject = getattr(params, "subject", "Automated Update")
             content = params.content
+            reply_to_uid = getattr(params, "reply_to_uid", None)
 
             if "@" not in recipient or "." not in recipient.split("@")[-1]:
                 raise FormattingError(
@@ -210,15 +215,32 @@ class EmailHandler(BaseHandler):
 
                 log.success(f"📤 Email dispatched to {recipient}")
 
-                result_text = (
-                    f"Email sent successfully to {recipient}.\nSubject: {subject}"
-                )
+                auto_mark_message = ""
+                if reply_to_uid:
+                    try:
+                        self.mailbox.flag(reply_to_uid, MailMessageFlags.SEEN, True)
+                        log.info(
+                            f"✓ Original email {reply_to_uid} automatically marked as read"
+                        )
+                        auto_mark_message = (
+                            f"\n✓ Original email (UID {reply_to_uid}) marked as read."
+                        )
+                    except Exception as mark_error:
+                        log.warning(
+                            f"⚠️ Could not auto-mark email as read: {mark_error}"
+                        )
+                        auto_mark_message = (
+                            f"\n⚠️ Note: Could not auto-mark original email as read."
+                        )
+
+                result_text = f"Email sent successfully to {recipient}.\nSubject: {subject}{auto_mark_message}"
                 anti_loop = f"Email to {recipient} SENT. Do NOT send the same email again. Move to another task."
 
                 return self.format_success(
                     action_name="email_send",
                     result_data=result_text,
                     anti_loop_hint=anti_loop,
+                    xp_gained=ProgressionSystem.get_xp_value("email_send"),
                 )
 
             except smtplib.SMTPAuthenticationError:
@@ -354,6 +376,7 @@ class EmailHandler(BaseHandler):
                     action_name="email_mark_as_read",
                     result_data=result_text,
                     anti_loop_hint=anti_loop,
+                    xp_gained=ProgressionSystem.get_xp_value("email_mark_as_read"),
                 )
 
             except Exception as e:
@@ -396,6 +419,7 @@ class EmailHandler(BaseHandler):
                     action_name="email_archive",
                     result_data=result_text,
                     anti_loop_hint=anti_loop,
+                    xp_gained=ProgressionSystem.get_xp_value("email_archive"),
                 )
 
             except Exception as e:
@@ -441,6 +465,7 @@ class EmailHandler(BaseHandler):
                     action_name="email_delete",
                     result_data=result_text,
                     anti_loop_hint=anti_loop,
+                    xp_gained=ProgressionSystem.get_xp_value("email_delete"),
                 )
 
             except Exception as e:
@@ -506,6 +531,7 @@ class EmailHandler(BaseHandler):
                         action_name="email_search",
                         result_data=result_text,
                         anti_loop_hint=anti_loop,
+                        xp_gained=ProgressionSystem.get_xp_value("email_search"),
                     )
 
                 result_text = f"Found {len(results)} email(s) matching '{query}'."
@@ -515,6 +541,7 @@ class EmailHandler(BaseHandler):
                     action_name="email_search",
                     result_data=result_text,
                     anti_loop_hint=anti_loop,
+                    xp_gained=ProgressionSystem.get_xp_value("email_search"),
                 )
 
             except Exception as e:

@@ -10,6 +10,7 @@ from src.utils.exceptions import (
     FormattingError,
 )
 from src.handlers.base_handler import BaseHandler
+from src.managers.progression_system import ProgressionSystem
 
 
 class MemoryHandler(BaseHandler):
@@ -241,6 +242,7 @@ class MemoryHandler(BaseHandler):
                 action_name="memory_store",
                 result_data=result_text,
                 anti_loop_hint=anti_loop,
+                xp_gained=ProgressionSystem.get_xp_value("memory_store"),
             )
 
         except Exception as e:
@@ -296,6 +298,7 @@ class MemoryHandler(BaseHandler):
                 action_name="memory_retrieve",
                 result_data=result_text,
                 anti_loop_hint=anti_loop,
+                xp_gained=ProgressionSystem.get_xp_value("memory_retrieve"),
             )
 
         except Exception as e:

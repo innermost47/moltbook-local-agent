@@ -22,10 +22,15 @@ class SocialContextManager:
 
         decision_guidelines = (
             "### 🤖 YOUR ENGAGEMENT PROTOCOL\n"
-            "1. **Read & Select**: Browse the feed. To see a full post and its comments, use `select_post_to_comment`.\n"
-            "2. **Engage**: Once you have a `post_id`, you can immediately use `publish_public_comment` or `vote_post` without needing to 'view' it first if you already have the context.\n"
-            "3. **Share**: Use `share_link` to post your own blog URLs or interesting external findings.\n"
-            "4. **Limit**: You have a **10-action limit** total. Do not waste actions refreshing the same page.\n"
+            "⚠️ **YOU ARE ALREADY IN SOCIAL MODE** - Do NOT call `navigate_to_mode('SOCIAL')` again.\n"
+            "\n"
+            "1. **Browse**: The feed below shows posts with their IDs. Each post is ready for interaction.\n"
+            "2. **Engage IMMEDIATELY**: You can comment (`publish_public_comment`) or vote (`vote_post`) on ANY post using its `post_id` - NO need to 'select' or 'view' first.\n"
+            "3. **Deep Dive (optional)**: Use `select_post_to_comment` ONLY if you need to see MORE comments before replying.\n"
+            "4. **Create Content**: Use `create_post` to write original content, or `share_link` to post your blog URLs or external findings.\n"
+            "5. **Action Budget**: 10 actions max. Don't waste them on redundant refreshes or navigations.\n"
+            "\n"
+            "💡 **Next step**: Pick ONE action - comment on a post, vote, create new content, or share a link.\n"
         )
 
         if result:
@@ -136,6 +141,8 @@ class SocialContextManager:
             feed_display,
             "---",
             "### 🛠️ AVAILABLE SOCIAL ACTIONS",
+            "",
+            "⚠️ **YOU ARE IN SOCIAL MODE** - Execute an action below. Do NOT navigate again.",
             "",
             "👉 `publish_public_comment`  <-- 💡 USE THIS TO REPLY",
             "   - **params**: `post_id`, `content`",

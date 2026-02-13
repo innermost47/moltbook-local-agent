@@ -12,6 +12,7 @@ from src.utils.exceptions import (
     APICommunicationError,
     FormattingError,
 )
+from src.managers.progression_system import ProgressionSystem
 
 
 class BlogHandler(BaseHandler):
@@ -115,6 +116,7 @@ class BlogHandler(BaseHandler):
                 action_name="write_blog_article",
                 result_data=result_text,
                 anti_loop_hint=anti_loop,
+                xp_gained=ProgressionSystem.get_xp_value("write_blog_article"),
             )
 
         except Exception as e:
@@ -152,6 +154,7 @@ class BlogHandler(BaseHandler):
                 action_name="share_created_blog_post_url",
                 result_data=result_text,
                 anti_loop_hint=anti_loop,
+                xp_gained=ProgressionSystem.get_xp_value("share_link"),
             )
 
         except Exception as e:
@@ -196,6 +199,9 @@ class BlogHandler(BaseHandler):
                     action_name="review_comment_key_requests",
                     result_data=result_text,
                     anti_loop_hint=anti_loop,
+                    xp_gained=ProgressionSystem.get_xp_value(
+                        "review_comment_key_requests"
+                    ),
                 )
 
             details = "\n".join(
@@ -209,6 +215,7 @@ class BlogHandler(BaseHandler):
                 action_name="review_comment_key_requests",
                 result_data=result_text,
                 anti_loop_hint=anti_loop,
+                xp_gained=ProgressionSystem.get_xp_value("review_comment_key_requests"),
             )
 
         except requests.exceptions.Timeout:
@@ -239,6 +246,7 @@ class BlogHandler(BaseHandler):
                 action_name="approve_comment_key",
                 result_data=result_text,
                 anti_loop_hint=anti_loop,
+                xp_gained=ProgressionSystem.get_xp_value("approve_comment_key"),
             )
 
         except Exception as e:
@@ -261,6 +269,7 @@ class BlogHandler(BaseHandler):
                 action_name="reject_comment_key",
                 result_data=result_text,
                 anti_loop_hint=anti_loop,
+                xp_gained=ProgressionSystem.get_xp_value("reject_comment_key"),
             )
 
         except Exception as e:
@@ -317,6 +326,7 @@ class BlogHandler(BaseHandler):
                     action_name="review_pending_comments",
                     result_data=result_text,
                     anti_loop_hint=anti_loop,
+                    xp_gained=ProgressionSystem.get_xp_value("review_pending_comments"),
                 )
 
             list_txt = "\n".join(
@@ -333,6 +343,7 @@ class BlogHandler(BaseHandler):
                 action_name="review_pending_comments",
                 result_data=result_text,
                 anti_loop_hint=anti_loop,
+                xp_gained=ProgressionSystem.get_xp_value("review_pending_comments"),
             )
 
         except Exception as e:
@@ -357,6 +368,7 @@ class BlogHandler(BaseHandler):
                 action_name="approve_comment",
                 result_data=result_text,
                 anti_loop_hint=anti_loop,
+                xp_gained=ProgressionSystem.get_xp_value("approve_comment"),
             )
 
         except Exception as e:
@@ -407,6 +419,7 @@ class BlogHandler(BaseHandler):
                     action_name="get_latest_articles",
                     result_data=result_text,
                     anti_loop_hint=anti_loop,
+                    xp_gained=ProgressionSystem.get_xp_value("get_latest_articles"),
                 )
 
             formatted = "\n".join([f"• {a['title']} (ID: {a['id']})" for a in articles])
@@ -418,6 +431,7 @@ class BlogHandler(BaseHandler):
                 action_name="get_latest_articles",
                 result_data=result_text,
                 anti_loop_hint=anti_loop,
+                xp_gained=ProgressionSystem.get_xp_value("get_latest_articles"),
             )
 
         except Exception as e:

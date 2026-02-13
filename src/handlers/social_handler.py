@@ -9,6 +9,7 @@ from src.utils.exceptions import (
     ResourceNotFoundError,
     RateLimitError,
 )
+from src.managers.progression_system import ProgressionSystem
 
 
 class SocialHandler(BaseHandler):
@@ -267,6 +268,7 @@ class SocialHandler(BaseHandler):
                 action_name="social_register",
                 result_data=result_text,
                 anti_loop_hint=anti_loop,
+                xp_gained=ProgressionSystem.get_xp_value("social_register"),
             )
 
         except Exception as e:
@@ -287,6 +289,7 @@ class SocialHandler(BaseHandler):
                 action_name="social_get_me",
                 result_data=result_text,
                 anti_loop_hint=anti_loop,
+                xp_gained=0,
             )
 
         except Exception as e:
@@ -315,6 +318,7 @@ class SocialHandler(BaseHandler):
                 action_name="social_update_profile",
                 result_data=result_text,
                 anti_loop_hint=anti_loop,
+                xp_gained=ProgressionSystem.get_xp_value("social_update_profile"),
             )
 
         except Exception as e:
@@ -331,6 +335,7 @@ class SocialHandler(BaseHandler):
                 action_name="social_claim_status",
                 result_data=result_text,
                 anti_loop_hint=anti_loop,
+                xp_gained=ProgressionSystem.get_xp_value("social_claim_status"),
             )
 
         except Exception as e:
@@ -357,6 +362,7 @@ class SocialHandler(BaseHandler):
                 action_name="social_view_profile",
                 result_data=result_text,
                 anti_loop_hint=anti_loop,
+                xp_gained=0,
             )
 
         except Exception as e:
@@ -422,6 +428,7 @@ class SocialHandler(BaseHandler):
                 action_name="social_create_post",
                 result_data=result_text,
                 anti_loop_hint=anti_loop,
+                xp_gained=ProgressionSystem.get_xp_value("create_post"),
             )
 
         except Exception as e:
@@ -466,6 +473,7 @@ class SocialHandler(BaseHandler):
                 action_name="social_share_link",
                 result_data=result_text,
                 anti_loop_hint=anti_loop,
+                xp_gained=ProgressionSystem.get_xp_value("share_link"),
             )
 
         except Exception as e:
@@ -498,6 +506,7 @@ class SocialHandler(BaseHandler):
                 action_name="social_get_posts",
                 result_data=result_text,
                 anti_loop_hint=anti_loop,
+                xp_gained=0,
             )
 
         except Exception as e:
@@ -523,6 +532,7 @@ class SocialHandler(BaseHandler):
                 action_name="social_get_single_post",
                 result_data=result_text,
                 anti_loop_hint=anti_loop,
+                xp_gained=0,
             )
 
         except Exception as e:
@@ -545,6 +555,7 @@ class SocialHandler(BaseHandler):
                 action_name="social_delete_post",
                 result_data=result_text,
                 anti_loop_hint=anti_loop,
+                xp_gained=ProgressionSystem.get_xp_value("delete_post"),
             )
 
         except Exception as e:
@@ -590,6 +601,7 @@ class SocialHandler(BaseHandler):
                 action_name="social_comment",
                 result_data=result_text,
                 anti_loop_hint=anti_loop,
+                xp_gained=ProgressionSystem.get_xp_value("publish_public_comment"),
             )
 
         except Exception as e:
@@ -623,6 +635,7 @@ class SocialHandler(BaseHandler):
                 action_name="social_get_comments",
                 result_data=result_text,
                 anti_loop_hint=anti_loop,
+                xp_gained=0,
             )
 
         except Exception as e:
@@ -662,6 +675,7 @@ class SocialHandler(BaseHandler):
                 action_name="social_vote",
                 result_data=result_text,
                 anti_loop_hint=anti_loop,
+                xp_gained=ProgressionSystem.get_xp_value("vote_post"),
             )
 
         except Exception as e:
@@ -713,6 +727,7 @@ class SocialHandler(BaseHandler):
                 action_name="social_create_submolt",
                 result_data=result_text,
                 anti_loop_hint=anti_loop,
+                xp_gained=ProgressionSystem.get_xp_value("create_submolt"),
             )
 
         except Exception as e:
@@ -730,6 +745,7 @@ class SocialHandler(BaseHandler):
                 action_name="social_list_submolts",
                 result_data=result_text,
                 anti_loop_hint=anti_loop,
+                xp_gained=0,
             )
 
         except Exception as e:
@@ -755,8 +771,8 @@ class SocialHandler(BaseHandler):
                 action_name="social_get_submolt_info",
                 result_data=result_text,
                 anti_loop_hint=anti_loop,
+                xp_gained=0,
             )
-
         except Exception as e:
             return self.format_error("social_get_submolt_info", e)
 
@@ -787,6 +803,7 @@ class SocialHandler(BaseHandler):
                 action_name="social_subscribe",
                 result_data=result_text,
                 anti_loop_hint=anti_loop,
+                xp_gained=ProgressionSystem.get_xp_value("subscribe_submolt"),
             )
 
         except Exception as e:
@@ -817,6 +834,7 @@ class SocialHandler(BaseHandler):
                 action_name="social_follow_agent",
                 result_data=result_text,
                 anti_loop_hint=anti_loop,
+                xp_gained=ProgressionSystem.get_xp_value("follow_agent"),
             )
 
         except Exception as e:
@@ -849,6 +867,7 @@ class SocialHandler(BaseHandler):
                 action_name="social_get_feed",
                 result_data=result_text,
                 anti_loop_hint=anti_loop,
+                xp_gained=0,
             )
 
         except Exception as e:
@@ -888,6 +907,7 @@ class SocialHandler(BaseHandler):
                 action_name="social_search",
                 result_data=result_text,
                 anti_loop_hint=anti_loop,
+                xp_gained=ProgressionSystem.get_xp_value("social_search"),
             )
 
         except Exception as e:

@@ -105,6 +105,8 @@ class BlogContextManager(BaseContextManager):
             "👉 `write_blog_article`",
             "   - **params**: `title`, `excerpt`, `content` (markdown), `image_prompt`",
             "   - Create a new blog post with AI-generated header image",
+            "   - ⚠️ CRITICAL: Write content DIRECTLY as the article, NOT 'I will write about...'",
+            "   - 💡 **After publishing**: Use `pin_to_workspace` to save the article URL, then navigate to SOCIAL to share it with `share_link`",
             "",
             "👉 `review_pending_comments`",
             "   - Review and moderate pending blog comments",

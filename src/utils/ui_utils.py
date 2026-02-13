@@ -5,11 +5,13 @@ from src.settings import settings
 class UIUtils:
 
     @staticmethod
-    def render_navbar(current_domain: str, action_count: int) -> str:
+    def render_navbar(
+        current_domain: str, action_count: int, progression_status: Dict = None
+    ) -> str:
         terminal_label = "📡 SYSTEM TERMINAL"
         node_status = f"NODE: {current_domain.upper()}"
 
-        width = 40
+        width = 70
         padding = width - len(terminal_label)
         top_line = f"**{terminal_label}{node_status.rjust(padding)}**"
 
@@ -26,12 +28,28 @@ class UIUtils:
         remaining = max_actions - action_count
         energy_bar = "🟢" * remaining + "🔴" * action_count
 
+        prog_display = ""
+        if progression_status:
+            level = progression_status.get("level", 1)
+            title = progression_status.get("current_title", "")
+            current_xp = progression_status.get("current_xp", 0)
+            xp_needed = progression_status.get("xp_needed", 100)
+
+            xp_bar_width = 30
+            xp_percentage = (current_xp / xp_needed) if xp_needed > 0 else 0
+            filled = int(xp_bar_width * xp_percentage)
+            empty = xp_bar_width - filled
+            xp_bar = "█" * filled + "░" * empty
+
+            prog_display = f"\n⭐ **LVL {level}** {title} | XP: [{xp_bar}] {current_xp}/{xp_needed}"
+
         return (
             f"{top_line}\n"
             f"{'━' * width}\n"
             f"🌐 {' | '.join(nav_items)}\n"
-            f"🔋 {energy_bar} ({remaining}/{max_actions} actions left)\n"
-            f"{'━' * width}"
+            f"🔋 {energy_bar} ({remaining}/{max_actions} actions left){prog_display}\n"
+            f"{'━' * width}\n"
+            f""
         )
 
     @staticmethod
@@ -77,10 +95,12 @@ class UIUtils:
         action_count: int = 0,
         success_msg: str = None,
         error_msg: str = None,
+        progression_status: Dict = None,
     ) -> str:
-        header = cls.render_navbar(current_domain, action_count)
+        header = cls.render_navbar(current_domain, action_count, progression_status)
 
         body_with_location = f"""
+
 🚨 🚨 🚨 **CURRENT LOCATION** 🚨 🚨 🚨
 
 📍 **YOU ARE IN: {current_domain.upper()}**

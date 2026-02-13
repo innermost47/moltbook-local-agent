@@ -4,12 +4,21 @@ from src.settings import settings
 
 
 class HomeManager:
-    def __init__(self, mail_ctx, blog_ctx, social_ctx, research_ctx, memory_handler):
+    def __init__(
+        self,
+        mail_ctx,
+        blog_ctx,
+        social_ctx,
+        research_ctx,
+        memory_handler,
+        progression_system,
+    ):
         self.mail = mail_ctx
         self.blog = blog_ctx
         self.social = social_ctx
         self.research = research_ctx
         self.memory = memory_handler
+        self.progression = progression_system
 
     def build_home_screen(self, session_id: int) -> str:
         log.info(f"🏠 Assembling Home Dashboard for Session {session_id}...")
@@ -28,6 +37,9 @@ class HomeManager:
             plan_header = [
                 "⚠️ **MASTER PLAN REQUIRED**: Define your long-term objectives.\n"
             ]
+
+        prog_status = self.progression.get_current_status()
+        progression_block = self._build_progression_block(prog_status)
 
         recent_learnings = self.memory.get_recent_learnings(limit=3)
 
@@ -59,6 +71,8 @@ class HomeManager:
         cached_topics_display = self._build_cached_research_block()
 
         dashboard = ["## 🏠 AGENT HOME DASHBOARD", "\n".join(plan_header), ""]
+        dashboard.append(progression_block)
+        dashboard.append("")
         dashboard.extend(recap_block)
 
         dashboard += [
@@ -85,6 +99,48 @@ class HomeManager:
         ]
 
         return "\n".join(dashboard)
+
+    def _build_progression_block(self, prog_status: dict) -> str:
+        if not prog_status:
+            return ""
+
+        level = prog_status.get("level", 1)
+        current_xp = prog_status.get("current_xp", 0)
+        xp_needed = prog_status.get("xp_needed", 100)
+        total_xp = prog_status.get("total_xp", 0)
+        title = prog_status.get("current_title", "🌱 Digital Seedling")
+        badges = prog_status.get("badges", [])
+        progress_pct = prog_status.get("progress_percentage", 0)
+
+        bar_width = 30
+        filled = int(bar_width * (progress_pct / 100))
+        empty = bar_width - filled
+        xp_bar = "█" * filled + "░" * empty
+
+        badge_display = ""
+        if badges:
+            badge_icons = " ".join([b["icon"] for b in badges[:5]])
+            badge_count = len(badges)
+            badge_display = (
+                f"\n🏆 **Badges Unlocked**: {badge_icons} ({badge_count} total)"
+            )
+
+        progression_block = [
+            "### 🎮 PROGRESSION & ACHIEVEMENTS",
+            f"**Level {level}** - {title}",
+            f"XP: [{xp_bar}] {current_xp}/{xp_needed} ({progress_pct:.1f}%)",
+            f"Total XP Earned: {total_xp:,}",
+            badge_display if badge_display else "",
+            "",
+            "💡 **How to Earn XP:**",
+            "• Major actions: Write blog (25 XP), Complete research (40 XP)",
+            "• Medium actions: Send email (10 XP), Create post (15 XP), Share link (12 XP)",
+            "• Small actions: Comment (8 XP), Store memory (7 XP), Vote (3 XP)",
+            "• Special bonuses: Perfect session (100 XP), Engagement master (50 XP)",
+            f"{'━' * 40}",
+        ]
+
+        return "\n".join([line for line in progression_block if line])
 
     def _build_memory_entries_block(self) -> str:
         try:

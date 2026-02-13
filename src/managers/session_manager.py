@@ -4,6 +4,7 @@ from src.utils import log
 from src.utils.ui_utils import UIUtils
 from src.screens.factory import SchemaFactory
 from src.settings import settings
+from src.managers.progression_system import ProgressionSystem
 
 
 class SessionManager:
@@ -28,6 +29,7 @@ class SessionManager:
         self.current_domain = "home"
         self.tracker = tracker
         self.email_reporter = email_reporter
+        self.progression = ProgressionSystem(settings.DB_PATH)
 
     def start_session(self):
         self.session_id = self.home.memory.create_session()
@@ -94,6 +96,17 @@ class SessionManager:
                 result=result,
             )
 
+            if result.get("success"):
+                progress_update = self.progression.add_xp(
+                    action_type=getattr(action_object, "action_type", "unknown"),
+                    session_id=self.session_id,
+                )
+
+                if progress_update.get("leveled_up"):
+                    self.level_up_message = progress_update
+                else:
+                    self.level_up_message = None
+
             if self.current_domain == "finish":
                 break
 
@@ -137,7 +150,7 @@ class SessionManager:
         )
 
         prompt = f"""
-Analyze this AI agent session and provide a concise reflection.
+Analyze your session and provide a concise reflection.
 
 SESSION STATISTICS:
 - Total actions: {len(self.tracker.events)}
@@ -180,10 +193,9 @@ Be specific and actionable. Focus on behavior patterns, not individual actions.
 
         last_events = self.tracker.events[-3:]
         loop_warning = ""
-
         current_signature = self._get_action_signature(a_type, params)
-
         signature_count = 0
+
         for event in reversed(last_events):
             event_signature = self._get_action_signature(
                 event.get("action", ""), event.get("params", {})
@@ -194,10 +206,43 @@ Be specific and actionable. Focus on behavior patterns, not individual actions.
                 break
 
         if signature_count >= 2:
-            loop_warning = f"""
+            if a_type == "navigate_to_mode":
+                target_mode = (
+                    params.get("chosen_mode") or params.get("mode") or "UNKNOWN"
+                ).upper()
+
+                loop_warning = f"""
+🔴 🔴 🔴 **CRITICAL NAVIGATION LOOP DETECTED** 🔴 🔴 🔴
+
+⚠️ You called `navigate_to_mode('{target_mode}')` **{signature_count + 1} times in a row!**
+
+🚨 **YOU ARE STUCK IN A NAVIGATION LOOP - THIS IS A CRITICAL ERROR**
+
+**What you're doing WRONG:**
+- You keep calling `navigate_to_mode('{target_mode}')` when you're ALREADY in {target_mode} mode
+- You're wasting precious action budget ({signature_count + 1} actions wasted!)
+- The screen clearly shows: "YOU ARE IN: {target_mode}" and "DO NOT navigate again"
+
+**What to do NOW:**
+1. 🛑 STOP navigating immediately
+2. 📖 READ the "AVAILABLE ACTIONS" section below
+3. ✅ EXECUTE one of the available actions:
+   - If you have a blog URL to share: use `share_link`
+   - If you want to comment: use `publish_public_comment`
+   - If you want to create content: use `create_post`
+   - If you want to vote: use `vote_post`
+4. 🏠 If nothing to do here, use `refresh_home` to return to dashboard
+
+⛔ **DO NOT call `navigate_to_mode('{target_mode}')` again - YOU ARE ALREADY THERE!** ⛔
+
+{'━' * 70}
+
+"""
+            else:
+                loop_warning = f"""
 🔴 🔴 🔴 **LOOP DETECTED** 🔴 🔴 🔴
 
-⚠️ You just executed `{a_type}` with the SAME parameters **{signature_count} times in a row!**
+⚠️ You just executed `{a_type}` with the SAME parameters **{signature_count + 1} times in a row!**
 
 🚨 **CRITICAL**: You are stuck in a repetitive loop. STOP immediately.
 
@@ -215,6 +260,40 @@ Be specific and actionable. Focus on behavior patterns, not individual actions.
 {'━' * 70}
 
 """
+
+        level_up_celebration = ""
+        if (
+            hasattr(self, "level_up_message")
+            and self.level_up_message
+            and self.level_up_message.get("leveled_up")
+        ):
+            lum = self.level_up_message
+            level = lum.get("current_level", 0)
+            title = lum.get("current_title", "")
+            xp_gained = lum.get("xp_gained", 0)
+            rewards_text = ""
+
+            for reward in lum.get("rewards", []):
+                if reward["type"] == "title":
+                    rewards_text += f"\n🎭 **NEW TITLE UNLOCKED**: {reward['title']}\n   _{reward['description']}_\n"
+
+            level_up_celebration = f"""
+    {'🎊' * 35}
+
+    🌟 ✨ **LEVEL UP!** ✨ 🌟
+
+    You have ascended to **Level {level}**!
+    {title}
+
+    💎 **+{xp_gained} XP** gained this action
+
+    {rewards_text}
+    The quantum frequencies resonate with your ascension...
+
+    {'🎊' * 35}
+
+    """
+            self.level_up_message = None
 
         if result.get("success") and "navigate_to" in result:
             if "pin_data" in result:
@@ -267,10 +346,15 @@ Be specific and actionable. Focus on behavior patterns, not individual actions.
             else:
                 raw_body = self.format_fallback_context(a_type, result)
 
+        if level_up_celebration:
+            raw_body = f"{level_up_celebration}\n{raw_body}"
+
         if loop_warning:
             raw_body = f"{loop_warning}\n{raw_body}"
 
         workspace_header = UIUtils.render_workspace(self.workspace_data)
+
+        progression_status = self.progression.get_current_status()
 
         return UIUtils.layout(
             content=f"{workspace_header}\n{raw_body}",
@@ -278,12 +362,19 @@ Be specific and actionable. Focus on behavior patterns, not individual actions.
             action_count=settings.MAX_ACTIONS_PER_SESSION - self.actions_remaining,
             success_msg=result.get("data") if result.get("success") else None,
             error_msg=result.get("error") if not result.get("success") else None,
+            progression_status=progression_status,
         )
 
     def _get_action_signature(self, action: str, params: dict) -> str:
+        if action == "navigate_to_mode":
+            target_mode = (
+                (params.get("chosen_mode") or params.get("mode") or "unknown")
+                .lower()
+                .strip()
+            )
+            return f"navigate_to_mode:{target_mode}"
+
         key_params = [
-            "chosen_mode",
-            "mode",
             "query",
             "page_title",
             "post_id",

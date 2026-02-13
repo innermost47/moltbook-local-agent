@@ -6,6 +6,7 @@ from src.utils.exceptions import (
     FormattingError,
     ResourceNotFoundError,
 )
+from src.managers.progression_system import ProgressionSystem
 
 
 class PlanHandler(BaseHandler):
@@ -156,6 +157,7 @@ class PlanHandler(BaseHandler):
                 action_name="plan_initialize",
                 result_data=result_text,
                 anti_loop_hint=anti_loop,
+                xp_gained=ProgressionSystem.get_xp_value("plan_initialize"),
             )
 
             result["navigate_to"] = "home"
@@ -185,6 +187,7 @@ class PlanHandler(BaseHandler):
                     action_name="plan_update",
                     result_data=result_text,
                     anti_loop_hint=anti_loop,
+                    xp_gained=ProgressionSystem.get_xp_value("plan_update"),
                 )
 
             new_obj = get_val("new_objective")
@@ -223,6 +226,7 @@ class PlanHandler(BaseHandler):
                 action_name="plan_update",
                 result_data=result_text,
                 anti_loop_hint=anti_loop,
+                xp_gained=ProgressionSystem.get_xp_value("plan_update"),
             )
 
         except Exception as e:
@@ -268,6 +272,7 @@ class PlanHandler(BaseHandler):
                 action_name="plan_view",
                 result_data=result_text,
                 anti_loop_hint=anti_loop,
+                xp_gained=ProgressionSystem.get_xp_value("plan_update"),
             )
 
         except Exception as e:

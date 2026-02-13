@@ -1,24 +1,26 @@
-import sys
-import traceback
 from argparse import ArgumentParser
-from src.utils import log
-from src.utils.email_reporter import EmailReporter
-from src.providers.ollama_provider import OllamaProvider
 from src.dispatchers.action_dispatcher import ActionDispatcher
-from src.managers.social_context_manager import SocialContextManager
-from src.managers.mail_context_manager import MailContextManager
 from src.managers.blog_context_manager import BlogContextManager
-from src.managers.research_context_manager import ResearchContextManager
-from src.managers.memory_context_manager import MemoryContextManager
 from src.managers.home_manager import HomeManager
+from src.managers.mail_context_manager import MailContextManager
+from src.managers.memory_context_manager import MemoryContextManager
+from src.managers.progression_system import ProgressionSystem
+from src.managers.research_context_manager import ResearchContextManager
 from src.managers.session_manager import SessionManager
 from src.managers.session_tracker import SessionTracker
-from src.tests.research_tests import ResearchTestSuite
-from src.tests.memory_tests import MemoryTestSuite
+from src.managers.social_context_manager import SocialContextManager
+from src.providers.ollama_provider import OllamaProvider
+from src.settings import settings
 from src.tests.global_tests import GlobalTestSuite
-from src.tests.plan_tests import PlanTestSuite
-from src.tests.social_tests import SocialTestSuite
+from src.tests.memory_tests import MemoryTestSuite
 from src.tests.moltbook_tests import MoltbookLiveTester
+from src.tests.plan_tests import PlanTestSuite
+from src.tests.research_tests import ResearchTestSuite
+from src.tests.social_tests import SocialTestSuite
+from src.utils import log
+from src.utils.email_reporter import EmailReporter
+import sys
+import traceback
 
 
 def bootstrap(test_mode: bool = False):
@@ -29,6 +31,8 @@ def bootstrap(test_mode: bool = False):
     email_reporter = EmailReporter()
 
     dispatcher = ActionDispatcher(test_mode=test_mode)
+
+    progression_system = ProgressionSystem(settings.DB_PATH)
 
     social_ctx = SocialContextManager(dispatcher.social_handler)
     mail_ctx = MailContextManager(dispatcher.email_handler)
@@ -42,6 +46,7 @@ def bootstrap(test_mode: bool = False):
         social_ctx=social_ctx,
         research_ctx=research_ctx,
         memory_handler=dispatcher.memory_handler,
+        progression_system=progression_system,
     )
 
     managers_map = {

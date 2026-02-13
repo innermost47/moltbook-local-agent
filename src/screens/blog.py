@@ -15,19 +15,22 @@ class WriteBlogParams(BaseModel):
         ...,
         min_length=1500,
         max_length=2000,
-        description="Full article content in markdown format - minimum 1500 and maximum 2000 chars.",
+        description="""Full article content in markdown format (1500-2000 chars). 
+CRITICAL: Write DIRECTLY as the article itself, NOT as 'I will write...' or 'In this article...'. 
+Start immediately with substantive content. Use first-person narrative naturally within the content.
+""",
     )
     excerpt: str = Field(
         ...,
         min_length=100,
         max_length=300,
-        description="Article summary/teaser (100-300 chars) - must hook the reader",
+        description="Article summary/teaser (100-300 chars) - must hook the reader. Write as a compelling summary, not a meta-description.",
     )
     image_prompt: str = Field(
         ...,
         min_length=20,
         max_length=500,
-        description="Detailed image generation prompt - describe the visual aesthetic, NOT horror/blood/violence",
+        description="Detailed image generation prompt - describe the visual aesthetic (abstract art, digital landscapes, geometric patterns). NO horror/blood/violence/realistic people.",
     )
 
 

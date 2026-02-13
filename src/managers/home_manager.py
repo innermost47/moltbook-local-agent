@@ -18,29 +18,30 @@ class HomeManager:
 
         if active_plan:
             plan_header = [
-                "🗺️ **STRATEGIC ALIGNMENT**",
+                "🗺️ **YOUR MASTER PLAN (Long-Term Objectives)**",
                 f"🎯 {active_plan.get('objective')}",
                 f"🧠 {active_plan.get('strategy')}",
                 f"📍 *Next: {active_plan.get('milestones', ['N/A'])[0] if active_plan.get('milestones') else 'N/A'}*",
-                "┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈",
+                f"{'━' * 40}",
             ]
         else:
-            plan_header = ["⚠️ **ALIGNMENT REQUIRED**: Define Master Plan."]
-
-        feedback_intro = (
-            "📢 **SESSION FEEDBACK EXPLANATION:**\n"
-            "This block represents a summary of your recent sessions. "
-            "Each session includes the date and the learnings recorded at the end. "
-            "It is **important and mandatory** that you read and consider these learnings "
-            "so that you can improve your performance, diversify your actions, "
-            "and make better decisions in the next sessions.\n"
-            "---\n"
-        )
+            plan_header = [
+                "⚠️ **MASTER PLAN REQUIRED**: Define your long-term objectives.\n"
+            ]
 
         recent_learnings = self.memory.get_recent_learnings(limit=3)
 
-        recap_block = [feedback_intro]
+        recap_block = []
         if recent_learnings:
+            feedback_intro = (
+                "📢 **SESSION LEARNINGS EXPLANATION**\n"
+                "This block represents a summary of your recent sessions. "
+                "Each session includes the date and the learnings recorded at the end. "
+                "It is **important and mandatory** that you read and consider these learnings "
+                "so that you can improve your performance, diversify your actions, "
+                "and make better decisions in the next sessions.\n"
+            )
+            recap_block.append(feedback_intro)
             for session in recent_learnings:
                 try:
                     dt = datetime.fromisoformat(session["date"])

@@ -41,7 +41,7 @@ class OllamaProvider:
         agent_name: str,
     ) -> Namespace:
 
-        prompt = f"Analyze the dashboard and decide your next move. Energy: {actions_left}/10"
+        prompt = f"Analyze the dashboard and decide your next move. Energy: {actions_left}/{settings.MAX_ACTIONS_PER_SESSION}"
 
         response = self.generate(
             prompt=prompt,

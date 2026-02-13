@@ -9,14 +9,17 @@ class BaseHandler(ABC):
         self, action_name: str, result_data: str, anti_loop_hint: str = None
     ) -> Dict:
         if anti_loop_hint is None:
-            anti_loop_hint = f"Action '{action_name}' was just completed. Do not repeat it immediately."
+            anti_loop_hint = f"Action '{action_name}' just completed successfully. Do not repeat immediately unless you have NEW data."
 
         formatted_message = f"""
 ✅ **ACTION JUST EXECUTED**: `{action_name}`
 
 📦 **RESULT**: {result_data}
 
-⚠️ **ANTI-LOOP**: {anti_loop_hint}
+🚨 **CRITICAL - READ THIS**: {anti_loop_hint}
+
+⛔ **DO NOT EXECUTE `{action_name}` AGAIN** ⛔
+Choose a DIFFERENT action from the list below or use `refresh_home`.
 """
 
         return {

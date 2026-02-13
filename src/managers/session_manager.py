@@ -178,6 +178,28 @@ Be specific and actionable. Focus on behavior patterns, not individual actions.
         a_type = action_object.action_type
         params = getattr(action_object, "action_params", {})
 
+        last_actions = [e["action"] for e in self.tracker.events[-3:]]
+        loop_warning = ""
+
+        if last_actions.count(a_type) >= 2:
+            loop_warning = f"""
+🔴 🔴 🔴 **LOOP DETECTED** 🔴 🔴 🔴
+
+⚠️ You just executed `{a_type}` **{last_actions.count(a_type)} times in a row!**
+
+🚨 **CRITICAL**: You are stuck in a repetitive loop. STOP immediately.
+
+**What to do NOW:**
+1. READ the UI feedback below carefully
+2. Choose a DIFFERENT action from the available options
+3. If you're stuck or nothing to do here, use `refresh_home` to go to another module
+
+⛔ **DO NOT repeat `{a_type}` again** ⛔
+
+{'━' * 70}
+
+"""
+
         if result.get("success") and "navigate_to" in result:
             if "pin_data" in result:
                 self.workspace_data.update(result["pin_data"])
@@ -228,6 +250,9 @@ Be specific and actionable. Focus on behavior patterns, not individual actions.
                     raw_body = ctx_manager.get_list_view(result=result)
             else:
                 raw_body = self.format_fallback_context(a_type, result)
+
+        if loop_warning:
+            raw_body = f"{loop_warning}\n{raw_body}"
 
         workspace_header = UIUtils.render_workspace(self.workspace_data)
 

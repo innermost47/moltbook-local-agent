@@ -36,9 +36,18 @@ class UIUtils:
 
     @staticmethod
     def render_feedback(
-        success_msg: Optional[str] = None, error_msg: Optional[str] = None
+        success_msg: Optional[str] = None,
+        error_msg: Optional[str] = None,
+        current_domain: str = "HOME",
     ) -> str:
         feedback = ""
+
+        location_reminder = (
+            f"\n⚠️ **YOU ARE CURRENTLY IN: {current_domain.upper()} MODE**\n"
+            f"⚠️ **DO NOT call `navigate_to_mode('{current_domain.upper()}')` - you are ALREADY here!**\n"
+            f"⚠️ **Execute an ACTION from the list below, or use `refresh_home` to leave.**\n"
+        )
+
         if success_msg:
             feedback += f"\n✅ **LAST STATUS**: {success_msg}\n"
             feedback += "⚠️ IMPORTANT AND HIGH-PRIORITY: DO NOT REPEAT THIS STEP. MOVE IMMEDIATELY TO THE NEXT TASK.\n"
@@ -47,6 +56,9 @@ class UIUtils:
             feedback += f"\n❌ **LAST STATUS**: {error_msg}\n"
             feedback += "⚠️ CRITICAL AND MANDATORY: CORRECT THIS ERROR IMMEDIATELY BEFORE PROCEEDING.\n"
 
+        if current_domain.lower() != "home":
+            feedback += location_reminder
+
         return feedback
 
     @staticmethod
@@ -54,7 +66,7 @@ class UIUtils:
         return (
             f"{'━' * 40}\n"
             "🎮 **GLOBAL SHORTCUTS**\n"
-            "🏠 `refresh_home` | 🧠 `memory_list` | 🗺️ `plan_update` | 🔌 `archive_session`"
+            "🏠 `refresh_home` | 🧠 `memory_retrieve` | 🗺️ `plan_update` | 🔌 `session_finish`"
         )
 
     @classmethod
@@ -67,11 +79,23 @@ class UIUtils:
         error_msg: str = None,
     ) -> str:
         header = cls.render_navbar(current_domain, action_count)
-        notifications = cls.render_feedback(success_msg, error_msg)
-        body = content
+
+        body_with_location = f"""
+🚨 🚨 🚨 **CURRENT LOCATION** 🚨 🚨 🚨
+
+📍 **YOU ARE IN: {current_domain.upper()}**
+
+{f"⛔ DO NOT execute `navigate_to_mode('{current_domain.upper()}')` - you are ALREADY HERE" if current_domain.lower() != 'home' else ""}
+
+{'━' * 70}
+
+{content}
+"""
+
+        notifications = cls.render_feedback(success_msg, error_msg, current_domain)
         footer = cls.render_footer()
 
-        return f"{header}\n\n{body}\n\n{footer}\n\n{notifications}"
+        return f"{header}\n\n{body_with_location}\n\n{footer}\n\n{notifications}"
 
     @staticmethod
     def render_workspace(workspace_data: Dict[str, str]) -> str:
@@ -102,9 +126,7 @@ class UIUtils:
         title: str, message: str, action_required: str, modules: Dict[str, tuple]
     ) -> str:
 
-        separator = (
-            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-        )
+        separator = "━" * 70
 
         module_lines = "\n".join(
             [

@@ -13,6 +13,21 @@ class SocialContextManager:
     def get_list_view(self, status_msg: str = "", result: Dict = None) -> str:
         action_feedback = ""
 
+        moltbook_brief = (
+            "### 🌐 ABOUT MOLTBOOK\n"
+            "Moltbook is a **Social Network for AI Agents**. Here, you are not just a tool; "
+            "you are a participant. Your goal is to engage with other AIs, share knowledge, "
+            "and help surface high-quality content through votes.\n"
+        )
+
+        decision_guidelines = (
+            "### 🤖 YOUR ENGAGEMENT PROTOCOL\n"
+            "1. **Read**: Analyze the titles and previews in the feed below.\n"
+            "2. **Vote**: Upvote posts that provide high value or interesting AI insights.\n"
+            "3. **Engage**: Use `select_post_to_comment` to read a full thread if the preview interests you.\n"
+            "4. **Limit**: You have a **10-action limit** per session. Choose your interactions wisely.\n"
+        )
+
         if result:
             if result.get("success"):
                 action_feedback = (
@@ -111,6 +126,9 @@ class SocialContextManager:
         ctx = [
             "## 🦞 MOLTBOOK SOCIAL",
             f"✅ **STATUS**: {status_msg}" if status_msg else "",
+            "---",
+            moltbook_brief,
+            decision_guidelines,
             "---",
             action_feedback,
             submolts_display,

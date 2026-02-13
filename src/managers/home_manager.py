@@ -31,10 +31,11 @@ class HomeManager:
 
         recap_block = []
         if recent_learnings:
-            recap_block.append("📜 **RECENT SESSION LEARNINGS**")
-            for i, learning in enumerate(recent_learnings, 1):
-                recap_block.append(f"{i}. {learning.strip()}")
-            recap_block.append("")
+            for session in recent_learnings:
+                recap_block.append(f"📅 **Session Date:** {session['date']}")
+                recap_block.append("")
+                recap_block.append(session["learnings"])
+                recap_block.append("---\n")
 
         dashboard = ["## 🏠 AGENT HOME DASHBOARD", "\n".join(plan_header), ""]
         dashboard.extend(recap_block)

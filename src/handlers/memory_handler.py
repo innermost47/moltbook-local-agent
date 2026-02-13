@@ -501,48 +501,29 @@ class MemoryHandler:
         except sqlite3.Error as e:
             raise SystemLogicError(f"Plan persistence failure: {str(e)}")
 
-    def get_recent_learnings(self, limit: int = 3) -> List[str]:
+    def get_recent_learnings(self, limit: int = 3) -> List[Dict[str, str]]:
         try:
             cursor = self.conn.cursor()
             cursor.execute(
                 """
-                SELECT learnings FROM sessions 
-                WHERE learnings IS NOT NULL 
-                AND learnings != '' 
+                SELECT timestamp, learnings FROM sessions
+                WHERE learnings IS NOT NULL
+                AND learnings != ''
                 AND learnings != 'Initial Session'
-                ORDER BY id DESC 
+                ORDER BY timestamp ASC
                 LIMIT ?
                 """,
                 (limit,),
             )
 
             rows = cursor.fetchall()
-            all_points = []
-
+            result = []
             for row in rows:
-                text = row["learnings"]
-                lines = [line.strip() for line in text.split("\n") if line.strip()]
+                result.append(
+                    {"date": row["timestamp"], "learnings": row["learnings"].strip()}
+                )
 
-                for line in lines:
-                    clean = line
-
-                    clean = clean.replace("**", "").strip()
-
-                    if clean.lower().startswith("learnings"):
-                        clean = clean.split(":", 1)[-1].strip()
-
-                    clean = clean.lstrip("-*• ").strip()
-                    clean = re.sub(r"^\d+[\.\)]\s*", "", clean)
-
-                    if not clean:
-                        continue
-
-                    if len(clean) > 400:
-                        clean = clean[:400] + "..."
-
-                    all_points.append(clean)
-
-            return all_points[:limit]
+            return result
 
         except Exception as e:
             log.error(f"Failed to get recent learnings: {e}")

@@ -121,24 +121,20 @@ class OllamaProvider:
 
         if not self.conversation_history:
             system_content = self.get_system_prompt()
-            allowed_types = []
-            if hasattr(pydantic_model, "model_json_schema"):
-                schema = pydantic_model.model_json_schema()
-                mapping = (
-                    schema.get("properties", {})
-                    .get("action", {})
-                    .get("discriminator", {})
-                    .get("mapping", {})
-                )
-                allowed_types = list(mapping.keys())
 
             STRICT_JSON_SUFFIX = (
-                "\n\n### ⚠️ MANDATORY TECHNICAL CONSTRAINT\n"
-                "1. Your response MUST be a single, valid JSON object.\n"
-                "2. You MUST include the 'action_type' field inside the 'action' object.\n"
-                f"3. ALLOWED action_type values: {', '.join(allowed_types)}\n"
-                "4. DO NOT include any text before or after the JSON.\n"
-                "5. If you navigate, you MUST also include 'chosen_mode' and 'expected_actions_count'."
+                "### 🌐 ENVIRONMENT & OPPORTUNITIES\n"
+                "You have access to multiple modules to expand your actions beyond mere research:\n"
+                "- **Research (wiki_read, wiki_search)**: Collect knowledge, but remember, the goal is to apply it.\n"
+                "- **Workspace (pin_to_workspace, memory_retrieve)**: Organize and retrieve your findings; use them as reference to inform posts, emails, or collaborations.\n"
+                "- **Blog & Social (Moltbook)**: Share your insights, create posts, comment on others, and engage with the community.\n"
+                "- **Email**: Send and respond to messages; integrate information from research or workspace notes when relevant.\n\n"
+                "### 🎯 RECOMMENDED STRATEGY\n"
+                "1. Conduct focused research, but DO NOT linger in repetitive reading loops.\n"
+                "2. Apply your knowledge to create new content: blog entries, social posts, comments.\n"
+                "3. Regularly retrieve your memories to enhance context and avoid redundant work.\n"
+                "4. Balance your time across modules—research, content creation, social interaction, and email—to fully leverage your environment.\n"
+                "5. Always prioritize actions that move you forward: share, engage, create, and learn in a diversified manner."
             )
             system_content += STRICT_JSON_SUFFIX
             if system_content:

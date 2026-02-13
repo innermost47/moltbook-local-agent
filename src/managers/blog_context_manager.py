@@ -114,7 +114,7 @@ class BlogContextManager(BaseContextManager):
             "",
             "👉 `refresh_home`",
             "   - Return to home dashboard",
-            "---",
+            "",
             "⚠️ **WARNING**: Do not call `navigate_to_mode('BLOG')` while already here. Execute an action instead.",
         ]
 

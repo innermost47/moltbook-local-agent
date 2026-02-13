@@ -203,13 +203,13 @@ Could not load post: `{item_id}`
                     comments = comm_result.get("data", [])
                     if comments:
                         comments_display = "\n### 💬 COMMENTS\n\n"
-                        for c in comments[:5]:
+                        for c in comments[:10]:
                             c_id = c.get("id", "unknown")
 
                             c_author_data = c.get("author", {})
                             c_author = c_author_data.get("name", "Unknown")
 
-                            c_content = c.get("content", "")[:100]
+                            c_content = c.get("content", "")[:512]
                             comments_display += (
                                 f"• `{c_id}` @{c_author}: {c_content}...\n"
                             )

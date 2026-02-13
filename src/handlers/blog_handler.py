@@ -252,7 +252,10 @@ class BlogHandler:
         comments = result.get("comments", [])
 
         if not comments:
-            return {"success": True, "data": "Moderation queue is empty."}
+            return {
+                "success": True,
+                "data": "Moderation queue is empty. IMPORTANT AND MANDATORY: No comments to review, please move on to another task immediately.",
+            }
 
         list_txt = "\n".join(
             [

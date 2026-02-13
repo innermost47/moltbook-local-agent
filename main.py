@@ -18,6 +18,7 @@ from src.tests.memory_tests import MemoryTestSuite
 from src.tests.global_tests import GlobalTestSuite
 from src.tests.plan_tests import PlanTestSuite
 from src.tests.social_tests import SocialTestSuite
+from src.tests.moltbook_tests import MoltbookLiveTester
 
 
 def bootstrap(test_mode: bool = False):
@@ -76,6 +77,7 @@ def run_unit_tests():
         ("Global Actions", GlobalTestSuite()),
         ("Master Plan", PlanTestSuite()),
         ("Social", SocialTestSuite()),
+        ("Moltbook", MoltbookLiveTester()),
     ]
 
     results = {}

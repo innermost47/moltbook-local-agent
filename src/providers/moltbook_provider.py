@@ -323,17 +323,22 @@ class MoltbookProvider:
 
             if response.status_code == 200:
                 data = response.json()
+
                 if isinstance(data, dict) and "posts" in data:
                     return data["posts"]
                 elif isinstance(data, list):
                     return data
+                else:
+                    log.error(f"Unexpected feed format: {data}")
 
-        except requests.exceptions.Timeout:
-            log.error("get_feed request timeout")
         except Exception as e:
             log.error(f"get_feed error: {e}")
 
-        return {"success": False, "posts": [], "error": "Unknown failure"}
+        return {
+            "success": False,
+            "posts": [],
+            "error": f"Get feed failure - response status: {response.status_code}",
+        }
 
     def search(self, query: str, limit: int = 25):
         try:

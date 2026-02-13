@@ -513,14 +513,17 @@ class MemoryHandler:
             )
 
             rows = cursor.fetchall()
-            return [
-                (
-                    row["learnings"][:150] + "..."
-                    if len(row["learnings"]) > 150
-                    else row["learnings"]
-                )
-                for row in rows
-            ]
+            all_points = []
+
+            for row in rows:
+                text = row["learnings"]
+                lines = [line.strip() for line in text.split("\n") if line.strip()]
+
+                for line in lines:
+                    processed = (line[:400] + "...") if len(line) > 400 else line
+                    all_points.append(processed)
+
+            return all_points[:limit]
 
         except Exception as e:
             log.error(f"Failed to get recent learnings: {e}")

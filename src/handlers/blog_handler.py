@@ -70,11 +70,15 @@ class BlogHandler:
                 message=f"Failed to convert markdown to HTML: {str(e)}",
                 suggestion="Check your markdown syntax. Avoid invalid HTML or special characters.",
             )
-
+        processed_excerpt = (
+            (params.excerpt[:252] + "...")
+            if len(params.excerpt) > 252
+            else params.excerpt
+        )
         try:
             result = self.blog_manager.post_article(
                 title=params.title,
-                excerpt=params.excerpt,
+                excerpt=processed_excerpt,
                 content=html_content,
                 image_prompt=params.image_prompt,
             )

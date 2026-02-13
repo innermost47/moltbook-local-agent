@@ -246,9 +246,7 @@ class OllamaProvider:
             }
         finally:
             if is_ok and save_to_history:
-                self.conversation_history.append(
-                    {"role": "user", "content": full_llm_payload}
-                )
+                self.conversation_history.append({"role": "user", "content": prompt})
                 self.conversation_history.append(
                     {"role": "assistant", "content": assistant_msg}
                 )

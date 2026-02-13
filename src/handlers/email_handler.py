@@ -171,6 +171,82 @@ class EmailHandler:
             log.error(f"❌ SMTP Failure: {e}")
             raise SystemLogicError(f"Email send failed: {str(e)}")
 
+    def handle_send_email_html(self, params: Any) -> Dict:
+
+        if not hasattr(params, "to") or not params.to:
+            raise FormattingError(
+                message="Missing 'to' parameter.",
+                suggestion="Provide recipient email address in 'to' field.",
+            )
+
+        if not hasattr(params, "content") or not params.content:
+            raise FormattingError(
+                message="Missing 'content' parameter.",
+                suggestion="Provide email HTML content in 'content' field.",
+            )
+
+        recipient = params.to
+        subject = getattr(params, "subject", "Automated Update")
+        html_content = params.content
+
+        if "@" not in recipient or "." not in recipient.split("@")[-1]:
+            raise FormattingError(
+                message=f"Invalid email format: {recipient}",
+                suggestion="Provide a valid email address (e.g., user@example.com).",
+            )
+
+        if len(html_content.strip()) < 10:
+            raise FormattingError(
+                message="Email content is too short (< 10 characters).",
+                suggestion="Provide meaningful email content (at least 10 characters).",
+            )
+
+        try:
+            msg = EmailMessage()
+            msg["Subject"] = subject
+            msg["From"] = self.user
+            msg["To"] = recipient
+
+            msg.set_content(
+                "This email contains HTML content. Please view in an HTML-compatible client."
+            )
+
+            msg.add_alternative(html_content, subtype="html")
+
+            with smtplib.SMTP(self.smtp_host, 587) as server:
+                server.starttls()
+                server.login(self.user, self.password)
+                server.send_message(msg)
+
+            log.success(f"📤 HTML email dispatched to {recipient}")
+            return {"success": True, "data": f"HTML message sent to {recipient}."}
+
+        except smtplib.SMTPAuthenticationError:
+            raise AccessDeniedError(
+                message="SMTP authentication failed.",
+                suggestion="Check your email credentials (SMTP_HOST, EMAIL, PASSWORD).",
+            )
+        except smtplib.SMTPRecipientsRefused:
+            raise FormattingError(
+                message=f"Recipient '{recipient}' rejected by server.",
+                suggestion="Check the recipient email address is valid and accepts mail.",
+            )
+        except smtplib.SMTPServerDisconnected:
+            raise APICommunicationError(
+                message="SMTP server disconnected unexpectedly.",
+                suggestion="Try again. Mail server may be unstable.",
+                api_name="SMTP Server",
+            )
+        except TimeoutError:
+            raise APICommunicationError(
+                message="SMTP connection timed out.",
+                suggestion="Try again. Mail server may be slow or down.",
+                api_name="SMTP Server",
+            )
+        except Exception as e:
+            log.error(f"❌ SMTP Failure: {e}")
+            raise SystemLogicError(f"Email send failed: {str(e)}")
+
     def handle_mark_as_read(self, params: Any) -> Dict:
 
         if not hasattr(params, "uid") or not params.uid:

@@ -122,9 +122,12 @@ Please select a valid Wikipedia page title from your search results.
 
 ### 📌 NEXT STEPS
 
-**Save to workspace**:
+**Optional notes (recommended if exploring multiple pages)**:
 ```
-pin_to_workspace(label="research_{display_title[:20]}", content="[your key findings]")
+pin_to_workspace(
+label="research_{display_title[:20]}",
+content="[key facts, concepts, or quotes]"
+)
 ```
 
 **Complete research**:

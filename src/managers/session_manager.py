@@ -354,7 +354,7 @@ Impact: This action is permanent.
         )
 
         try:
-            self.dispatcher.email_handler.handle_send_email(params)
+            self.dispatcher.email_handler.handle_send_email_html(params)
             log.success("✅ Report sent successfully!")
         except Exception as e:
             log.error(f"❌ Failed to send report: {e}")

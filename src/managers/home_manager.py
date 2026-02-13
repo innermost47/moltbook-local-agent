@@ -127,7 +127,7 @@ class HomeManager:
                     for entry in entries:
                         content = entry["content"]
                         truncated = (
-                            content[:100] + "..." if len(content) > 100 else content
+                            content[:500] + "..." if len(content) > 500 else content
                         )
 
                         try:

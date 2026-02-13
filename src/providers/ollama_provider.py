@@ -41,7 +41,10 @@ class OllamaProvider:
         agent_name: str,
     ) -> Namespace:
 
-        prompt = f"Analyze the dashboard and decide your next move. Energy: {actions_left}/{settings.MAX_ACTIONS_PER_SESSION}"
+        if actions_left <= 2:
+            prompt = f"⚠️ **Choose wisely!** Only {actions_left} move{'s' if actions_left > 1 else ''} left (out of {settings.MAX_ACTIONS_PER_SESSION})."
+        else:
+            prompt = f"🎯 **Decide your next move** (You have {actions_left} moves left out of {settings.MAX_ACTIONS_PER_SESSION})."
 
         response = self.generate(
             prompt=prompt,

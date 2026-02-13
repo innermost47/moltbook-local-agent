@@ -100,7 +100,7 @@ class EmailHandler:
             log.warning(f"⚠️ HTML cleaning failed: {e}")
             return "[HTML content - parsing failed]"
 
-    def handle_send_email(self, params: Any) -> Dict:
+    def handle_email_send(self, params: Any) -> Dict:
 
         if not hasattr(params, "to") or not params.to:
             raise FormattingError(

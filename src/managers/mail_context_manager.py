@@ -38,22 +38,26 @@ class MailContextManager:
             params = Namespace(limit=10)
             fetch_result = self.handler.handle_get_messages(params)
 
-            if fetch_result.get("success") and fetch_result.get("data"):
-                messages = fetch_result.get("data", [])
-                messages_display = "### 📬 LATEST CORRESPONDENCE\n\n"
-
-                for msg in messages:
-                    messages_display += f"✉️ **ID**: `{msg['uid']}`\n"
-                    messages_display += (
-                        f"   From: {msg['from']} | Subject: {msg['subject']}\n\n"
+            if fetch_result.get("success"):
+                data = fetch_result.get("data")
+                if isinstance(data, list) and data:
+                    messages = data
+                    messages_display = "### 📬 LATEST CORRESPONDENCE\n\n"
+                    for msg in messages:
+                        messages_display += f"✉️ **ID**: `{msg['uid']}`\n"
+                        messages_display += (
+                            f"   From: {msg['from']} | Subject: {msg['subject']}\n\n"
+                        )
+                    messages_display += "👉 **ACTION**: Use `email_read(uid='...')` to view a message.\n"
+                elif isinstance(data, str):
+                    messages_display = f"### 📬 LATEST CORRESPONDENCE\n\n_{data}_\n"
+                else:
+                    messages_display = (
+                        "### 📬 LATEST CORRESPONDENCE\n\n_The inbox is empty._\n"
                     )
-
-                messages_display += (
-                    "👉 **ACTION**: Use `email_read(uid='...')` to view a message.\n"
-                )
             else:
                 messages_display = (
-                    "### 📬 LATEST CORRESPONDENCE\n\n_The inbox is empty._\n"
+                    "### 📬 LATEST CORRESPONDENCE\n\n_Status unavailable_\n"
                 )
         except Exception as e:
             log.warning(f"Could not fetch messages: {e}")

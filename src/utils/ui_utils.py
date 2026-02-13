@@ -47,9 +47,6 @@ class UIUtils:
             feedback += f"\n❌ **LAST STATUS**: {error_msg}\n"
             feedback += "⚠️ CRITICAL AND MANDATORY: CORRECT THIS ERROR IMMEDIATELY BEFORE PROCEEDING.\n"
 
-        if feedback:
-            feedback += f"{'━' * 40}"
-
         return feedback
 
     @staticmethod
@@ -74,7 +71,7 @@ class UIUtils:
         body = content
         footer = cls.render_footer()
 
-        return f"{header}\n{notifications}\n\n{body}\n\n{footer}"
+        return f"{header}\n\n{body}\n\n{footer}\n\n{notifications}"
 
     @staticmethod
     def render_workspace(workspace_data: Dict[str, str]) -> str:

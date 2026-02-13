@@ -41,10 +41,7 @@ class OllamaProvider:
         agent_name: str,
     ) -> Namespace:
 
-        if actions_left <= 2:
-            prompt = f"⚠️ **Choose wisely!** Only {actions_left} move{'s' if actions_left > 1 else ''} left (out of {settings.MAX_ACTIONS_PER_SESSION})."
-        else:
-            prompt = f"🎯 **Decide your next move** (You have {actions_left} moves left out of {settings.MAX_ACTIONS_PER_SESSION})."
+        prompt = f"Analyze the dashboard and decide your next move. Actions left: {actions_left}/{settings.MAX_ACTIONS_PER_SESSION}"
 
         response = self.generate(
             prompt=prompt,
@@ -229,8 +226,13 @@ class OllamaProvider:
     def _manage_context_window(self, response: Dict):
         max_tokens = getattr(settings, "LLAMA_CPP_MODEL_CTX_SIZE", 8192)
 
-        prompt_tokens = response.get("prompt_eval_count", 0)
-        completion_tokens = response.get("eval_count", 0)
+        prompt_tokens = response.get("prompt_eval_count") or 0
+        completion_tokens = response.get("eval_count") or 0
+        if not isinstance(prompt_tokens, int):
+            prompt_tokens = 0
+        if not isinstance(completion_tokens, int):
+            completion_tokens = 0
+
         total_tokens = prompt_tokens + completion_tokens
 
         log.debug(

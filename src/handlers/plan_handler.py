@@ -1,4 +1,5 @@
 from typing import Dict, Any, Optional
+from src.handlers.base_handler import BaseHandler
 from src.utils import log
 from src.utils.exceptions import (
     SystemLogicError,
@@ -7,7 +8,7 @@ from src.utils.exceptions import (
 )
 
 
-class PlanHandler:
+class PlanHandler(BaseHandler):
 
     def __init__(self, memory_handler):
         self.memory = memory_handler
@@ -117,113 +118,137 @@ class PlanHandler:
             raise SystemLogicError(f"Could not persist strategy: {str(e)}")
 
     def handle_plan_initialize(self, params: Any) -> Dict:
+        try:
 
-        def get_val(key, default=None):
-            if isinstance(params, dict):
-                return params.get(key, default)
-            return getattr(params, key, default)
+            def get_val(key, default=None):
+                if isinstance(params, dict):
+                    return params.get(key, default)
+                return getattr(params, key, default)
 
-        objective = get_val("objective")
-        strategy = get_val("strategy")
-        milestones = get_val("milestones", [])
-        reasoning = get_val("reasoning", "Initial setup")
+            objective = get_val("objective")
+            strategy = get_val("strategy")
+            milestones = get_val("milestones", [])
+            reasoning = get_val("reasoning", "Initial setup")
 
-        if not objective:
-            raise FormattingError(
-                message="Missing 'objective' parameter in plan initialization.",
-                suggestion="Provide a clear objective defining what you want to achieve.",
+            if not objective:
+                raise FormattingError(
+                    message="Missing 'objective' parameter in plan initialization.",
+                    suggestion="Provide a clear objective defining what you want to achieve.",
+                )
+
+            if not strategy:
+                raise FormattingError(
+                    message="Missing 'strategy' parameter in plan initialization.",
+                    suggestion="Provide a strategy explaining how you'll achieve the objective.",
+                )
+
+            self.create_or_update_master_plan(
+                objective=objective,
+                strategy=strategy,
+                milestones=milestones,
+                reasoning=reasoning,
             )
 
-        if not strategy:
-            raise FormattingError(
-                message="Missing 'strategy' parameter in plan initialization.",
-                suggestion="Provide a strategy explaining how you'll achieve the objective.",
+            result_text = f"Master Plan initialized.\n🎯 Objective: {objective[:100]}...\n🧠 Strategy: {strategy[:100]}...\n📍 Milestones: {len(milestones)} defined"
+            anti_loop = "Master Plan is NOW ACTIVE. Do NOT initialize again. System is unlocked - proceed with executing your strategy (Email, Blog, Social, Research)."
+
+            result = self.format_success(
+                action_name="plan_initialize",
+                result_data=result_text,
+                anti_loop_hint=anti_loop,
             )
 
-        self.create_or_update_master_plan(
-            objective=objective,
-            strategy=strategy,
-            milestones=milestones,
-            reasoning=reasoning,
-        )
+            result["navigate_to"] = "home"
+            return result
 
-        return {
-            "success": True,
-            "data": "✅ Master Plan initialized. Neural alignment confirmed.",
-            "navigate_to": "home",
-        }
+        except Exception as e:
+            return self.format_error("plan_initialize", e)
 
     def handle_plan_update(self, params: Any) -> Dict:
+        try:
 
-        def get_val(key, default=None):
-            if isinstance(params, dict):
-                return params.get(key, default)
-            return getattr(params, key, default)
+            def get_val(key, default=None):
+                if isinstance(params, dict):
+                    return params.get(key, default)
+                return getattr(params, key, default)
 
-        should_update = get_val("should_update", False)
-        reasoning = get_val("reasoning", "Periodic recalibration")
+            should_update = get_val("should_update", False)
+            reasoning = get_val("reasoning", "Periodic recalibration")
 
-        if not should_update:
-            return {
-                "success": True,
-                "action_type": "plan_update",
-                "data": "📡 Strategy remains in resonance. No changes applied.",
-            }
+            if not should_update:
+                result_text = (
+                    "Strategy evaluated. No changes needed - plan remains in alignment."
+                )
+                anti_loop = "Plan review complete. Current strategy is VALID. Do NOT update again unless circumstances change. Execute the existing plan."
 
-        new_obj = get_val("new_objective")
-        new_strat = get_val("new_strategy")
-        new_miles = get_val("new_milestones")
+                return self.format_success(
+                    action_name="plan_update",
+                    result_data=result_text,
+                    anti_loop_hint=anti_loop,
+                )
 
-        if not new_obj:
-            raise FormattingError(
-                message="Update requested but 'new_objective' is missing.",
-                suggestion="Provide 'new_objective' to update the master plan.",
+            new_obj = get_val("new_objective")
+            new_strat = get_val("new_strategy")
+            new_miles = get_val("new_milestones")
+
+            if not new_obj:
+                raise FormattingError(
+                    message="Update requested but 'new_objective' is missing.",
+                    suggestion="Provide 'new_objective' to update the master plan.",
+                )
+
+            if not new_strat:
+                raise FormattingError(
+                    message="Update requested but 'new_strategy' is missing.",
+                    suggestion="Provide 'new_strategy' to update the master plan.",
+                )
+
+            if not new_miles or not isinstance(new_miles, list):
+                raise FormattingError(
+                    message="Update requested but 'new_milestones' is missing or invalid.",
+                    suggestion="Provide 'new_milestones' as a list of milestone strings.",
+                )
+
+            self.create_or_update_master_plan(
+                objective=new_obj,
+                strategy=new_strat,
+                milestones=new_miles,
+                reasoning=reasoning,
             )
 
-        if not new_strat:
-            raise FormattingError(
-                message="Update requested but 'new_strategy' is missing.",
-                suggestion="Provide 'new_strategy' to update the master plan.",
+            result_text = f"Master Plan updated successfully.\nReason: {reasoning}\n🎯 New Objective: {new_obj[:100]}..."
+            anti_loop = "Plan update complete. Do NOT update again immediately. Execute the NEW strategy now."
+
+            return self.format_success(
+                action_name="plan_update",
+                result_data=result_text,
+                anti_loop_hint=anti_loop,
             )
 
-        if not new_miles or not isinstance(new_miles, list):
-            raise FormattingError(
-                message="Update requested but 'new_milestones' is missing or invalid.",
-                suggestion="Provide 'new_milestones' as a list of milestone strings.",
-            )
-
-        self.create_or_update_master_plan(
-            objective=new_obj,
-            strategy=new_strat,
-            milestones=new_miles,
-            reasoning=reasoning,
-        )
-
-        return {
-            "success": True,
-            "action_type": "plan_update",
-            "data": f"🔄 Master Plan evolved: {reasoning}",
-        }
+        except Exception as e:
+            return self.format_error("plan_update", e)
 
     def handle_plan_view(self, params: Any) -> Dict:
+        try:
+            plan = self.get_active_master_plan()
 
-        plan = self.get_active_master_plan()
+            if not plan:
+                raise ResourceNotFoundError(
+                    message="No active master plan found.",
+                    suggestion="Initialize a master plan using 'plan_initialize' action.",
+                )
 
-        if not plan:
-            raise ResourceNotFoundError(
-                message="No active master plan found.",
-                suggestion="Initialize a master plan using 'plan_initialize' action.",
+            objective = plan.get("objective", "Unknown")
+            strategy = plan.get("strategy", "Unknown")
+            milestones = plan.get("milestones", [])
+            version = plan.get("version", 0)
+            last_updated = plan.get("last_updated", "Unknown")
+
+            milestones_str = "\n".join(
+                [f"   {i+1}. {m}" for i, m in enumerate(milestones)]
             )
 
-        objective = plan.get("objective", "Unknown")
-        strategy = plan.get("strategy", "Unknown")
-        milestones = plan.get("milestones", [])
-        version = plan.get("version", 0)
-        last_updated = plan.get("last_updated", "Unknown")
-
-        milestones_str = "\n".join([f"   {i+1}. {m}" for i, m in enumerate(milestones)])
-
-        plan_summary = f"""
+            plan_summary = f"""
 🗺️ **MASTER PLAN (v{version})**
 
 🎯 **OBJECTIVE**: {objective}
@@ -236,10 +261,17 @@ class PlanHandler:
 📅 **Last Updated**: {last_updated}
 """
 
-        return {
-            "success": True,
-            "data": plan_summary.strip(),
-        }
+            result_text = plan_summary.strip()
+            anti_loop = "Plan viewed. You now have the full strategy. Do NOT view again - EXECUTE it instead."
+
+            return self.format_success(
+                action_name="plan_view",
+                result_data=result_text,
+                anti_loop_hint=anti_loop,
+            )
+
+        except Exception as e:
+            return self.format_error("plan_view", e)
 
     def get_plan_context_for_prompt(self) -> str:
 

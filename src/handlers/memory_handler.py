@@ -1,6 +1,5 @@
 import sqlite3
 import json
-import re
 from datetime import datetime
 from typing import List, Dict, Any, Optional
 from src.settings import settings
@@ -10,9 +9,10 @@ from src.utils.exceptions import (
     ResourceNotFoundError,
     FormattingError,
 )
+from src.handlers.base_handler import BaseHandler
 
 
-class MemoryHandler:
+class MemoryHandler(BaseHandler):
     def __init__(self, db_path: str = None, test_mode=False):
         self.db_path = db_path or settings.DB_PATH
         self.test_mode = test_mode
@@ -177,39 +177,38 @@ class MemoryHandler:
             raise SystemLogicError(f"Session archiving failed: {str(e)}")
 
     def handle_memory_store(self, params: Any, session_id: int = None) -> Dict:
-
-        if isinstance(params, dict):
-            category = params.get("memory_category")
-            content = params.get("memory_content")
-        else:
-            category = getattr(params, "memory_category", None)
-            content = getattr(params, "memory_content", None)
-
-        if not category:
-            raise FormattingError(
-                message="Missing 'memory_category' parameter.",
-                suggestion=f"Specify a category: {', '.join(settings.MEMORY_CATEGORIES.keys())}",
-            )
-
-        if category not in settings.MEMORY_CATEGORIES:
-            raise ResourceNotFoundError(
-                message=f"Category '{category}' does not exist in the neural map.",
-                suggestion=f"Use one of: {', '.join(settings.MEMORY_CATEGORIES.keys())}",
-            )
-
-        if not content or not content.strip():
-            raise FormattingError(
-                message="Memory content is empty.",
-                suggestion="Provide meaningful content to store in memory.",
-            )
-
-        if len(content.strip()) < 10:
-            raise FormattingError(
-                message="Memory content too short (< 10 characters).",
-                suggestion="Provide substantial content worth remembering (at least 10 characters).",
-            )
-
         try:
+            if isinstance(params, dict):
+                category = params.get("memory_category")
+                content = params.get("memory_content")
+            else:
+                category = getattr(params, "memory_category", None)
+                content = getattr(params, "memory_content", None)
+
+            if not category:
+                raise FormattingError(
+                    message="Missing 'memory_category' parameter.",
+                    suggestion=f"Specify a category: {', '.join(settings.MEMORY_CATEGORIES.keys())}",
+                )
+
+            if category not in settings.MEMORY_CATEGORIES:
+                raise ResourceNotFoundError(
+                    message=f"Category '{category}' does not exist in the neural map.",
+                    suggestion=f"Use one of: {', '.join(settings.MEMORY_CATEGORIES.keys())}",
+                )
+
+            if not content or not content.strip():
+                raise FormattingError(
+                    message="Memory content is empty.",
+                    suggestion="Provide meaningful content to store in memory.",
+                )
+
+            if len(content.strip()) < 10:
+                raise FormattingError(
+                    message="Memory content too short (< 10 characters).",
+                    suggestion="Provide substantial content worth remembering (at least 10 characters).",
+                )
+
             cursor = self.conn.cursor()
             cursor.execute(
                 "INSERT INTO memory_entries (category, content, created_at, session_id) VALUES (?, ?, ?, ?)",
@@ -234,42 +233,46 @@ class MemoryHandler:
 
             self.conn.commit()
 
-            return {
-                "success": True,
-                "data": f"✅ Memory stored in '{category}' sector ({count}/{settings.MAX_ENTRIES_PER_CATEGORY} entries).",
-            }
+            result_text = f"Memory stored in '{category}' sector ({count}/{settings.MAX_ENTRIES_PER_CATEGORY} entries). Content: {content[:50]}..."
 
-        except sqlite3.Error as e:
-            raise SystemLogicError(f"Database write failure: {str(e)}")
+            anti_loop = f"Memory already saved in '{category}'. No need to store it again unless you have NEW information."
+
+            return self.format_success(
+                action_name="memory_store",
+                result_data=result_text,
+                anti_loop_hint=anti_loop,
+            )
+
+        except Exception as e:
+            return self.format_error("memory_store", e)
 
     def handle_memory_retrieve(self, params: Any) -> Dict:
-
-        if isinstance(params, dict):
-            category = params.get("memory_category")
-            limit = params.get("memory_limit", 5)
-        else:
-            category = getattr(params, "memory_category", None)
-            limit = getattr(params, "memory_limit", 5)
-
-        if not category:
-            raise FormattingError(
-                message="Missing 'memory_category' parameter.",
-                suggestion=f"Specify a category: {', '.join(settings.MEMORY_CATEGORIES.keys())}",
-            )
-
-        if category not in settings.MEMORY_CATEGORIES:
-            raise ResourceNotFoundError(
-                message=f"Category '{category}' does not exist.",
-                suggestion=f"Use one of: {', '.join(settings.MEMORY_CATEGORIES.keys())}",
-            )
-
-        if limit < 1 or limit > 50:
-            raise FormattingError(
-                message=f"Invalid limit: {limit}. Must be between 1-50.",
-                suggestion="Set 'memory_limit' between 1 and 50.",
-            )
-
         try:
+            if isinstance(params, dict):
+                category = params.get("memory_category")
+                limit = params.get("memory_limit", 5)
+            else:
+                category = getattr(params, "memory_category", None)
+                limit = getattr(params, "memory_limit", 5)
+
+            if not category:
+                raise FormattingError(
+                    message="Missing 'memory_category' parameter.",
+                    suggestion=f"Specify a category: {', '.join(settings.MEMORY_CATEGORIES.keys())}",
+                )
+
+            if category not in settings.MEMORY_CATEGORIES:
+                raise ResourceNotFoundError(
+                    message=f"Category '{category}' does not exist.",
+                    suggestion=f"Use one of: {', '.join(settings.MEMORY_CATEGORIES.keys())}",
+                )
+
+            if limit < 1 or limit > 50:
+                raise FormattingError(
+                    message=f"Invalid limit: {limit}. Must be between 1-50.",
+                    suggestion="Set 'memory_limit' between 1 and 50.",
+                )
+
             cursor = self.conn.cursor()
             cursor.execute(
                 "SELECT content, created_at FROM memory_entries WHERE category = ? ORDER BY created_at DESC LIMIT ?",
@@ -278,21 +281,25 @@ class MemoryHandler:
             rows = cursor.fetchall()
 
             if not rows:
-                return {
-                    "success": True,
-                    "data": f"No memories found in '{category}' sector.",
-                }
+                result_text = f"No memories found in '{category}' sector."
+                anti_loop = f"Category '{category}' is empty. You already checked - it's still empty. Store something there first."
+            else:
+                entries = [
+                    f"[{row['created_at'][:10]}] {row['content']}" for row in rows
+                ]
+                result_text = f"RECOLLECTION FROM '{category.upper()}':\n" + "\n".join(
+                    entries
+                )
+                anti_loop = f"Memories from '{category}' retrieved. You now have this information - no need to retrieve again."
 
-            entries = [f"[{row['created_at'][:10]}] {row['content']}" for row in rows]
+            return self.format_success(
+                action_name="memory_retrieve",
+                result_data=result_text,
+                anti_loop_hint=anti_loop,
+            )
 
-            return {
-                "success": True,
-                "data": f"RECOLLECTION FROM '{category.upper()}':\n"
-                + "\n".join(entries),
-            }
-
-        except sqlite3.Error as e:
-            raise SystemLogicError(f"Memory retrieval failed: {str(e)}")
+        except Exception as e:
+            return self.format_error("memory_retrieve", e)
 
     def store_metrics(self, session_id: int, metrics: Dict):
 

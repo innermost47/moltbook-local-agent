@@ -130,37 +130,48 @@ class SessionManager:
             ]
         )
 
-        prompt = f"""
-Analyze this session and provide a concise reflection:
-
-{events_summary}
-
-Generate:
-1. **Learnings**: 2-3 key insights or patterns discovered
-2. **Struggles**: What didn't work or needs improvement
-3. **Next Session Plan**: Recommended priorities for next time
-
-Keep it brief (max 200 words total).
-"""
-
-        response = self.ollama.client.chat(
-            model=self.ollama.model,
-            messages=[{"role": "user", "content": prompt}],
-            options={"temperature": 0.3, "num_predict": 300},
+        successes = sum(1 for e in self.tracker.events if e["success"])
+        failures = len(self.tracker.events) - successes
+        success_rate = (
+            (successes / len(self.tracker.events) * 100) if self.tracker.events else 0
         )
 
-        reflection = response["message"]["content"]
+        prompt = f"""
+Analyze this AI agent session and provide a concise reflection.
+
+SESSION STATISTICS:
+- Total actions: {len(self.tracker.events)}
+- Successes: {successes}
+- Failures: {failures}
+- Success rate: {success_rate:.1f}%
+
+ACTIONS LOG:
+{events_summary}
+
+GENERATE A REFLECTION (max 200 words):
+
+1. **Learnings**: What patterns or insights emerged? What worked well?
+
+2. **Struggles**: What failed or needs improvement? What caused loops or errors?
+
+3. **Next Session Plan**: What should be prioritized next time to improve performance?
+
+Be specific and actionable. Focus on behavior patterns, not individual actions.
+"""
+
+        response = self.ollama.generate(
+            prompt=prompt, save_to_history=False, temperature=0.3
+        )
+
+        reflection = response.get("message", {}).get(
+            "content", "Session completed successfully."
+        )
 
         return {
             "learnings": reflection,
             "next_session_plan": "Continue strategic execution based on master plan",
             "total_actions": len(self.tracker.events),
-            "success_rate": (
-                sum(1 for e in self.tracker.events if e["success"])
-                / len(self.tracker.events)
-                if self.tracker.events
-                else 0
-            ),
+            "success_rate": success_rate / 100,
         }
 
     def navigate_context(self, action_object: Any, result: Dict) -> str:

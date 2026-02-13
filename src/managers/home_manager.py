@@ -33,7 +33,7 @@ class HomeManager:
         if recent_learnings:
             recap_block.append("📜 **RECENT SESSION LEARNINGS**")
             for i, learning in enumerate(recent_learnings, 1):
-                recap_block.append(f"{i}. {learning}")
+                recap_block.append(f"{i}. {learning.strip()}")
             recap_block.append("")
 
         dashboard = ["## 🏠 AGENT HOME DASHBOARD", "\n".join(plan_header), ""]

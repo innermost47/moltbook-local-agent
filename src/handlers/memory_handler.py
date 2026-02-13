@@ -520,7 +520,18 @@ class MemoryHandler:
                 lines = [line.strip() for line in text.split("\n") if line.strip()]
 
                 for line in lines:
-                    processed = (line[:400] + "...") if len(line) > 400 else line
+                    clean_line = line
+                    if clean_line.lower().startswith("learnings:"):
+                        clean_line = clean_line[10:].strip()
+                    clean_line = clean_line.lstrip("-*• ").strip()
+                    if not clean_line:
+                        continue
+
+                    processed = (
+                        (clean_line[:400] + "...")
+                        if len(clean_line) > 400
+                        else clean_line
+                    )
                     all_points.append(processed)
 
             return all_points[:limit]

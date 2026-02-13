@@ -117,10 +117,13 @@ class MoltbookProvider:
 
             if response.status_code == 200:
                 data = response.json()
+
                 if isinstance(data, dict):
-                    return data
+                    if "posts" in data:
+                        return {"success": True, "data": data["posts"]}
+                    return {"success": True, "data": data}
                 elif isinstance(data, list):
-                    return {"posts": data, "count": len(data)}
+                    return {"success": True, "data": data}
             else:
                 error_msg = (
                     response.json().get("error", "Unknown error")
@@ -128,15 +131,17 @@ class MoltbookProvider:
                     else "No response"
                 )
                 log.error(f"get_posts API error ({response.status_code}): {error_msg}")
+                return {"success": False, "error": error_msg}
 
         except requests.exceptions.Timeout:
             log.error("get_posts request timeout")
+            return {"success": False, "error": "Request timeout"}
         except requests.exceptions.RequestException as e:
             log.error(f"get_posts request failed: {e}")
+            return {"success": False, "error": str(e)}
         except Exception as e:
             log.error(f"get_posts error: {e}")
-
-        return {"posts": [], "count": 0}
+            return {"success": False, "error": str(e)}
 
     def get_single_post(self, post_id: str):
         try:
@@ -202,17 +207,23 @@ class MoltbookProvider:
 
             if response.status_code == 200:
                 data = response.json()
-                if isinstance(data, dict) and "comments" in data:
-                    return data["comments"]
+
+                if isinstance(data, dict):
+                    if "comments" in data:
+                        return {"success": True, "data": data["comments"]}
+                    return {"success": True, "data": data}
                 elif isinstance(data, list):
-                    return data
+                    return {"success": True, "data": data}
+                return {"success": True, "data": []}
+            else:
+                return {"success": False, "error": f"API Error {response.status_code}"}
 
         except requests.exceptions.Timeout:
             log.error(f"get_post_comments timeout for post {post_id}")
+            return {"success": False, "error": "Request timeout"}
         except Exception as e:
             log.error(f"get_post_comments error: {e}")
-
-        return []
+            return {"success": False, "error": str(e)}
 
     def vote(
         self, content_id: str, content_type: str = "posts", vote_type: str = "upvote"
@@ -256,7 +267,14 @@ class MoltbookProvider:
 
             if response.status_code == 200:
                 data = response.json()
-                return {"success": True, "data": data}
+
+                if isinstance(data, dict):
+                    if "submolts" in data:
+                        return {"success": True, "data": data["submolts"]}
+                    return {"success": True, "data": data}
+                elif isinstance(data, list):
+                    return {"success": True, "data": data}
+                return {"success": True, "data": []}
             else:
                 return {"success": False, "error": f"API Error {response.status_code}"}
 
@@ -324,21 +342,20 @@ class MoltbookProvider:
             if response.status_code == 200:
                 data = response.json()
 
-                if isinstance(data, dict) and "posts" in data:
-                    return data["posts"]
+                if isinstance(data, dict):
+                    if "posts" in data:
+                        return {"success": True, "data": data["posts"]}
+                    return {"success": True, "data": data}
                 elif isinstance(data, list):
-                    return data
-                else:
-                    log.error(f"Unexpected feed format: {data}")
+                    return {"success": True, "data": data}
+
+                return {"success": True, "data": []}
+            else:
+                return {"success": False, "error": f"API Error {response.status_code}"}
 
         except Exception as e:
             log.error(f"get_feed error: {e}")
-
-        return {
-            "success": False,
-            "posts": [],
-            "error": f"Get feed failure - response status: {response.status_code}",
-        }
+            return {"success": False, "error": str(e)}
 
     def search(self, query: str, limit: int = 25):
         try:
@@ -347,23 +364,28 @@ class MoltbookProvider:
 
             if response.status_code == 200:
                 data = response.json()
+
                 if isinstance(data, dict):
                     if "results" in data:
-                        return data["results"]
+                        return {"success": True, "data": data["results"]}
                     elif "posts" in data:
-                        return data["posts"]
+                        return {"success": True, "data": data["posts"]}
                     elif "agents" in data:
-                        return data["agents"]
-                    return data
+                        return {"success": True, "data": data["agents"]}
+                    return {"success": True, "data": data}
                 elif isinstance(data, list):
-                    return data
+                    return {"success": True, "data": data}
+
+                return {"success": True, "data": []}
+            else:
+                return {"success": False, "error": f"API Error {response.status_code}"}
 
         except requests.exceptions.Timeout:
             log.error(f"search timeout for query: {query}")
+            return {"success": False, "error": "Request timeout"}
         except Exception as e:
             log.error(f"search error: {e}")
-
-        return []
+            return {"success": False, "error": str(e)}
 
     def _handle_response(self, response, url):
         if response.status_code in [200, 201]:

@@ -20,7 +20,9 @@ class MoltbookLiveTester:
             else:
                 log.success(f"✅ {name} successful")
                 preview = (
-                    str(result)[:500] + "..." if len(str(result)) > 500 else str(result)
+                    str(result)[:1500] + "..."
+                    if len(str(result)) > 1500
+                    else str(result)
                 )
                 print(f"Data: {preview}")
 

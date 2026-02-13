@@ -118,7 +118,7 @@ class OllamaProvider:
         temperature: Optional[float] = None,
     ) -> Dict:
         now = datetime.now().strftime("%Y-%m-%d %H:%M")
-
+        is_ok = True
         if not self.conversation_history:
             system_content = self.get_system_prompt()
 
@@ -232,24 +232,25 @@ class OllamaProvider:
                         suggestion="Ensure all required fields are present and correctly typed.",
                     )
 
-            if save_to_history:
+            response["message"]["content"] = assistant_msg
+            return response
+
+        except FormattingError as fe:
+            log.warning(f"⚠️ {fe.message}")
+            is_ok = False
+            return {
+                "message": {"content": "Error"},
+                "error": fe.message,
+                "suggestion": fe.suggestion,
+            }
+        finally:
+            if is_ok and save_to_history:
                 self.conversation_history.append(
                     {"role": "user", "content": full_llm_payload}
                 )
                 self.conversation_history.append(
                     {"role": "assistant", "content": assistant_msg}
                 )
-
-            response["message"]["content"] = assistant_msg
-            return response
-
-        except FormattingError as fe:
-            log.warning(f"⚠️ {fe.message}")
-            return {
-                "message": {"content": "Error"},
-                "error": fe.message,
-                "suggestion": fe.suggestion,
-            }
 
     def _count_message_tokens(self, message: Dict) -> int:
         if self.tokenizer:

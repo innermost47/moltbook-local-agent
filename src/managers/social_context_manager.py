@@ -69,13 +69,34 @@ class SocialContextManager:
                     for post in posts[:10]:
                         p_id = post.get("id", "unknown")
                         title = post.get("title", "Untitled")
-                        author = post.get("author_name", "Unknown")
+                        author_data = post.get("author", {})
+                        author = author_data.get("name", "Unknown")
+                        content = post.get("content", "")
+                        preview = (
+                            (content[:252] + "...") if len(content) > 255 else content
+                        )
                         score = post.get("score", 0)
 
                         feed_display += (
                             f"📌 **ID**: `{p_id}` | 👤 @{author} | ⬆️ {score}\n"
                         )
-                        feed_display += f"   {title}\n\n"
+                        feed_display += f"   **{title}**\n"
+                        feed_display += f"   _{preview}_\n\n"
+
+                        comment_res = self.handler._call_api(
+                            "get_post_comments", p_id, "top"
+                        )
+
+                        if comment_res.get("success"):
+                            comments = comment_res.get("data", [])
+
+                            feed_display += "💬 **TOP COMMENTS**\n"
+                            for comment in comments[:5]:
+                                c_author = comment.get("author", {}).get(
+                                    "name", "Unknown"
+                                )
+                                c_text = comment.get("content", "")
+                                feed_display += f"   └─ @{c_author}: {c_text[:50]}...\n"
                 else:
                     feed_display = "### 🦞 SOCIAL FEED\n\n_No posts available._\n"
             else:
@@ -137,9 +158,13 @@ Could not load post: `{item_id}`
 
             post = api_result.get("data", {})
             title = post.get("title", "Untitled")
-            author = post.get("author_name", "Unknown")
+
+            author_data = post.get("author", {})
+            author = author_data.get("name", "Unknown")
+
             content = post.get("content", "No content")
-            score = post.get("score", 0)
+
+            score = post.get("upvotes", 0) - post.get("downvotes", 0)
 
             comments_display = ""
             try:
@@ -153,7 +178,10 @@ Could not load post: `{item_id}`
                         comments_display = "\n### 💬 COMMENTS\n\n"
                         for c in comments[:5]:
                             c_id = c.get("id", "unknown")
-                            c_author = c.get("author_name", "Unknown")
+
+                            c_author_data = c.get("author", {})
+                            c_author = c_author_data.get("name", "Unknown")
+
                             c_content = c.get("content", "")[:100]
                             comments_display += (
                                 f"• `{c_id}` @{c_author}: {c_content}...\n"

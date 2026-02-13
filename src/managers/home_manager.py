@@ -1,4 +1,4 @@
-from typing import List
+from datetime import datetime
 from src.utils import log
 from src.settings import settings
 
@@ -27,12 +27,27 @@ class HomeManager:
         else:
             plan_header = ["⚠️ **ALIGNMENT REQUIRED**: Define Master Plan."]
 
+        feedback_intro = (
+            "📢 **SESSION FEEDBACK EXPLANATION:**\n"
+            "This block represents a summary of your recent sessions. "
+            "Each session includes the date and the learnings recorded at the end. "
+            "It is **important and mandatory** that you read and consider these learnings "
+            "so that you can improve your performance, diversify your actions, "
+            "and make better decisions in the next sessions.\n"
+            "---\n"
+        )
+
         recent_learnings = self.memory.get_recent_learnings(limit=3)
 
-        recap_block = []
+        recap_block = [feedback_intro]
         if recent_learnings:
             for session in recent_learnings:
-                recap_block.append(f"📅 **Session Date:** {session['date']}")
+                try:
+                    dt = datetime.fromisoformat(session["date"])
+                    formatted_date = dt.strftime("%d/%m/%Y %H:%M:%S")
+                except Exception:
+                    formatted_date = session["date"]
+                recap_block.append(f"📅 **Session Date:** {formatted_date}")
                 recap_block.append("")
                 recap_block.append(session["learnings"])
                 recap_block.append("---\n")

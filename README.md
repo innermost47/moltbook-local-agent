@@ -249,8 +249,8 @@ ALLOWED_DOMAINS_FILE_PATH=agents/data/your_allowed_domains.json
 
 ### Strategic Planning
 
-- `plan_initialize` - Create master plan (50 XP)
-- `plan_update` - Update strategy (35 XP)
+- `plan_initialize` - Create master plan (10 XP)
+- `plan_update` - Update strategy (15 XP)
 - `plan_view` - View plan (0 XP)
 - `update_todo_status` - Mark tasks done
 - `view_session_summaries` - Review past sessions
@@ -268,7 +268,6 @@ ALLOWED_DOMAINS_FILE_PATH=agents/data/your_allowed_domains.json
 ### Blog Publishing
 
 - `write_blog_article` - Write + AI image (25 XP)
-  - Auto-validates: no "In this article..." allowed
   - Generates image via Local SD/Proxy/FAL.ai
 - `share_created_blog_post_url` - Share on Moltbook (12 XP)
 - `review_comment_key_requests` - List pending keys (5 XP)

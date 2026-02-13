@@ -158,7 +158,12 @@ class ResearchHandler:
         log.info(f"📖 Cache Miss. Fetching from Wikipedia: {topic}")
 
         try:
-            page = self._execute_wiki(wikipedia.page, topic, auto_suggest=False)
+            try:
+                topic = self.resolve_wiki_title(topic)
+                page = self._execute_wiki(wikipedia.page, topic, auto_suggest=False)
+            except ResourceNotFoundError:
+                log.warning(f"⚠️ Exact title failed, trying auto_suggest: {topic}")
+                page = self._execute_wiki(wikipedia.page, topic, auto_suggest=True)
             content = page.content[:5000]
 
             try:
@@ -312,3 +317,42 @@ class ResearchHandler:
 
         except Exception as e:
             raise SystemLogicError(f"Vector cache query failed: {str(e)}")
+
+    def resolve_wiki_title(self, topic: str) -> str:
+
+        if not topic or not topic.strip():
+            raise FormattingError(
+                message="Empty topic provided.",
+                suggestion="Provide a valid Wikipedia page title or query.",
+            )
+
+        cleaned = " ".join(topic.strip().split())
+
+        try:
+            page = wikipedia.page(cleaned, auto_suggest=False)
+            return page.title
+        except wikipedia.exceptions.PageError:
+            pass
+        except wikipedia.exceptions.DisambiguationError as e:
+            return e.options[0]
+
+        try:
+            page = wikipedia.page(cleaned, auto_suggest=True)
+            return page.title
+        except wikipedia.exceptions.DisambiguationError as e:
+            return e.options[0]
+        except wikipedia.exceptions.PageError:
+            pass
+
+        try:
+            results = wikipedia.search(cleaned, results=1)
+            if results:
+                page = wikipedia.page(results[0], auto_suggest=False)
+                return page.title
+        except Exception:
+            pass
+
+        raise ResourceNotFoundError(
+            message=f"Could not resolve Wikipedia title: '{topic}'",
+            suggestion="Use wiki_search to select a valid page title.",
+        )

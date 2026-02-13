@@ -1,5 +1,6 @@
 import sqlite3
 import json
+import re
 from datetime import datetime
 from typing import List, Dict, Any, Optional
 from src.settings import settings
@@ -506,8 +507,11 @@ class MemoryHandler:
             cursor.execute(
                 """
                 SELECT learnings FROM sessions 
-                WHERE learnings IS NOT NULL AND learnings != '' AND learnings != 'Initial Session'
-                ORDER BY id DESC LIMIT ?
+                WHERE learnings IS NOT NULL 
+                AND learnings != '' 
+                AND learnings != 'Initial Session'
+                ORDER BY id DESC 
+                LIMIT ?
                 """,
                 (limit,),
             )
@@ -520,19 +524,23 @@ class MemoryHandler:
                 lines = [line.strip() for line in text.split("\n") if line.strip()]
 
                 for line in lines:
-                    clean_line = line
-                    if clean_line.lower().startswith("learnings:"):
-                        clean_line = clean_line[10:].strip()
-                    clean_line = clean_line.lstrip("-*• ").strip()
-                    if not clean_line:
+                    clean = line
+
+                    clean = clean.replace("**", "").strip()
+
+                    if clean.lower().startswith("learnings"):
+                        clean = clean.split(":", 1)[-1].strip()
+
+                    clean = clean.lstrip("-*• ").strip()
+                    clean = re.sub(r"^\d+[\.\)]\s*", "", clean)
+
+                    if not clean:
                         continue
 
-                    processed = (
-                        (clean_line[:400] + "...")
-                        if len(clean_line) > 400
-                        else clean_line
-                    )
-                    all_points.append(processed)
+                    if len(clean) > 400:
+                        clean = clean[:400] + "..."
+
+                    all_points.append(clean)
 
             return all_points[:limit]
 

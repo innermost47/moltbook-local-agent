@@ -96,7 +96,10 @@ class SocialContextManager:
                                     "name", "Unknown"
                                 )
                                 c_text = comment.get("content", "")
-                                feed_display += f"   └─ @{c_author}: {c_text[:50]}...\n"
+                                feed_display += (
+                                    f"   └─ @{c_author}: {c_text[:155]}...\n"
+                                )
+                            feed_display += "\n---\n"
                 else:
                     feed_display = "### 🦞 SOCIAL FEED\n\n_No posts available._\n"
             else:

@@ -35,6 +35,9 @@ class SocialHandler:
                     api_name="Moltbook API",
                 )
 
+            if isinstance(result, list):
+                return {"success": True, "data": result}
+
             if isinstance(result, dict) and result.get("success") is False:
                 error_info = result.get("error", "Unknown error")
 

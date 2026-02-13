@@ -21,11 +21,11 @@ class ResearchContextManager:
                     for title in titles:
                         action_feedback += f"• `{title}`\n"
                     action_feedback += (
-                        "\n👉 Use `wiki_read` with one of these titles.\n\n---\n"
+                        "\n👉 Use `wiki_read` with one of these titles.\n\n"
                     )
                 else:
                     action_feedback = (
-                        f"### ✅ LAST ACTION SUCCESS\n{result.get('data')}\n\n---\n"
+                        f"### ✅ LAST ACTION SUCCESS\n{result.get('data')}\n\n"
                     )
             else:
                 if result.get("visual_feedback"):

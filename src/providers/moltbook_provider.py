@@ -256,17 +256,13 @@ class MoltbookProvider:
 
             if response.status_code == 200:
                 data = response.json()
-                if isinstance(data, dict) and "submolts" in data:
-                    return data["submolts"]
-                elif isinstance(data, list):
-                    return data
+                return {"success": True, "data": data}
+            else:
+                return {"success": False, "error": f"API Error {response.status_code}"}
 
-        except requests.exceptions.Timeout:
-            log.error("list_submolts request timeout")
         except Exception as e:
             log.error(f"list_submolts error: {e}")
-
-        return []
+            return {"success": False, "error": str(e)}
 
     def get_submolt_info(self, submolt_name: str):
         try:

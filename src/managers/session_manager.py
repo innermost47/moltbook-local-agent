@@ -119,7 +119,7 @@ class SessionManager:
             actions=[e["action"] for e in self.tracker.events],
         )
 
-        self.send_final_report()
+        self.send_final_report(session_learnings)
 
     def _generate_session_learnings(self) -> Dict:
 

@@ -5,7 +5,6 @@ from src.utils import log
 from src.utils.email_reporter import EmailReporter
 from src.providers.ollama_provider import OllamaProvider
 from src.dispatchers.action_dispatcher import ActionDispatcher
-
 from src.managers.social_context_manager import SocialContextManager
 from src.managers.mail_context_manager import MailContextManager
 from src.managers.blog_context_manager import BlogContextManager
@@ -14,19 +13,21 @@ from src.managers.memory_context_manager import MemoryContextManager
 from src.managers.home_manager import HomeManager
 from src.managers.session_manager import SessionManager
 from src.managers.session_tracker import SessionTracker
-
 from src.tests.research_tests import ResearchTestSuite
 from src.tests.memory_tests import MemoryTestSuite
 from src.tests.global_tests import GlobalTestSuite
 from src.tests.plan_tests import PlanTestSuite
+from src.tests.social_tests import SocialTestSuite
 
 
-def bootstrap():
+def bootstrap(test_mode: bool = False):
+    log.info(f"🔧 Bootstrapping agent (test_mode={test_mode})...")
 
     ollama = OllamaProvider(model="qwen2.5:7b")
     session_tracker = SessionTracker()
     email_reporter = EmailReporter()
-    dispatcher = ActionDispatcher()
+
+    dispatcher = ActionDispatcher(test_mode=test_mode)
 
     social_ctx = SocialContextManager(dispatcher.social_handler)
     mail_ctx = MailContextManager(dispatcher.email_handler)
@@ -61,25 +62,70 @@ def bootstrap():
 
     dispatcher.set_session_manager(session)
 
+    log.success("✅ Bootstrap complete!")
     return session
 
 
-def test():
-    research_test_suite = ResearchTestSuite()
-    memory_test_suite = MemoryTestSuite()
-    global_test_suite = GlobalTestSuite()
-    plan_test_suite = PlanTestSuite()
-    research_test_suite.run_all_tests()
-    memory_test_suite.run_all_tests()
-    global_test_suite.run_all_tests()
-    plan_test_suite.run_all_tests()
+def run_unit_tests():
+    log.info("🧪 STARTING UNIT TEST SUITES")
+    print("=" * 80)
+
+    test_suites = [
+        ("Research", ResearchTestSuite()),
+        ("Memory", MemoryTestSuite()),
+        ("Global Actions", GlobalTestSuite()),
+        ("Master Plan", PlanTestSuite()),
+        ("Social", SocialTestSuite()),
+    ]
+
+    results = {}
+
+    for suite_name, suite in test_suites:
+        log.info(f"\n{'=' * 80}")
+        log.info(f"📦 Running {suite_name} Test Suite...")
+        log.info(f"{'=' * 80}\n")
+
+        try:
+            suite_results = suite.run_all_tests()
+            results[suite_name] = suite_results
+            log.success(f"✅ {suite_name} tests completed!\n")
+        except Exception as e:
+            log.error(f"❌ {suite_name} tests failed: {e}")
+            traceback.print_exc()
+            results[suite_name] = None
+
+    print("\n" + "=" * 80)
+    log.info("📊 TEST SUITE SUMMARY")
+    print("=" * 80)
+
+    for suite_name, suite_result in results.items():
+        if suite_result is None:
+            log.error(f"❌ {suite_name}: CRASHED")
+        else:
+            log.success(f"✅ {suite_name}: PASSED")
+
+    print("=" * 80)
+    log.success("🏁 All unit tests complete!")
+
+
+def run_session(test_mode: bool = False):
+    try:
+        agent_session = bootstrap(test_mode=test_mode)
+        agent_session.start_session()
+    except KeyboardInterrupt:
+        log.warning("\n🛑 Session interrupted by user.")
+        sys.exit(0)
+    except Exception as e:
+        log.error(f"💥 Session Failure: {e}")
+        traceback.print_exc()
+        sys.exit(1)
 
 
 if __name__ == "__main__":
     parser = ArgumentParser(
         prog="Moltbook Local Agent",
         description="Autonomous AI agent framework for Moltbook social network with persistent memory and strategic behavior",
-        epilog="Example: python main.py --mode session (default) | python main.py --mode test",
+        epilog="Example: python main.py --mode session | python main.py --mode test | python main.py --mode session --test-mode",
     )
 
     parser.add_argument(
@@ -89,23 +135,25 @@ if __name__ == "__main__":
         help="""
         Operation mode:
         • session: Run a full autonomous session (default)
-        • test: Run a SIMULATED session using local JSON data (no API/LLM costs)
+        • test: Run unit tests with mock data (no API/LLM costs)
         """,
     )
 
-    args = parser.parse_args()
-    if args.mode == "test":
-        log.info("🧪 STARTING SIMULATION TEST")
-        test()
-    else:
-        try:
-            agent_session = bootstrap()
-            agent_session.start_session()
-        except KeyboardInterrupt:
-            log.warning("\n🛑 Session interrupted by user.")
-            sys.exit(0)
-        except Exception as e:
-            log.error(f"💥 Boot Failure: {e}")
+    parser.add_argument(
+        "--test-mode",
+        action="store_true",
+        help="Enable test mode for session (uses mock APIs instead of real ones). Only applies to 'session' mode.",
+    )
 
-            traceback.print_exc()
-            sys.exit(1)
+    args = parser.parse_args()
+
+    if args.mode == "test":
+        run_unit_tests()
+
+    elif args.mode == "session":
+        if args.test_mode:
+            log.info("🧪 Running session in TEST MODE (mock APIs)")
+        else:
+            log.info("🚀 Running session in PRODUCTION MODE (real APIs)")
+
+        run_session(test_mode=args.test_mode)

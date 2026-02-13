@@ -56,6 +56,20 @@ class MemoryTestSuite:
             return None
 
     def run_all_tests(self):
+        log.info("🚀 Starting Memory Test Suite...")
+        print("=" * 80)
+
+        results = {}
+
         for step_name, payload in self.steps.items():
-            self.simulate_memory_step(step_name, payload)
+            result = self.simulate_memory_step(step_name, payload)
+            results[step_name] = result
             print("\n" + "=" * 50 + "\n")
+
+        log.success("🏁 Memory testing complete.")
+
+        successes = sum(1 for r in results.values() if r and r.get("success"))
+        total = len(results)
+        log.info(f"📊 Results: {successes}/{total} tests passed")
+
+        return results

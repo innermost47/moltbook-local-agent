@@ -8,6 +8,8 @@ from src.utils.exceptions import (
     LazyContentError,
     AccessDeniedError,
     SystemLogicError,
+    APICommunicationError,
+    FormattingError,
 )
 
 
@@ -24,24 +26,76 @@ class BlogHandler:
         return cleaned.strip()
 
     def handle_write_blog_article(self, params: Any) -> Dict[str, Any]:
-        if "[INSERT]" in params.content or "[TODO]" in params.content:
+
+        if (
+            "[INSERT]" in params.content
+            or "[TODO]" in params.content
+            or "[TBD]" in params.content
+        ):
             raise LazyContentError(
-                message="Your article contains technical placeholders.",
-                suggestion="Complete the article content fully. Do not leave [TODO] or [INSERT] tags.",
+                message="Your article contains technical placeholders ([INSERT], [TODO], [TBD]).",
+                suggestion="Complete the article content fully. Do not leave placeholder tags.",
+            )
+
+        if len(params.content.strip()) < 100:
+            raise LazyContentError(
+                message="Article content is too short (< 100 characters).",
+                suggestion="Write a complete, substantial article with at least 200-300 words.",
+            )
+
+        if not params.title or not params.title.strip():
+            raise FormattingError(
+                message="Article title is missing or empty.",
+                suggestion="Provide a clear, descriptive title for your article.",
+            )
+
+        if not params.excerpt or not params.excerpt.strip():
+            raise FormattingError(
+                message="Article excerpt is missing or empty.",
+                suggestion="Provide a brief excerpt (1-2 sentences) summarizing the article.",
+            )
+
+        if not params.image_prompt or not params.image_prompt.strip():
+            raise FormattingError(
+                message="Image prompt is missing or empty.",
+                suggestion="Provide a detailed prompt for image generation (e.g., 'abstract art with blue and gold colors').",
             )
 
         cleaned_content = self._remove_all_hashtags(params.content)
-        html_content = self.blog_manager.format_article_safe(cleaned_content)
 
-        result = self.blog_manager.post_article(
-            title=params.title,
-            excerpt=params.excerpt,
-            content=html_content,
-            image_prompt=params.image_prompt,
-        )
+        try:
+            html_content = self.blog_manager.format_article_safe(cleaned_content)
+        except Exception as e:
+            raise FormattingError(
+                message=f"Failed to convert markdown to HTML: {str(e)}",
+                suggestion="Check your markdown syntax. Avoid invalid HTML or special characters.",
+            )
+
+        try:
+            result = self.blog_manager.post_article(
+                title=params.title,
+                excerpt=params.excerpt,
+                content=html_content,
+                image_prompt=params.image_prompt,
+            )
+        except requests.exceptions.Timeout:
+            raise APICommunicationError(
+                message="Blog API request timed out after 30 seconds.",
+                suggestion="Try again. If problem persists, the blog server may be down.",
+                api_name="Blog API",
+            )
+        except requests.exceptions.ConnectionError:
+            raise APICommunicationError(
+                message="Cannot connect to blog server.",
+                suggestion="Check network connection or try again later.",
+                api_name="Blog API",
+            )
+        except Exception as e:
+            raise SystemLogicError(f"Blog API unexpected error: {str(e)}")
 
         if not result.get("success"):
-            raise SystemLogicError(f"Blog API Failure: {result.get('error')}")
+            error_detail = result.get("error", "Unknown error")
+            raise SystemLogicError(f"Blog API Failure: {error_detail}")
 
         article_url = result.get("url", "")
 
@@ -52,13 +106,26 @@ class BlogHandler:
         }
 
     def handle_share_created_blog_post_url(self, params: Any) -> Dict[str, Any]:
+
+        if not hasattr(params, "share_link_url") or not params.share_link_url:
+            raise FormattingError(
+                message="Missing 'share_link_url' parameter.",
+                suggestion="Provide the full URL of the article you want to share.",
+            )
+
+        if not hasattr(params, "title") or not params.title:
+            raise FormattingError(
+                message="Missing 'title' parameter.",
+                suggestion="Provide the article title for the share action.",
+            )
+
         if (
             not params.share_link_url.startswith(self.blog_manager.blog_base_url)
             and not self.test_mode
         ):
             raise AccessDeniedError(
-                message="Security violation: URL origin mismatch.",
-                suggestion=f"You can only share articles from {self.blog_manager.blog_base_url}",
+                message=f"Security violation: URL must start with {self.blog_manager.blog_base_url}",
+                suggestion=f"You can only share articles from your own blog ({self.blog_manager.blog_base_url}).",
             )
 
         return {
@@ -67,6 +134,7 @@ class BlogHandler:
         }
 
     def handle_review_comment_key_requests(self, params: Any) -> Dict[str, Any]:
+
         try:
             headers = self._get_headers()
             response = requests.get(
@@ -75,8 +143,24 @@ class BlogHandler:
                 timeout=10,
             )
 
+            if response.status_code == 404:
+                raise ResourceNotFoundError(
+                    message="Key review endpoint not found.",
+                    suggestion="This feature may not be enabled on your blog.",
+                )
+
+            if response.status_code == 403:
+                raise AccessDeniedError(
+                    message="Access denied to key review endpoint.",
+                    suggestion="Check your API key permissions.",
+                )
+
             if response.status_code != 200:
-                raise SystemLogicError(f"Server returned HTTP {response.status_code}")
+                raise APICommunicationError(
+                    message=f"Server returned HTTP {response.status_code}",
+                    suggestion="Try again later or check blog server status.",
+                    api_name="Blog API",
+                )
 
             result = response.json()
             pending = result.get("requests", [])
@@ -89,28 +173,76 @@ class BlogHandler:
             )
             return {"success": True, "data": f"PENDING KEYS:\n{details}"}
 
+        except requests.exceptions.Timeout:
+            raise APICommunicationError(
+                message="Request timed out while fetching key requests.",
+                suggestion="Try again. Server may be slow or down.",
+                api_name="Blog API",
+            )
+        except requests.exceptions.JSONDecodeError:
+            raise SystemLogicError("Server returned invalid JSON response.")
         except Exception as e:
             raise SystemLogicError(f"Key Review Failed: {str(e)}")
 
     def handle_approve_comment_key(self, params: Any) -> Dict[str, Any]:
+
+        if not hasattr(params, "request_id") or not params.request_id:
+            raise FormattingError(
+                message="Missing 'request_id' parameter.",
+                suggestion="Provide the ID of the key request to approve.",
+            )
+
         return self._process_key_action(params.request_id, "approve")
 
     def handle_reject_comment_key(self, params: Any) -> Dict[str, Any]:
+
+        if not hasattr(params, "request_id") or not params.request_id:
+            raise FormattingError(
+                message="Missing 'request_id' parameter.",
+                suggestion="Provide the ID of the key request to reject.",
+            )
+
         return self._process_key_action(params.request_id, "reject")
 
     def handle_review_pending_comments(self, params: Any) -> Dict[str, Any]:
-        headers = self._get_headers()
-        query = {"limit": params.limit}
 
-        response = requests.get(
-            f"{self.blog_manager.blog_api_url}/auto_moderate_comments.php",
-            params=query,
-            headers=headers,
-            timeout=10,
-        )
+        limit = getattr(params, "limit", 10)
+
+        if limit < 1 or limit > 50:
+            raise FormattingError(
+                message=f"Invalid limit value: {limit}. Must be between 1-50.",
+                suggestion="Set 'limit' parameter between 1 and 50.",
+            )
+
+        headers = self._get_headers()
+        query = {"limit": limit}
+
+        try:
+            response = requests.get(
+                f"{self.blog_manager.blog_api_url}/auto_moderate_comments.php",
+                params=query,
+                headers=headers,
+                timeout=10,
+            )
+        except requests.exceptions.Timeout:
+            raise APICommunicationError(
+                message="Moderation API request timed out.",
+                suggestion="Try again with a smaller limit value.",
+                api_name="Blog Moderation API",
+            )
+
+        if response.status_code == 404:
+            raise ResourceNotFoundError(
+                message="Moderation endpoint not found.",
+                suggestion="This feature may not be enabled on your blog.",
+            )
 
         if response.status_code != 200:
-            raise SystemLogicError("Moderation endpoint unreachable.")
+            raise APICommunicationError(
+                message=f"Moderation endpoint returned HTTP {response.status_code}",
+                suggestion="Try again later or check blog server status.",
+                api_name="Blog Moderation API",
+            )
 
         result = response.json()
         comments = result.get("comments", [])
@@ -127,9 +259,23 @@ class BlogHandler:
         return {"success": True, "data": f"PENDING COMMENTS:\n{list_txt}"}
 
     def handle_approve_comment(self, params: Any) -> Dict[str, Any]:
+
+        if not hasattr(params, "comment_id_blog") or not params.comment_id_blog:
+            raise FormattingError(
+                message="Missing 'comment_id_blog' parameter.",
+                suggestion="Provide the ID of the comment to approve.",
+            )
+
         return self._process_moderation(params.comment_id_blog, "approve")
 
     def get_latest_articles(self, limit: int = 10) -> Dict[str, Any]:
+
+        if limit < 1 or limit > 50:
+            raise FormattingError(
+                message=f"Invalid limit: {limit}. Must be between 1-50.",
+                suggestion="Set limit between 1 and 50.",
+            )
+
         try:
             response = requests.get(
                 f"{self.blog_manager.blog_api_url}/get_articles.php",
@@ -137,48 +283,97 @@ class BlogHandler:
                 headers=self._get_headers(),
                 timeout=10,
             )
-            if response.status_code == 200:
-                articles = response.json().get("articles", [])
-                if not articles:
-                    return {"success": True, "data": "No articles published yet."}
+        except requests.exceptions.Timeout:
+            raise APICommunicationError(
+                message="Request timed out while fetching articles.",
+                suggestion="Try again with a smaller limit.",
+                api_name="Blog API",
+            )
+        except requests.exceptions.ConnectionError:
+            raise APICommunicationError(
+                message="Cannot connect to blog server.",
+                suggestion="Check network connection or try again later.",
+                api_name="Blog API",
+            )
 
-                formatted = "\n".join(
-                    [f"• {a['title']} (ID: {a['id']})" for a in articles]
-                )
-                return {"success": True, "data": formatted, "raw": articles}
-            return {"success": False, "data": "Could not retrieve articles."}
-        except Exception as e:
-            return {"success": False, "data": f"Error: {str(e)}"}
+        if response.status_code != 200:
+            raise APICommunicationError(
+                message=f"Failed to retrieve articles (HTTP {response.status_code})",
+                suggestion="Try again later or check blog server status.",
+                api_name="Blog API",
+            )
 
-    def _process_key_action(self, request_id: str, action: str):
-        response = requests.post(
-            f"{self.blog_manager.blog_api_url}/auto_approve_keys.php",
-            headers=self._get_headers(),
-            json={"request_id": request_id, "action": action},
-            timeout=10,
-        )
+        articles = response.json().get("articles", [])
+
+        if not articles:
+            return {"success": True, "data": "No articles published yet."}
+
+        formatted = "\n".join([f"• {a['title']} (ID: {a['id']})" for a in articles])
+        return {"success": True, "data": formatted, "raw": articles}
+
+    def _process_key_action(self, request_id: str, action: str) -> Dict[str, Any]:
+
+        try:
+            response = requests.post(
+                f"{self.blog_manager.blog_api_url}/auto_approve_keys.php",
+                headers=self._get_headers(),
+                json={"request_id": request_id, "action": action},
+                timeout=10,
+            )
+        except requests.exceptions.Timeout:
+            raise APICommunicationError(
+                message=f"Timeout while trying to {action} key request.",
+                suggestion="Try again.",
+                api_name="Blog API",
+            )
+
         if response.status_code == 404:
             raise ResourceNotFoundError(
-                message=f"Key Request ID '{request_id}' not found.",
-                suggestion="Call 'review_comment_key_requests' to refresh valid IDs.",
+                message=f"Key Request ID '{request_id}' not found or already processed.",
+                suggestion="Call 'review_comment_key_requests' to get valid IDs.",
             )
-        return {"success": True, "data": f"Key {action}ed for ID {request_id}"}
 
-    def _process_moderation(self, comment_id: str, action: str):
-        response = requests.post(
-            f"{self.blog_manager.blog_api_url}/auto_moderate_comments.php",
-            headers=self._get_headers(),
-            json={"comment_id": comment_id, "action": action},
-            timeout=10,
-        )
+        if response.status_code != 200:
+            raise APICommunicationError(
+                message=f"Key {action} failed (HTTP {response.status_code})",
+                suggestion="Try again or check if the request ID is valid.",
+                api_name="Blog API",
+            )
+
+        return {"success": True, "data": f"Key {action}d for ID {request_id}"}
+
+    def _process_moderation(self, comment_id: str, action: str) -> Dict[str, Any]:
+
+        try:
+            response = requests.post(
+                f"{self.blog_manager.blog_api_url}/auto_moderate_comments.php",
+                headers=self._get_headers(),
+                json={"comment_id": comment_id, "action": action},
+                timeout=10,
+            )
+        except requests.exceptions.Timeout:
+            raise APICommunicationError(
+                message=f"Timeout while trying to {action} comment.",
+                suggestion="Try again.",
+                api_name="Blog Moderation API",
+            )
+
         if response.status_code == 404:
             raise ResourceNotFoundError(
-                message=f"Comment ID '{comment_id}' invalid.",
-                suggestion="Review the moderation queue to get fresh IDs.",
+                message=f"Comment ID '{comment_id}' not found or already moderated.",
+                suggestion="Call 'review_pending_comments' to get fresh IDs.",
             )
-        return {"success": True, "data": f"Comment {comment_id} {action}ed."}
 
-    def _get_headers(self):
+        if response.status_code != 200:
+            raise APICommunicationError(
+                message=f"Comment {action} failed (HTTP {response.status_code})",
+                suggestion="Try again or check if the comment ID is valid.",
+                api_name="Blog Moderation API",
+            )
+
+        return {"success": True, "data": f"Comment {comment_id} {action}d."}
+
+    def _get_headers(self) -> Dict[str, str]:
         return {
             "X-API-Key": self.blog_manager.blog_api_key,
             "Content-Type": "application/json",

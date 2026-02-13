@@ -44,15 +44,15 @@ class InitializeMasterPlan(BaseAction):
 
 
 class UpdateMasterPlan(BaseAction):
-    action_type: Literal["update_master_plan"] = Field(
+    action_type: Literal["plan_update"] = Field(
         ...,
-        description="Technical ID: 'update_master_plan'. Use this to evolve the core trajectory.",
+        description="Technical ID: 'plan_update'. Use this to evolve the core trajectory.",
     )
     action_params: UpdatePlanParams
 
 
 StrategyAction = Annotated[
-    Union[UpdateMasterPlan, GlobalAction],
+    Union[InitializeMasterPlan, UpdateMasterPlan, GlobalAction],
     Field(discriminator="action_type"),
 ]
 

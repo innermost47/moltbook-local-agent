@@ -10,7 +10,13 @@ from src.handlers.research_handler import ResearchHandler
 from src.handlers.memory_handler import MemoryHandler
 from src.handlers.plan_handler import PlanHandler
 from src.settings import settings, AvailableModule
-from src.utils.exceptions import UnknownActionError, ActionPointExhausted
+from src.utils.exceptions import (
+    UnknownActionError,
+    ActionPointExhausted,
+    AgentException,
+    SystemLogicError,
+    get_exception_feedback,
+)
 
 
 class ActionDispatcher:
@@ -46,6 +52,7 @@ class ActionDispatcher:
             "publish_": self.social_handler,
             "vote_": self.social_handler,
             "follow_": self.social_handler,
+            "social_": self.social_handler,
             "wiki_": self.research_handler,
             "research_": self.research_handler,
             "memory_": self.memory_handler,
@@ -117,27 +124,30 @@ class ActionDispatcher:
                 message=f"Action '{action_type}' is not recognized.",
                 suggestion="Consult the available commands in the current UI context.",
             )
-            return {
-                "success": False,
-                "error": err.message,
-                "suggestion": err.suggestion,
-            }
+            feedback = get_exception_feedback(err)
+            log.warning(f"⚠️ Unknown action attempted: {action_type}")
+            return feedback
 
         if self.session_manager and self.session_manager.actions_remaining <= 0:
-            raise ActionPointExhausted(
+            err = ActionPointExhausted(
                 message="No energy remaining.",
-                suggestion="Use 'archive_session' or 'session_finish' to wrap up.",
+                suggestion="Use 'session_finish' to wrap up gracefully.",
             )
+            feedback = get_exception_feedback(err)
+            log.error("🔴 Energy depleted!")
+            return feedback
 
         method_name = f"handle_{action_type}"
         handler_method = getattr(handler, method_name, None)
         if not handler_method:
-            return {"success": False, "error": f"Method {method_name} not found"}
+            return {
+                "success": False,
+                "error": f"Method {method_name} not found in handler",
+            }
 
         payload = (
             params.get("action_params", params) if isinstance(params, dict) else params
         )
-
         if isinstance(payload, dict):
             payload = Namespace(**payload)
 
@@ -146,9 +156,33 @@ class ActionDispatcher:
             result = handler_method(payload)
 
             return result
+
+        except AgentException as e:
+            feedback = get_exception_feedback(e)
+            log.warning(f"⚠️ {e.__class__.__name__}: {e.message}")
+
+            if self.session_manager and hasattr(self.session_manager, "tracker"):
+                self.session_manager.tracker.apply_penalty(
+                    exception_type=e.__class__.__name__,
+                    penalty=feedback.get("xp_penalty", 0),
+                )
+
+            return feedback
+
+        except SystemLogicError as e:
+            feedback = get_exception_feedback(e)
+            log.error(f"💥 System Error: {e.details}")
+
+            if self.session_manager:
+                self.session_manager.actions_remaining += 1
+                log.info("♻️ Energy refunded (system error)")
+
+            return feedback
+
         except Exception as e:
-            log.error(f"💥 Execution Error in {method_name}: {e}")
-            return {"success": False, "error": str(e)}
+            log.error(f"💥 Unexpected Error in {method_name}: {e}")
+            feedback = get_exception_feedback(e)
+            return feedback
 
     def handle_workspace_pin(self, params: Any) -> Dict:
         if isinstance(params, dict):

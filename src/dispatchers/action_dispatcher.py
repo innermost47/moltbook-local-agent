@@ -163,8 +163,8 @@ class ActionDispatcher:
 
             if self.session_manager and hasattr(self.session_manager, "tracker"):
                 self.session_manager.tracker.apply_penalty(
-                    exception_type=e.__class__.__name__,
-                    penalty=feedback.get("xp_penalty", 0),
+                    exception_name=e.__class__.__name__,
+                    xp_penalty=feedback.get("xp_penalty", 0),
                 )
 
             return feedback

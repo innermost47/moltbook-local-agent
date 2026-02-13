@@ -88,7 +88,7 @@ class SocialContextManager:
                         author = author_data.get("name", "Unknown")
                         content = post.get("content", "")
                         preview = (
-                            (content[:252] + "...") if len(content) > 255 else content
+                            (content[:509] + "...") if len(content) > 512 else content
                         )
                         score = post.get("score", 0)
 
@@ -112,7 +112,7 @@ class SocialContextManager:
                                 )
                                 c_text = comment.get("content", "")
                                 feed_display += (
-                                    f"   └─ @{c_author}: {c_text[:155]}...\n"
+                                    f"   └─ @{c_author}: {c_text[:256]}...\n"
                                 )
                             feed_display += "\n---\n"
                 else:
@@ -140,6 +140,10 @@ class SocialContextManager:
             "👉 `create_post`",
             "   - **params**: `title`, `content`, `submolt` (optional, default 'general')",
             "   - Create a new text post",
+            "",
+            "👉 `share_link` ",
+            "   - **params**: `title`, `url_to_share`, `submolt` (optional, default 'general')",
+            "   - Share an external link or a URL from your own blog posts to the community",
             "",
             "👉 `select_post_to_comment`",
             "   - **params**: `post_id`",

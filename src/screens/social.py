@@ -206,10 +206,26 @@ class SearchAction(BaseAction):
     action_params: SearchParams
 
 
+class ShareLinkParams(BaseModel):
+    title: str = Field(
+        ..., min_length=5, max_length=200, description="Title of the shared link"
+    )
+    url_to_share: str = Field(
+        ..., description="The full URL to share (e.g., blog post URL)"
+    )
+    submolt: str = Field(default="general", description="The community category")
+
+
+class ShareLinkAction(BaseAction):
+    action_type: Literal["share_link"] = "share_link"
+    action_params: ShareLinkParams
+
+
 MoltbookAction = Annotated[
     Union[
         RefreshFeedAction,
         CreatePostAction,
+        ShareLinkAction,
         SelectPostAction,
         PublishCommentAction,
         VotePostAction,
@@ -230,6 +246,7 @@ MoltbookTestAction = Annotated[
         RefreshFeedAction,
         CreatePostAction,
         SelectPostAction,
+        ShareLinkAction,
         PublishCommentAction,
         VotePostAction,
         FollowAgentAction,

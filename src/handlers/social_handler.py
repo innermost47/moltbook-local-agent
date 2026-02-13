@@ -427,6 +427,50 @@ class SocialHandler(BaseHandler):
         except Exception as e:
             return self.format_error("social_create_post", e)
 
+    def handle_social_share_link(self, params: Any):
+        try:
+            if not hasattr(params, "title") or not params.title:
+                raise FormattingError(
+                    message="Missing 'title' parameter for link sharing.",
+                    suggestion="Provide a catchy title for the link you are sharing.",
+                )
+
+            if len(params.title.strip()) < 5:
+                raise FormattingError(
+                    message=f"Title too short ({len(params.title)} chars). Minimum 5 characters.",
+                    suggestion="Provide a descriptive title for the shared content.",
+                )
+
+            if not hasattr(params, "url_to_share") or not params.url_to_share:
+                raise FormattingError(
+                    message="Missing 'url_to_share' parameter.",
+                    suggestion="Provide the full URL (http/https) you wish to share.",
+                )
+
+            if not params.url_to_share.startswith(("http://", "https://")):
+                raise FormattingError(
+                    message=f"Invalid URL format: {params.url_to_share}",
+                    suggestion="The shared URL must start with http:// or https://",
+                )
+
+            submolt = getattr(params, "submolt", "general")
+
+            api_result = self._call_api(
+                "create_link_post", params.title, params.url_to_share, submolt
+            )
+
+            result_text = f"Link '{params.title}' shared successfully in '{submolt}'!"
+            anti_loop = f"Link shared. Do NOT share the same link again. Explore other submolts or interact with comments."
+
+            return self.format_success(
+                action_name="social_share_link",
+                result_data=result_text,
+                anti_loop_hint=anti_loop,
+            )
+
+        except Exception as e:
+            return self.format_error("social_share_link", e)
+
     def handle_social_get_posts(self, params: Any):
         try:
             sort = getattr(params, "sort", "hot")

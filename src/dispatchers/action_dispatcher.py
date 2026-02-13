@@ -49,6 +49,7 @@ class ActionDispatcher:
             "refresh_": self.social_handler,
             "create_post": self.social_handler,
             "select_": self.social_handler,
+            "share_link": self.social_handler,
             "publish_": self.social_handler,
             "vote_": self.social_handler,
             "follow_": self.social_handler,

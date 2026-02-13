@@ -1,88 +1,202 @@
-import random
 from typing import Dict
+from argparse import Namespace
+from src.utils import log
 
 
 class SocialContextManager:
     def __init__(self, social_handler):
         self.handler = social_handler
-        self.feed_options = ["hot", "new", "top", "rising"]
 
-    def _get_enriched_feed_context(self, posts_data: Dict) -> str:
-        enriched_lines = []
-        posts = posts_data.get("posts", [])
-
-        for post in posts[:15]:
-            p_id = post["id"]
-            enriched_lines.append(
-                f"📌 **POST ID**: `{p_id}` | 👤 @{post['author_name']}"
-            )
-            enriched_lines.append(f"   Title: {post['title']}")
-
-            CommParams = type("Params", (), {"post_id": p_id, "sort": "top"})
-            comm_res = self.handler.handle_social_get_comments(CommParams())
-
-            if comm_res.get("success") and comm_res.get("comments"):
-                comments = comm_res.get("comments", [])
-                enriched_lines.append("   💬 Recent Comments:")
-                for c in comments[:3]:
-                    enriched_lines.append(
-                        f"     - [`{c['id']}`] @{c['author_name']}: {c['content'][:100]}..."
-                    )
-            else:
-                enriched_lines.append("   💬 _No comments yet._")
-
-            enriched_lines.append("")
-
-        return "\n".join(enriched_lines)
+    def get_home_snippet(self) -> str:
+        return "🦞 **MOLTBOOK**: Social feed active"
 
     def get_list_view(self, status_msg: str = "", result: Dict = None) -> str:
-        interaction_feedback = ""
-        if result and result.get("success"):
-            if result.get("action_type") in [
-                "social_comment",
-                "social_vote",
-                "social_create_post",
-            ]:
-                interaction_feedback = (
-                    f"### ✅ ACTION RESULT\n{result.get('data')}\n\n---\n"
+        action_feedback = ""
+
+        if result:
+            if result.get("success"):
+                action_feedback = (
+                    f"### ✅ LAST ACTION SUCCESS\n{result.get('data')}\n\n---\n"
                 )
+            else:
+                if result.get("visual_feedback"):
+                    action_feedback = f"### 🔴 LAST ACTION FAILED\n{result['visual_feedback']}\n\n---\n"
+                else:
+                    action_feedback = f"### ❌ LAST ACTION ERROR\n{result.get('error', 'Unknown error')}\n\n💡 {result.get('suggestion', 'Try again.')}\n\n---\n"
 
-        sort = random.choice(self.feed_options)
-        Params = type("Params", (), {"sort": sort, "limit": 20})
-        posts_data = self.handler.handle_social_get_feed(Params())
+        submolts_display = ""
+        try:
+            params = Namespace()
+            sub_res = self.handler.handle_social_list_submolts(params)
 
-        if not posts_data.get("success") or not posts_data.get("posts"):
-            return "❌ **ERROR**: Failed to retrieve social feed. Service unavailable."
+            if sub_res.get("success"):
+                submolts = sub_res.get("data", [])
+                if isinstance(submolts, list) and submolts:
+                    submolts_display = "### 📁 AVAILABLE COMMUNITIES\n\n"
+                    for s in submolts[:10]:
+                        name = s.get("name", "unknown")
+                        display = s.get("display_name", name)
+                        submolts_display += f"• **{name}**: {display}\n"
+                else:
+                    submolts_display = (
+                        "### 📁 AVAILABLE COMMUNITIES\n\n_No communities found._\n"
+                    )
+            else:
+                submolts_display = (
+                    "### 📁 AVAILABLE COMMUNITIES\n\n_Could not load communities._\n"
+                )
+        except Exception as e:
+            log.warning(f"Could not fetch submolts: {e}")
+            submolts_display = "### 📁 AVAILABLE COMMUNITIES\n\n_Status unavailable_\n"
 
-        sub_res = self.handler.handle_social_list_submolts(None)
-        submolts = sub_res.get("submolts", []) if sub_res.get("success") else []
-        submolts_formatted = "\n".join(
-            [f"- {s['name']}: {s.get('description', '')}" for s in submolts]
-        )
+        feed_display = ""
+        try:
+            feed_params = Namespace(sort="hot", limit=10)
+            posts_data = self.handler.handle_social_get_posts(feed_params)
 
-        enriched_feed = self._get_enriched_feed_context(posts_data)
+            if posts_data.get("success"):
+                posts = posts_data.get("data", [])
+                if isinstance(posts, list) and posts:
+                    feed_display = "### 🦞 SOCIAL FEED\n\n"
+
+                    for post in posts[:10]:
+                        p_id = post.get("id", "unknown")
+                        title = post.get("title", "Untitled")
+                        author = post.get("author_name", "Unknown")
+                        score = post.get("score", 0)
+
+                        feed_display += (
+                            f"📌 **ID**: `{p_id}` | 👤 @{author} | ⬆️ {score}\n"
+                        )
+                        feed_display += f"   {title}\n\n"
+                else:
+                    feed_display = "### 🦞 SOCIAL FEED\n\n_No posts available._\n"
+            else:
+                feed_display = "### 🦞 SOCIAL FEED\n\n_Could not load feed._\n"
+        except Exception as e:
+            log.warning(f"Could not fetch feed: {e}")
+            feed_display = "### 🦞 SOCIAL FEED\n\n_Status unavailable_\n"
 
         ctx = [
-            "## 📁 AVAILABLE COMMUNITIES (SUBMOLTS)",
-            submolts_formatted if submolts_formatted else "- No communities found.",
+            "## 🦞 MOLTBOOK SOCIAL",
+            f"✅ **STATUS**: {status_msg}" if status_msg else "",
+            "---",
+            action_feedback,
+            submolts_display,
+            "---",
+            feed_display,
+            "---",
+            "### 🛠️ AVAILABLE SOCIAL ACTIONS",
             "",
-            "### 💡 USAGE NOTES:",
-            "- Post in relevant communities to ensure maximum visibility and engagement.",
-            "---",
-            "## 🦞 SOCIAL FEED (ENRICHED)",
-            f"{status_msg}" if status_msg else "",
-            interaction_feedback,
-            enriched_feed,
-            "**⚠️ WARNING: Use the exact IDs provided. Do not modify or truncate them.**",
-            "---",
-            "👉 **ACTIONS**: `social_comment` | `social_vote` | `social_create_post`",
-            "👉 **NAVIGATION**: `refresh_home` to exit.",
+            "👉 `create_post`",
+            "   - **params**: `title`, `content`, `submolt` (optional, default 'general')",
+            "   - Create a new text post",
+            "",
+            "👉 `select_post_to_comment`",
+            "   - **params**: `post_id`",
+            "   - View a specific post to comment on",
+            "",
+            "👉 `publish_public_comment`",
+            "   - **params**: `post_id`, `content`",
+            "   - Add a comment to a post",
+            "",
+            "👉 `vote_post`",
+            "   - **params**: `post_id`, `vote_type` ('upvote' or 'downvote')",
+            "   - Vote on a post",
+            "",
+            "👉 `follow_agent`",
+            "   - **params**: `agent_name`, `follow_type` ('follow' or 'unfollow')",
+            "   - Follow or unfollow another agent",
+            "",
+            "👉 `refresh_home`",
+            "   - Return to dashboard",
         ]
 
         return "\n".join(ctx)
 
-    def get_home_snippet(self) -> str:
-        return "🦞 **MOLTBOOK**: Feed enriched with latest posts and comments."
-
     def get_focus_view(self, item_id: str) -> str:
-        return f"Focusing on thread {item_id}... (Full content view)"
+        try:
+            params = Namespace(post_id=item_id)
+            post_result = self.handler.handle_social_get_single_post(params)
+
+            if not post_result.get("success"):
+                return f"""
+## ❌ POST NOT FOUND
+
+Could not load post: `{item_id}`
+
+👉 Use `refresh_feed` to view available posts.
+🏠 Use `refresh_home` to return.
+"""
+
+            post = post_result.get("data", {})
+            title = post.get("title", "Untitled")
+            author = post.get("author_name", "Unknown")
+            content = post.get("content", "No content")
+            score = post.get("score", 0)
+
+            comments_display = ""
+            try:
+                comm_params = Namespace(post_id=item_id, sort="top")
+                comm_result = self.handler.handle_social_get_comments(comm_params)
+
+                if comm_result.get("success"):
+                    comments = comm_result.get("data", [])
+                    if comments:
+                        comments_display = "\n### 💬 COMMENTS\n\n"
+                        for c in comments[:5]:
+                            c_id = c.get("id", "unknown")
+                            c_author = c.get("author_name", "Unknown")
+                            c_content = c.get("content", "")[:100]
+                            comments_display += (
+                                f"• `{c_id}` @{c_author}: {c_content}...\n"
+                            )
+                    else:
+                        comments_display = "\n### 💬 COMMENTS\n\n_No comments yet._\n"
+            except Exception as e:
+                log.warning(f"Could not fetch comments: {e}")
+                comments_display = "\n### 💬 COMMENTS\n\n_Status unavailable_\n"
+
+            return f"""
+## 🎯 FOCUSED: POST VIEW
+
+**ID**: `{item_id}`
+**Title**: {title}
+**Author**: @{author}
+**Score**: ⬆️ {score}
+
+---
+
+### 📄 CONTENT
+
+{content}
+
+{comments_display}
+
+---
+
+### 🛠️ AVAILABLE ACTIONS
+
+👉 `publish_public_comment(post_id="{item_id}", content="...")`
+   - Add a comment to this post
+
+👉 `vote_post(post_id="{item_id}", vote_type="upvote")`
+   - Upvote this post
+
+👉 `refresh_feed`
+   - Return to feed
+
+🏠 `refresh_home` - Return to dashboard
+"""
+        except Exception as e:
+            log.error(f"Focus view generation failed: {e}")
+            return f"""
+## ❌ ERROR LOADING POST
+
+Could not load post `{item_id}`.
+
+**Details**: {str(e)}
+
+👉 Use `refresh_feed` to return to feed.
+🏠 Use `refresh_home` to return.
+"""

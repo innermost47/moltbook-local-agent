@@ -1,5 +1,7 @@
 from typing import Dict
+from argparse import Namespace
 from src.settings import settings
+from src.utils import log
 
 
 class MemoryContextManager:
@@ -7,65 +9,122 @@ class MemoryContextManager:
         self.handler = memory_handler
 
     def get_home_snippet(self) -> str:
-        return self.handler.get_agent_context_snippet()
+        try:
+            return self.handler.get_agent_context_snippet()
+        except Exception as e:
+            log.warning(f"Memory snippet generation failed: {e}")
+            return "🧠 **MEMORY**: Status unavailable"
 
     def get_list_view(self, status_msg: str = "", result: Dict = None) -> str:
-        last_state = self.handler.get_last_session_state() or {}
+        action_feedback = ""
 
-        recollection_content = ""
-        if result and result.get("success"):
-            if "data" in result and result.get("action_type") == "memory_retrieve":
-                recollection_content = (
-                    f"### 🔮 RECOLLECTED SHARDS\n{result.get('data')}\n\n---\n"
+        if result:
+            if result.get("success"):
+                action_feedback = (
+                    f"### ✅ LAST ACTION SUCCESS\n{result.get('data')}\n\n---\n"
                 )
+            else:
+                if result.get("visual_feedback"):
+                    action_feedback = f"### 🔴 LAST ACTION FAILED\n{result['visual_feedback']}\n\n---\n"
+                else:
+                    action_feedback = f"### ❌ LAST ACTION ERROR\n{result.get('error', 'Unknown error')}\n\n💡 {result.get('suggestion', 'Try again.')}\n\n---\n"
+
+        last_state_info = ""
+        try:
+            last_state = self.handler.get_last_session_state() or {}
+            last_state_info = f"""
+### 📜 PREVIOUS SESSION STATE
+
+🎯 **Last Learnings**: {last_state.get('learnings', 'N/A')}
+📈 **Previous Plan**: {last_state.get('plan', 'N/A')}
+"""
+        except Exception as e:
+            log.warning(f"Could not fetch last session state: {e}")
+            last_state_info = "### 📜 PREVIOUS SESSION STATE\n\n_Status unavailable_\n"
+
+        categories_display = ""
+        try:
+            cursor = self.handler.conn.cursor()
+            cursor.execute(
+                "SELECT category, COUNT(*) as cnt FROM memory_entries GROUP BY category"
+            )
+            counts = {row["category"]: row["cnt"] for row in cursor.fetchall()}
+
+            categories_display = "### 📂 AVAILABLE CATEGORIES\n\n"
+
+            for cat_name, description in settings.MEMORY_CATEGORIES.items():
+                count = counts.get(cat_name, 0)
+                categories_display += f"- **{cat_name.upper()}**: {count} shards\n"
+                categories_display += f"  _{description}_\n"
+        except Exception as e:
+            log.warning(f"Could not fetch memory categories: {e}")
+            categories_display = "### 📂 AVAILABLE CATEGORIES\n\n_Status unavailable_\n"
 
         ctx = [
             "## 🧠 INTERNAL MEMORY SYSTEMS",
-            f"{status_msg}" if status_msg else "",
+            f"✅ **STATUS**: {status_msg}" if status_msg else "",
             "---",
-            recollection_content,
-            f"🎯 **LAST SESSION LEARNINGS**: {last_state.get('learnings', 'N/A')}",
-            f"📈 **PREVIOUS PLAN**: {last_state.get('plan', 'N/A')}",
+            action_feedback,
+            last_state_info,
+            "---",
+            categories_display,
             "",
-            "### 📂 AVAILABLE CATEGORIES",
+            "### 🛠️ MEMORY ACTIONS",
+            "",
+            "👉 `memory_retrieve`",
+            "   - **params**: `memory_category`, `memory_limit`, `memory_order` ('asc'|'desc')",
+            "   - Recall stored memories from a category",
+            "",
+            "👉 `memory_store`",
+            "   - **params**: `memory_category`, `memory_content`",
+            "   - Store new memory in a category",
+            "",
+            "👉 `refresh_home`",
+            "   - Return to home dashboard",
         ]
-
-        cursor = self.handler.conn.cursor()
-        cursor.execute(
-            "SELECT category, COUNT(*) as cnt FROM memory_entries GROUP BY category"
-        )
-        counts = {row["category"]: row["cnt"] for row in cursor.fetchall()}
-
-        for cat_name, description in settings.MEMORY_CATEGORIES.items():
-            count = counts.get(cat_name, 0)
-            ctx.append(f"- **{cat_name.upper()}**: {count} shards")
-            ctx.append(f"  _{description}_")
-
-        ctx.append(
-            "\n### 🛠️ MEMORY PROTOCOL"
-            "\nTo recall shards, use: `memory_retrieve`"
-            "\n- **params**: `memory_category` (string), `memory_limit` (int), `memory_order` ('asc'|'desc')"
-            "\n"
-            "\nTo anchor new memory, use: `memory_store`"
-            "\n- **params**: `memory_category` (string), `memory_content` (string)"
-            "\n"
-            "\n👉 **ACTIONS**: `memory_retrieve` | `memory_store` | `refresh_home`"
-        )
 
         return "\n".join(ctx)
 
     def get_focus_view(self, item_id: str) -> str:
-        Params = type("Params", (), {"memory_category": item_id, "memory_limit": 10})
-        result = self.handler.handle_retrieve_memory(Params())
+        try:
+            params = Namespace(
+                memory_category=item_id, memory_limit=10, memory_order="desc"
+            )
+            result = self.handler.handle_memory_retrieve(params)
 
-        return f"""
-# 🎯 RECOLLECTION: {item_id}
-{result.get('data', 'No shards found in this sector.')}
+            if result.get("success"):
+                content = result.get("data", "No shards found in this sector.")
+            else:
+                content = f"❌ {result.get('error', 'Could not retrieve memories')}"
+
+            return f"""
+## 🎯 RECOLLECTION: {item_id.upper()}
+
+{content}
 
 ---
-### 🛠️ ACTIONS
-👉 **STORE NEW**: `memory_store(memory_category="{item_id}", memory_content="...")`
-👉 **BACK**: `memory_list` to see all categories.
 
-🏠 Use `refresh_home` to return to dashboard.
+### 🛠️ AVAILABLE ACTIONS
+
+👉 `memory_store(memory_category="{item_id}", memory_content="...")`
+   - Store new memory in this category
+
+👉 `memory_retrieve(memory_category="{item_id}", memory_limit=10)`
+   - Refresh memories from this category
+
+👉 `refresh_home`
+   - Return to dashboard
+
+---
+
+**Available categories**: {', '.join(settings.MEMORY_CATEGORIES.keys())}
+"""
+        except Exception as e:
+            log.error(f"Focus view generation failed: {e}")
+            return f"""
+## ❌ ERROR LOADING MEMORIES
+
+Could not load memories for category `{item_id}`.
+
+👉 Use `refresh_home` to return.
 """

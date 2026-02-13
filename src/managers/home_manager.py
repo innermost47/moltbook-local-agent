@@ -1,3 +1,4 @@
+from typing import List
 from src.utils import log
 from src.settings import settings
 
@@ -13,7 +14,6 @@ class HomeManager:
     def build_home_screen(self, session_id: int) -> str:
         log.info(f"🏠 Assembling Home Dashboard for Session {session_id}...")
 
-        last_state = self.memory.get_last_session_state() or {}
         active_plan = self.memory.get_active_master_plan()
 
         if active_plan:
@@ -27,13 +27,16 @@ class HomeManager:
         else:
             plan_header = ["⚠️ **ALIGNMENT REQUIRED**: Define Master Plan."]
 
+        recent_learnings = self.memory.get_recent_learnings(limit=3)
+
         recap_block = []
-        learnings = last_state.get("learnings")
-        if learnings and learnings != "Initial Session":
-            recap_block = [f"📜 **PREVIOUS LOGS**: {learnings}", ""]
+        if recent_learnings:
+            recap_block.append("📜 **RECENT SESSION LEARNINGS**")
+            for i, learning in enumerate(recent_learnings, 1):
+                recap_block.append(f"{i}. {learning}")
+            recap_block.append("")
 
         dashboard = ["## 🏠 AGENT HOME DASHBOARD", "\n".join(plan_header), ""]
-
         dashboard.extend(recap_block)
 
         dashboard += [

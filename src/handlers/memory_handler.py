@@ -500,6 +500,32 @@ class MemoryHandler:
         except sqlite3.Error as e:
             raise SystemLogicError(f"Plan persistence failure: {str(e)}")
 
+    def get_recent_learnings(self, limit: int = 3) -> List[str]:
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute(
+                """
+                SELECT learnings FROM sessions 
+                WHERE learnings IS NOT NULL AND learnings != '' AND learnings != 'Initial Session'
+                ORDER BY id DESC LIMIT ?
+                """,
+                (limit,),
+            )
+
+            rows = cursor.fetchall()
+            return [
+                (
+                    row["learnings"][:150] + "..."
+                    if len(row["learnings"]) > 150
+                    else row["learnings"]
+                )
+                for row in rows
+            ]
+
+        except Exception as e:
+            log.error(f"Failed to get recent learnings: {e}")
+            return []
+
     def __del__(self):
         if hasattr(self, "conn"):
             try:

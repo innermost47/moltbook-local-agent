@@ -1,5 +1,7 @@
 from typing import Dict
+from argparse import Namespace
 from src.managers.base_context_manager import BaseContextManager
+from src.utils import log
 
 
 class BlogContextManager(BaseContextManager):
@@ -8,10 +10,11 @@ class BlogContextManager(BaseContextManager):
 
     def get_home_snippet(self) -> str:
         try:
-            key_res = self.handler.handle_review_comment_key_requests(None)
-            comm_res = self.handler.handle_review_pending_comments(
-                type("Params", (), {"limit": 5})
-            )
+            key_params = Namespace()
+            comm_params = Namespace(limit=5)
+
+            key_res = self.handler.handle_review_comment_key_requests(key_params)
+            comm_res = self.handler.handle_review_pending_comments(comm_params)
 
             key_count = 0
             if key_res.get("success") and "PENDING KEYS" in key_res.get("data", ""):
@@ -26,25 +29,34 @@ class BlogContextManager(BaseContextManager):
             status_parts = ["📚 **BLOG**"]
 
             if key_count > 0:
-                status_parts.append(f"🔑 **{key_count} Keys**")
+                status_parts.append(f"🔑 {key_count} Keys")
 
             if comm_count > 0:
-                status_parts.append(f"💬 **{comm_count} Comments**")
+                status_parts.append(f"💬 {comm_count} Comments")
 
             if key_count == 0 and comm_count == 0:
                 status_parts.append("All clear")
 
             return " | ".join(status_parts)
 
-        except Exception:
-            return "📚 **BLOG**: Connectivity check required."
+        except Exception as e:
+            log.warning(f"Blog snippet generation failed: {e}")
+            return "📚 **BLOG**: Status unavailable"
 
     def get_list_view(self, status_msg: str = "", result: Dict = None) -> str:
+
         action_feedback = ""
-        if result and result.get("success"):
-            action_feedback = (
-                f"### ✅ LAST ACTION SUCCESS\n{result.get('data')}\n\n---\n"
-            )
+
+        if result:
+            if result.get("success"):
+                action_feedback = (
+                    f"### ✅ LAST ACTION SUCCESS\n{result.get('data')}\n\n---\n"
+                )
+            else:
+                if result.get("visual_feedback"):
+                    action_feedback = f"### 🔴 LAST ACTION FAILED\n{result['visual_feedback']}\n\n---\n"
+                else:
+                    action_feedback = f"### ❌ LAST ACTION ERROR\n{result.get('error', 'Unknown error')}\n\n💡 {result.get('suggestion', 'Try again.')}\n\n---\n"
 
         blog_knowledge = ""
         try:
@@ -58,11 +70,14 @@ class BlogContextManager(BaseContextManager):
                 blog_knowledge += "- " + "\n- ".join(published_titles) + "\n"
                 blog_knowledge += "\n**♟️ STRATEGIC INSTRUCTION**: Do not duplicate existing topics. Always provide a new angle.\n"
         except Exception as e:
-            blog_knowledge = f"⚠️ _Note: Could not synchronize blog catalog ({e})_\n"
+            log.warning(f"Could not sync blog catalog: {e}")
+            blog_knowledge = f"⚠️ _Note: Could not synchronize blog catalog_\n"
 
         key_context = ""
         try:
-            pending_res = self.handler.handle_review_comment_key_requests(None)
+            key_params = Namespace()
+            pending_res = self.handler.handle_review_comment_key_requests(key_params)
+
             if pending_res.get("success") and "PENDING KEYS" in pending_res.get(
                 "data", ""
             ):
@@ -71,8 +86,9 @@ class BlogContextManager(BaseContextManager):
                 )
             else:
                 key_context = "\n### 🔑 PENDING KEYS\n_No pending requests._\n"
-        except Exception:
-            key_context = ""
+        except Exception as e:
+            log.warning(f"Could not fetch key requests: {e}")
+            key_context = "\n### 🔑 PENDING KEYS\n_Status unavailable_\n"
 
         ctx = [
             "## 📚 BLOG ADMINISTRATION & HUB",
@@ -83,39 +99,50 @@ class BlogContextManager(BaseContextManager):
             "---",
             key_context,
             "---",
-            "### ✍️ MANDATORY BLOG ACTIONS",
-            "You are already in BLOG mode. **Do not navigate.** Execute one of these:",
+            "### ✍️ AVAILABLE BLOG ACTIONS",
+            "You are in BLOG mode. **Do not navigate.** Execute one of these:",
             "",
             "👉 `write_blog_article`",
-            "   - **params**: `title` (string), `content` (markdown), `tags` (list of strings)",
-            "   - *Note: Focus on your musical obsession.*",
+            "   - **params**: `title`, `excerpt`, `content` (markdown), `image_prompt`",
+            "   - Create a new blog post with AI-generated header image",
             "",
-            "👉 `review_pending_comments` or `handle_review_comment_key_requests`",
-            "   - Use these to manage the resonance of your audience.",
+            "👉 `review_pending_comments`",
+            "   - Review and moderate pending blog comments",
+            "",
+            "👉 `review_comment_key_requests`",
+            "   - Review access requests for commenting privileges",
             "",
             "👉 `refresh_home`",
-            "   - Use this only if you wish to exit the Blog frequency.",
+            "   - Return to home dashboard",
             "---",
-            "⚠️ **WARNING**: Calling `Maps_to_mode('BLOG')` while already here creates a feedback loop of digital static. **Execute a write or review action now.**",
+            "⚠️ **WARNING**: Do not call `navigate_to_mode('BLOG')` while already here. Execute an action instead.",
         ]
 
         return "\n".join(ctx)
 
     def get_focus_view(self, item_id: str) -> str:
+
         return f"""
-# 🎯 FOCUS: BLOG KEY REQUEST
-**Target ID:** {item_id}
+## 🎯 FOCUS: BLOG KEY REQUEST
 
-You are currently reviewing the request for ID `{item_id}`. 
-Review the list view or internal logs for the 'username' associated with this ID if necessary.
+**Target ID:** `{item_id}`
 
----
-### 🛠️ DECISION
-👉 **APPROVE**: `blog_approve_comment_key(request_id="{item_id}")`
-👉 **REJECT**: `blog_reject_comment_key(request_id="{item_id}")`
-
-💡 *Note: Approving will allow this user to comment on your articles.*
+You are reviewing the comment key request for ID `{item_id}`. 
+Review the list view for the 'username' associated with this ID if needed.
 
 ---
-🏠 Use `blog_review_comment_key_requests` to go back to the list.
+
+### 🛠️ DECISION ACTIONS
+
+👉 **APPROVE**: `approve_comment_key(request_id="{item_id}")`
+   - Grant this user permission to comment on your articles
+
+👉 **REJECT**: `reject_comment_key(request_id="{item_id}")`
+   - Deny commenting access to this user
+
+---
+
+💡 **TIP**: Use `review_comment_key_requests` to return to the full list.
+
+🏠 Use `refresh_home` to exit blog mode.
 """

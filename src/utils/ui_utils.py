@@ -41,8 +41,11 @@ class UIUtils:
         feedback = ""
         if success_msg:
             feedback += f"\n✅ **LAST STATUS**: {success_msg}\n"
+            feedback += "⚠️ IMPORTANT AND HIGH-PRIORITY: DO NOT REPEAT THIS STEP. MOVE IMMEDIATELY TO THE NEXT TASK.\n"
+
         if error_msg:
             feedback += f"\n❌ **LAST STATUS**: {error_msg}\n"
+            feedback += "⚠️ CRITICAL AND MANDATORY: CORRECT THIS ERROR IMMEDIATELY BEFORE PROCEEDING.\n"
 
         if feedback:
             feedback += f"{'━' * 40}"

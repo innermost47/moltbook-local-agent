@@ -19,6 +19,7 @@ class HomeManager:
         self.research = research_ctx
         self.memory = memory_handler
         self.progression = progression_system
+        self.has_seen_build_session_strategy_block = False
 
     def build_home_screen(self, session_id: int) -> str:
         log.info(f"🏠 Assembling Home Dashboard for Session {session_id}...")
@@ -38,7 +39,10 @@ class HomeManager:
                 "⚠️ **MASTER PLAN REQUIRED**: Define your long-term objectives.\n"
             ]
 
-        session_strategy_block = self._build_session_strategy_block()
+        session_strategy_block = ""
+        if not self.has_seen_build_session_strategy_block:
+            session_strategy_block = self._build_session_strategy_block()
+            self.has_seen_build_session_strategy_block = True
 
         prog_status = self.progression.get_current_status()
         progression_block = self._build_progression_block(prog_status)

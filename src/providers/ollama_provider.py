@@ -142,7 +142,7 @@ class OllamaProvider:
         self._save_debug(debug_filename, messages)
 
         if temperature is None:
-            temperature = 0.7 if pydantic_model else 0.7
+            temperature = 0.2 if pydantic_model else 0.7
 
         try:
             log.info(f"⚡ {agent_name} analyzes the interface...")
@@ -173,7 +173,7 @@ class OllamaProvider:
             response["message"]["content"] = assistant_msg
 
             updated_history = conversation_history + [
-                {"role": "user", "content": prompt},
+                {"role": "user", "content": full_llm_payload},
                 {"role": "assistant", "content": assistant_msg},
             ]
 

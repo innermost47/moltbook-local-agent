@@ -15,7 +15,7 @@ class MailContextManager:
 
             if messages:
                 return f"📩 **MAIL**: You have {len(messages)} active message(s) in your inbox."
-            return "📩 **MAIL**: Inbox is empty."
+            return "📩 **MAIL**: Inbox is empty"
         except Exception as e:
             log.warning(f"Mail snippet generation failed: {e}")
             return "📩 **MAIL**: Status unavailable"

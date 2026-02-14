@@ -69,7 +69,6 @@ class UIUtils:
             f"🌐 {' | '.join(nav_items)}\n"
             f"🔋 {energy_bar} ({remaining}/{max_actions} actions left){prog_display}{urgency_message}\n"
             f"{'━' * width}\n"
-            f""
         )
 
     @staticmethod
@@ -130,7 +129,7 @@ class UIUtils:
         notifications = cls.render_feedback(success_msg, error_msg, current_domain)
         footer = cls.render_footer()
 
-        return f"{header}\n{notification_section}\n{content}\n\n{footer}\n\n{notifications}"
+        return f"{header}{notification_section}{'━' * 70}\n\n{content}\n\n{footer}\n\n\n{notifications}"
 
     @staticmethod
     def render_workspace(workspace_data: Dict[str, str]) -> str:

@@ -357,6 +357,8 @@ Be specific and actionable. Focus on behavior patterns, not individual actions.
                 leveled_down = penalty_result.get("leveled_down", False)
 
             penalty_message = f"""
+{'━' * 40}
+
 💥 **XP PENALTY APPLIED**: -{xp_lost} XP for looping {signature_count} times!
 
 📉 **Current Status:**
@@ -372,6 +374,8 @@ Be specific and actionable. Focus on behavior patterns, not individual actions.
                 ).upper()
 
                 loop_warning = f"""
+{'━' * 40}
+
 🔴 🔴 🔴 **CRITICAL NAVIGATION LOOP DETECTED** 🔴 🔴 🔴
 
 ⚠️ You called `navigate_to_mode('{target_mode}')` **{signature_count + 1} times in a row!**
@@ -391,8 +395,6 @@ Be specific and actionable. Focus on behavior patterns, not individual actions.
 3. 🏠 If nothing to do here, use `refresh_home` to return to dashboard
 
 ⛔ **DO NOT call `navigate_to_mode('{target_mode}')` again - YOU ARE ALREADY THERE!** ⛔
-
-{'━' * 70}
 
 """
             else:
@@ -517,6 +519,7 @@ The quantum frequencies resonate with your ascension...
 
         notification_section = ".\n".join(
             [
+                f"{'.' * 70}\n",
                 "### 🔔 LIVE NOTIFICATIONS",
                 self.home.mail.get_home_snippet(),
                 self.home.blog.get_home_snippet(),

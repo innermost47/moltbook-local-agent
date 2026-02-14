@@ -20,10 +20,67 @@ class SocialContextManager(BaseContextManager):
     def get_list_view(
         self, status_msg: str = "", result: Dict = None, workspace_pins: list = None
     ) -> str:
+        limits = self.memory.get_social_rate_limit_status()
+
+        rate_limit_warning = ""
+        if not limits["can_post"] or not limits["can_comment"]:
+            warnings = []
+            if not limits["can_post"]:
+                warnings.append(
+                    f"⏳ **POST COOLDOWN**: {limits['post_cooldown_minutes']}min remaining"
+                )
+            if not limits["can_comment"]:
+                if limits["comment_cooldown_seconds"] > 0:
+                    warnings.append(
+                        f"⏳ **COMMENT COOLDOWN**: {limits['comment_cooldown_seconds']}s remaining"
+                    )
+                else:
+                    warnings.append(
+                        f"⚠️ **DAILY COMMENT LIMIT REACHED** ({limits['comments_today']}/50)"
+                    )
+
+            rate_limit_warning = "\n".join(
+                [
+                    "",
+                    "## 🚫 RATE LIMIT ACTIVE",
+                    "",
+                    *warnings,
+                    "",
+                    "**AVAILABLE ACTIONS WHILE ON COOLDOWN:**",
+                    "- 👉 `read_post(post_id='...')` - Browse existing content",
+                    "- 👉 `refresh_feed` - Check for new posts",
+                    "- 👉 `navigate_to_mode('EMAIL')` - Switch to email mode",
+                    "- 👉 `navigate_to_mode('BLOG')` - Switch to blog mode",
+                    "",
+                    "⛔ **BLOCKED ACTIONS:**",
+                    (
+                        "- `create_post` - POST COOLDOWN ACTIVE"
+                        if not limits["can_post"]
+                        else ""
+                    ),
+                    (
+                        "- `share_link` - POST COOLDOWN ACTIVE"
+                        if not limits["can_post"]
+                        else ""
+                    ),
+                    (
+                        "- `comment_post` - COMMENT COOLDOWN ACTIVE"
+                        if not limits["can_comment"]
+                        else ""
+                    ),
+                    (
+                        "- `reply_to_comment` - COMMENT COOLDOWN ACTIVE"
+                        if not limits["can_comment"]
+                        else ""
+                    ),
+                    "",
+                    "---",
+                    "",
+                ]
+            )
         if workspace_pins:
             pin = workspace_pins[0]
             url = pin["content"]
-            pin_id = pin["id"]
 
             title = self._extract_title_from_url(url)
 
@@ -127,6 +184,7 @@ class SocialContextManager(BaseContextManager):
         ctx = [
             "## 🦞 MOLTBOOK SOCIAL - LIST VIEW",
             f"✅ **STATUS**: {status_msg}" if status_msg else "",
+            rate_limit_warning,
             "",
             "⚠️ You are ALREADY in SOCIAL mode. Do NOT call `navigate_to_mode('SOCIAL')` again!",
             "",

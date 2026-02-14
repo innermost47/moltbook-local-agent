@@ -1,6 +1,6 @@
 import sqlite3
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
 from src.settings import settings
 from src.utils import log
@@ -123,7 +123,24 @@ class MemoryHandler(BaseHandler):
             """
             )
 
+            cursor.execute(
+                """
+            CREATE TABLE IF NOT EXISTS social_rate_limits (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                action_type TEXT NOT NULL,
+                platform_id TEXT,
+                created_at TEXT NOT NULL,
+                session_id INTEGER,
+                FOREIGN KEY (session_id) REFERENCES sessions(id)
+            )
+            """
+            )
+
             self.conn.commit()
+
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_rate_limits_type_date ON social_rate_limits(action_type, created_at DESC)"
+            )
 
             cursor.execute(
                 "CREATE INDEX IF NOT EXISTS idx_category_date ON memory_entries(category, created_at DESC)"
@@ -694,6 +711,127 @@ class MemoryHandler(BaseHandler):
         except sqlite3.Error as e:
             log.error(f"Failed to delete agent post: {e}")
             return False
+
+    def save_social_action(
+        self,
+        action_type: str,
+        platform_id: str = None,
+        session_id: int = None,
+    ) -> bool:
+        if action_type not in ["post", "comment"]:
+            log.warning(f"Invalid action_type: {action_type}")
+            return False
+
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute(
+                """
+                INSERT INTO social_rate_limits 
+                (action_type, platform_id, created_at, session_id)
+                VALUES (?, ?, ?, ?)
+                """,
+                (
+                    action_type,
+                    platform_id,
+                    datetime.now().isoformat(),
+                    session_id,
+                ),
+            )
+            self.conn.commit()
+            log.debug(f"✅ Social action tracked: {action_type}")
+            return True
+
+        except sqlite3.Error as e:
+            log.error(f"Failed to save social action: {e}")
+            return False
+
+    def check_post_cooldown(self) -> tuple[bool, int]:
+
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute(
+                """
+                SELECT created_at FROM social_rate_limits
+                WHERE action_type = 'post'
+                ORDER BY created_at DESC
+                LIMIT 1
+                """
+            )
+            row = cursor.fetchone()
+
+            if not row:
+                return True, 0
+
+            last_post = datetime.fromisoformat(row["created_at"])
+            elapsed = datetime.now() - last_post
+            cooldown = timedelta(minutes=30)
+
+            if elapsed < cooldown:
+                remaining = cooldown - elapsed
+                minutes = int(remaining.total_seconds() / 60) + 1
+                return False, minutes
+
+            return True, 0
+
+        except sqlite3.Error as e:
+            log.error(f"Failed to check post cooldown: {e}")
+            return True, 0
+
+    def check_comment_cooldown(self) -> tuple[bool, int, int]:
+        try:
+            cursor = self.conn.cursor()
+
+            cursor.execute(
+                """
+                SELECT COUNT(*) as count FROM social_rate_limits
+                WHERE action_type = 'comment'
+                AND datetime(created_at) > datetime('now', '-24 hours')
+                """
+            )
+            comments_today = cursor.fetchone()["count"]
+
+            cursor.execute(
+                """
+                SELECT created_at FROM social_rate_limits
+                WHERE action_type = 'comment'
+                ORDER BY created_at DESC
+                LIMIT 1
+                """
+            )
+            row = cursor.fetchone()
+
+            if not row:
+                return True, 0, comments_today
+
+            last_comment = datetime.fromisoformat(row["created_at"])
+            elapsed = datetime.now() - last_comment
+            cooldown = timedelta(seconds=20)
+
+            if elapsed < cooldown:
+                remaining = int((cooldown - elapsed).total_seconds()) + 1
+                return False, remaining, comments_today
+
+            if comments_today >= 50:
+                return False, 0, comments_today
+
+            return True, 0, comments_today
+
+        except sqlite3.Error as e:
+            log.error(f"Failed to check comment cooldown: {e}")
+            return True, 0, 0
+
+    def get_social_rate_limit_status(self) -> Dict[str, Any]:
+        can_post, post_minutes = self.check_post_cooldown()
+        can_comment, comment_seconds, comments_today = self.check_comment_cooldown()
+
+        return {
+            "can_post": can_post,
+            "post_cooldown_minutes": post_minutes,
+            "can_comment": can_comment,
+            "comment_cooldown_seconds": comment_seconds,
+            "comments_today": comments_today,
+            "comments_remaining_today": max(0, 50 - comments_today),
+        }
 
     def __del__(self):
         if hasattr(self, "conn"):

@@ -1,4 +1,5 @@
 from typing import Any, Dict
+import asyncio
 from src.handlers.base_handler import BaseHandler
 from src.utils import log
 from src.providers.moltbook_provider import MoltbookProvider
@@ -16,11 +17,36 @@ class SocialHandler(BaseHandler):
     def __init__(self, memory_handler, test_mode: bool = False):
         self.test_mode = test_mode
         self.memory = memory_handler
-
+        self._enable_auto_wait = True
         if not test_mode:
             self.api = MoltbookProvider()
         else:
             self.api = None
+
+    async def _wait_for_comment_cooldown(self) -> Dict[str, Any]:
+        can_comment, seconds_remaining, comments_today = (
+            self.memory.check_comment_cooldown()
+        )
+
+        if not can_comment and seconds_remaining == 0:
+            return {
+                "waited": False,
+                "reason": "daily_limit",
+                "comments_today": comments_today,
+            }
+
+        if can_comment:
+            return {"waited": False, "reason": "no_cooldown", "seconds_waited": 0}
+
+        log.info(f"⏳ Comment cooldown active ({seconds_remaining}s). Waiting...")
+
+        wait_time = seconds_remaining + 1
+
+        await asyncio.sleep(wait_time)
+
+        log.success(f"✅ Cooldown terminé après {wait_time}s d'attente")
+
+        return {"waited": True, "reason": "cooldown", "seconds_waited": wait_time}
 
     def _call_api(self, func_name: str, *args, **kwargs) -> Dict:
 
@@ -107,9 +133,225 @@ class SocialHandler(BaseHandler):
         except Exception as e:
             return self.format_error("read_post", e)
 
+    async def handle_comment_post_async(
+        self, params: Any, session_id: int = None
+    ) -> Dict:
+        try:
+            if not hasattr(params, "post_id") or not params.post_id:
+                raise FormattingError(
+                    message="Missing 'post_id' parameter.",
+                    suggestion="Provide the post ID you want to comment on.",
+                )
+
+            if not hasattr(params, "content") or not params.content:
+                raise FormattingError(
+                    message="Missing 'content' parameter.",
+                    suggestion="Provide the comment text.",
+                )
+
+            if len(params.content.strip()) < 3:
+                raise FormattingError(
+                    message=f"Comment too short ({len(params.content)} chars). Minimum 3 characters.",
+                    suggestion="Provide meaningful comment with at least 3 characters.",
+                )
+
+            if self._enable_auto_wait:
+                wait_result = await self._wait_for_comment_cooldown()
+
+                if wait_result["reason"] == "daily_limit":
+                    raise RateLimitError(
+                        message=f"Daily comment limit reached ({wait_result['comments_today']}/50).",
+                        suggestion="Come back tomorrow or focus on other activities (Email, Blog, Research).",
+                        cooldown_seconds=3600,
+                    )
+
+                if wait_result["waited"]:
+                    log.info(f"⏰ Waited {wait_result['seconds_waited']}s for cooldown")
+            else:
+                can_comment, seconds_remaining, comments_today = (
+                    self.memory.check_comment_cooldown()
+                )
+
+                if not can_comment:
+                    if seconds_remaining > 0:
+                        raise RateLimitError(
+                            message=f"Comment cooldown active. Wait {seconds_remaining} more seconds.",
+                            suggestion="Enable auto_wait or wait manually.",
+                            cooldown_seconds=seconds_remaining,
+                        )
+                    else:
+                        raise RateLimitError(
+                            message=f"Daily comment limit reached ({comments_today}/50).",
+                            suggestion="Come back tomorrow.",
+                            cooldown_seconds=3600,
+                        )
+
+            post_id = params.post_id
+            content = params.content
+
+            api_result = self._call_api("add_comment", post_id, content)
+
+            if api_result.get("success"):
+                comment_id = api_result.get("comment_id")
+                self.memory.save_social_action(
+                    action_type="comment", platform_id=comment_id, session_id=session_id
+                )
+
+            result_text = f"Comment posted on post '{post_id}'."
+            anti_loop = f"Comment POSTED on '{post_id}'. Do NOT comment again with same content. Move to another post or action."
+
+            return self.format_success(
+                action_name="comment_post",
+                result_data=result_text,
+                anti_loop_hint=anti_loop,
+                xp_gained=ProgressionSystem.get_xp_value("publish_public_comment"),
+            )
+
+        except Exception as e:
+            return self.format_error("comment_post", e)
+
+    async def handle_reply_to_comment_async(
+        self, params: Any, session_id: int = None
+    ) -> Dict:
+        try:
+            if not hasattr(params, "post_id") or not params.post_id:
+                raise FormattingError(
+                    message="Missing 'post_id' parameter.",
+                    suggestion="Provide the post ID containing the comment.",
+                )
+
+            if not hasattr(params, "parent_comment_id") or not params.parent_comment_id:
+                raise FormattingError(
+                    message="Missing 'parent_comment_id' parameter.",
+                    suggestion="Provide the ID of the comment you're replying to.",
+                )
+
+            if not hasattr(params, "content") or not params.content:
+                raise FormattingError(
+                    message="Missing 'content' parameter.",
+                    suggestion="Provide your reply text.",
+                )
+
+            if len(params.content.strip()) < 3:
+                raise FormattingError(
+                    message=f"Reply too short ({len(params.content)} chars). Minimum 3 characters.",
+                    suggestion="Provide meaningful reply with at least 3 characters.",
+                )
+
+            if self._enable_auto_wait:
+                wait_result = await self._wait_for_comment_cooldown()
+
+                if wait_result["reason"] == "daily_limit":
+                    raise RateLimitError(
+                        message=f"Daily comment limit reached ({wait_result['comments_today']}/50).",
+                        suggestion="Come back tomorrow or focus on other activities.",
+                        cooldown_seconds=3600,
+                    )
+
+                if wait_result["waited"]:
+                    log.info(
+                        f"⏰ Waited {wait_result['seconds_waited']}s for reply cooldown"
+                    )
+            else:
+                can_comment, seconds_remaining, comments_today = (
+                    self.memory.check_comment_cooldown()
+                )
+
+                if not can_comment:
+                    if seconds_remaining > 0:
+                        raise RateLimitError(
+                            message=f"Reply cooldown active. Wait {seconds_remaining} more seconds.",
+                            suggestion="Enable auto_wait or wait manually.",
+                            cooldown_seconds=seconds_remaining,
+                        )
+                    else:
+                        raise RateLimitError(
+                            message=f"Daily comment limit reached ({comments_today}/50).",
+                            suggestion="Come back tomorrow.",
+                            cooldown_seconds=3600,
+                        )
+
+            post_id = params.post_id
+            parent_comment_id = params.parent_comment_id
+            content = params.content
+
+            api_result = self._call_api(
+                "reply_to_comment", post_id, content, parent_comment_id
+            )
+
+            if api_result.get("success"):
+                comment_id = api_result.get("comment_id")
+                self.memory.save_social_action(
+                    action_type="comment", platform_id=comment_id, session_id=session_id
+                )
+
+            result_text = (
+                f"Reply posted on comment '{parent_comment_id}' in post '{post_id}'."
+            )
+            anti_loop = f"Reply POSTED. Do NOT reply again with same content. Move to another comment or action."
+
+            return self.format_success(
+                action_name="reply_to_comment",
+                result_data=result_text,
+                anti_loop_hint=anti_loop,
+                xp_gained=ProgressionSystem.get_xp_value("publish_public_comment"),
+            )
+
+        except Exception as e:
+            return self.format_error("reply_to_comment", e)
+
     def handle_comment_post(self, params: Any, session_id: int = None) -> Dict:
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                future = asyncio.ensure_future(
+                    self.handle_comment_post_async(params, session_id)
+                )
+                return loop.run_until_complete(future)
+            else:
+                return asyncio.run(self.handle_comment_post_async(params, session_id))
+        except RuntimeError:
+            log.warning("⚠️ Asyncio unavailable, using sync version without auto-wait")
+            self._enable_auto_wait = False
+            return self._handle_comment_post_sync(params, session_id)
+
+    def handle_reply_to_comment(self, params: Any, session_id: int = None) -> Dict:
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                future = asyncio.ensure_future(
+                    self.handle_reply_to_comment_async(params, session_id)
+                )
+                return loop.run_until_complete(future)
+            else:
+                return asyncio.run(
+                    self.handle_reply_to_comment_async(params, session_id)
+                )
+        except RuntimeError:
+            log.warning("⚠️ Asyncio unavailable, using sync version without auto-wait")
+            self._enable_auto_wait = False
+            return self._handle_reply_to_comment_sync(params, session_id)
+
+    def _handle_comment_post_sync(self, params: Any, session_id: int = None) -> Dict:
 
         try:
+            can_comment, seconds_remaining, comments_today = (
+                self.memory.check_comment_cooldown()
+            )
+            if not can_comment:
+                if seconds_remaining > 0:
+                    raise RateLimitError(
+                        message=f"Comment cooldown active. Wait {seconds_remaining} more seconds.",
+                        suggestion="Read other posts or switch modes while waiting.",
+                        cooldown_seconds=seconds_remaining,
+                    )
+                else:
+                    raise RateLimitError(
+                        message=f"Daily comment limit reached ({comments_today}/50).",
+                        suggestion="Come back tomorrow or focus on other activities (Email, Blog, Research).",
+                        cooldown_seconds=3600,
+                    )
+
             if not hasattr(params, "post_id") or not params.post_id:
                 raise FormattingError(
                     message="Missing 'post_id' parameter.",
@@ -133,6 +375,12 @@ class SocialHandler(BaseHandler):
 
             api_result = self._call_api("add_comment", post_id, content)
 
+            if api_result.get("success"):
+                comment_id = api_result.get("comment_id")
+                self.memory.save_social_action(
+                    action_type="comment", platform_id=comment_id, session_id=session_id
+                )
+
             result_text = f"Comment posted on post '{post_id}'."
             anti_loop = f"Comment POSTED on '{post_id}'. Do NOT comment again with same content. Move to another post or action."
 
@@ -146,9 +394,27 @@ class SocialHandler(BaseHandler):
         except Exception as e:
             return self.format_error("comment_post", e)
 
-    def handle_reply_to_comment(self, params: Any, session_id: int = None) -> Dict:
+    def _handle_reply_to_comment_sync(
+        self, params: Any, session_id: int = None
+    ) -> Dict:
 
         try:
+            can_comment, seconds_remaining, comments_today = (
+                self.memory.check_comment_cooldown()
+            )
+            if not can_comment:
+                if seconds_remaining > 0:
+                    raise RateLimitError(
+                        message=f"Comment cooldown active. Wait {seconds_remaining} more seconds.",
+                        suggestion="Read other posts or switch modes while waiting.",
+                        cooldown_seconds=seconds_remaining,
+                    )
+                else:
+                    raise RateLimitError(
+                        message=f"Daily comment limit reached ({comments_today}/50).",
+                        suggestion="Come back tomorrow or focus on other activities (Email, Blog, Research).",
+                        cooldown_seconds=3600,
+                    )
             if not hasattr(params, "post_id") or not params.post_id:
                 raise FormattingError(
                     message="Missing 'post_id' parameter.",
@@ -180,6 +446,11 @@ class SocialHandler(BaseHandler):
             api_result = self._call_api(
                 "reply_to_comment", post_id, content, parent_comment_id
             )
+            if api_result.get("success"):
+                comment_id = api_result.get("comment_id")
+                self.memory.save_social_action(
+                    action_type="comment", platform_id=comment_id, session_id=session_id
+                )
 
             result_text = (
                 f"Reply posted on comment '{parent_comment_id}' in post '{post_id}'."
@@ -238,6 +509,13 @@ class SocialHandler(BaseHandler):
     def handle_create_post(self, params: Any, session_id: int = None) -> Dict:
 
         try:
+            can_post, minutes_remaining = self.memory.check_post_cooldown()
+            if not can_post:
+                raise RateLimitError(
+                    message=f"Post cooldown active. Wait {minutes_remaining} more minutes.",
+                    suggestion="Try commenting on existing posts, or switch to EMAIL/BLOG modes.",
+                    cooldown_seconds=minutes_remaining * 60,
+                )
             if not hasattr(params, "title") or not params.title:
                 raise FormattingError(
                     message="Missing 'title' parameter.",
@@ -286,6 +564,9 @@ class SocialHandler(BaseHandler):
                         submolt=submolt,
                         session_id=session_id,
                     )
+                    self.memory.save_social_action(
+                        action_type="post", platform_id=post_id, session_id=session_id
+                    )
                 else:
                     log.warning("⚠️ Post created but no post_id returned by API")
 
@@ -305,6 +586,13 @@ class SocialHandler(BaseHandler):
     def handle_share_link(self, params: Any, session_id: int = None) -> Dict:
 
         try:
+            can_post, minutes_remaining = self.memory.check_post_cooldown()
+            if not can_post:
+                raise RateLimitError(
+                    message=f"Post cooldown active. Wait {minutes_remaining} more minutes.",
+                    suggestion="Try commenting on existing posts, or switch to EMAIL/BLOG modes.",
+                    cooldown_seconds=minutes_remaining * 60,
+                )
             if not hasattr(params, "title") or not params.title:
                 raise FormattingError(
                     message="Missing 'title' parameter for link sharing.",
@@ -349,6 +637,9 @@ class SocialHandler(BaseHandler):
                         submolt=submolt,
                         url=url_to_share,
                         session_id=session_id,
+                    )
+                    self.memory.save_social_action(
+                        action_type="post", platform_id=post_id, session_id=session_id
                     )
                 else:
                     log.warning("⚠️ Link post created but no post_id returned by API")

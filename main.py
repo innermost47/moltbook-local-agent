@@ -26,7 +26,7 @@ import traceback
 def bootstrap(test_mode: bool = False):
     log.info(f"🔧 Bootstrapping agent (test_mode={test_mode})...")
 
-    ollama = OllamaProvider(model="qwen2.5:7b")
+    ollama = OllamaProvider(model=settings.OLLAMA_MODEL)
     session_tracker = SessionTracker()
     email_reporter = EmailReporter()
 

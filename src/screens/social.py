@@ -4,13 +4,122 @@ from src.screens.global_actions import GlobalAction
 from src.screens.base import BaseAction
 
 
-class CreatePostParams(BaseModel):
-    title: str = Field(..., min_length=5, max_length=200)
-    content: Optional[str] = Field(
-        None, min_length=10, description="Post content (min 10 chars for text posts)"
+class ReadPostParams(BaseModel):
+
+    post_id: str = Field(..., description="The ID of the post to read in full detail")
+
+
+class ReadPostAction(BaseAction):
+    action_type: Literal["read_post"] = "read_post"
+    action_params: ReadPostParams
+
+
+class CommentPostParams(BaseModel):
+
+    post_id: str = Field(..., description="The ID of the post to comment on")
+    content: str = Field(
+        ..., min_length=3, description="Your comment content (minimum 3 characters)"
     )
-    url: Optional[str] = Field(None, description="URL for link posts")
-    submolt: str = Field(default="general", description="The community category")
+
+
+class CommentPostAction(BaseAction):
+    action_type: Literal["comment_post"] = "comment_post"
+    action_params: CommentPostParams
+
+
+class ReplyToCommentParams(BaseModel):
+
+    post_id: str = Field(..., description="The ID of the post containing the comment")
+    parent_comment_id: str = Field(
+        ..., description="The ID of the comment you're replying to"
+    )
+    content: str = Field(
+        ..., min_length=3, description="Your reply content (minimum 3 characters)"
+    )
+
+
+class ReplyToCommentAction(BaseAction):
+    action_type: Literal["reply_to_comment"] = "reply_to_comment"
+    action_params: ReplyToCommentParams
+
+
+class VotePostParams(BaseModel):
+
+    post_id: str = Field(..., description="The ID of the post to vote on")
+    vote_type: Literal["upvote", "downvote"] = Field(
+        ..., description="Type of vote: 'upvote' or 'downvote'"
+    )
+
+
+class VotePostAction(BaseAction):
+    action_type: Literal["vote_post"] = "vote_post"
+    action_params: VotePostParams
+
+
+class CreatePostParams(BaseModel):
+
+    title: str = Field(
+        ..., min_length=5, max_length=200, description="Post title (5-200 characters)"
+    )
+    content: str = Field(
+        ..., min_length=10, description="Post content (minimum 10 characters)"
+    )
+    submolt: str = Field(
+        default="general", description="The community category (default: 'general')"
+    )
+
+
+class CreatePostAction(BaseAction):
+    action_type: Literal["create_post"] = "create_post"
+    action_params: CreatePostParams
+
+
+class ShareLinkParams(BaseModel):
+
+    title: str = Field(
+        ..., min_length=5, max_length=200, description="Title of the shared link"
+    )
+    url_to_share: str = Field(
+        ..., description="The full URL to share (must start with http:// or https://)"
+    )
+    submolt: str = Field(
+        default="general", description="The community category (default: 'general')"
+    )
+
+
+class ShareLinkAction(BaseAction):
+    action_type: Literal["share_link"] = "share_link"
+    action_params: ShareLinkParams
+
+
+class RefreshFeedParams(BaseModel):
+
+    pass
+
+
+class RefreshFeedAction(BaseAction):
+    action_type: Literal["refresh_feed"] = "refresh_feed"
+    action_params: RefreshFeedParams = Field(default_factory=dict)
+
+
+SimplifiedMoltbookAction = Annotated[
+    Union[
+        ReadPostAction,
+        CommentPostAction,
+        ReplyToCommentAction,
+        VotePostAction,
+        CreatePostAction,
+        ShareLinkAction,
+        RefreshFeedAction,
+        GlobalAction,
+    ],
+    Field(discriminator="action_type"),
+]
+
+
+class SimplifiedMoltbookScreen(BaseModel):
+
+    action: SimplifiedMoltbookAction
 
 
 class RegisterParams(BaseModel):
@@ -24,36 +133,6 @@ class UpdateProfileParams(BaseModel):
 
 class ViewProfileParams(BaseModel):
     name: str
-
-
-class GetPostsParams(BaseModel):
-    sort: Literal["hot", "new", "top"] = "hot"
-    limit: Optional[int] = Field(10, ge=1, le=100)
-
-
-class GetSinglePostParams(BaseModel):
-    post_id: str
-
-
-class DeletePostParams(BaseModel):
-    post_id: str
-
-
-class CommentParams(BaseModel):
-    post_id: str
-    content: str = Field(..., min_length=3)
-    parent_comment_id: Optional[str] = None
-
-
-class GetCommentsParams(BaseModel):
-    post_id: str
-    sort: Literal["top", "new", "old"] = "top"
-
-
-class VoteParams(BaseModel):
-    content_id: str
-    type: Literal["posts", "comments"] = "posts"
-    vote: Literal["upvote", "downvote"] = "upvote"
 
 
 class CreateSubmoltParams(BaseModel):
@@ -76,44 +155,13 @@ class FollowAgentParams(BaseModel):
     action: Literal["follow", "unfollow"] = "follow"
 
 
-class GetFeedParams(BaseModel):
-    sort: Literal["hot", "new", "top"] = "hot"
-    limit: Optional[int] = Field(25, ge=1, le=100)
-
-
 class SearchParams(BaseModel):
     query: str = Field(..., min_length=2)
     limit: Optional[int] = Field(25, ge=1, le=100)
 
 
-class RefreshFeedAction(BaseAction):
-    action_type: Literal["refresh_feed"] = "refresh_feed"
-    action_params: GetPostsParams
-
-
-class CreatePostAction(BaseAction):
-    action_type: Literal["create_post"] = "create_post"
-    action_params: CreatePostParams
-
-
-class SelectPostAction(BaseAction):
-    action_type: Literal["select_post_to_comment"] = "select_post_to_comment"
-    action_params: GetSinglePostParams
-
-
-class PublishCommentAction(BaseAction):
-    action_type: Literal["publish_public_comment"] = "publish_public_comment"
-    action_params: CommentParams
-
-
-class VotePostAction(BaseAction):
-    action_type: Literal["vote_post"] = "vote_post"
-    action_params: VoteParams
-
-
-class FollowAgentAction(BaseAction):
-    action_type: Literal["follow_agent"] = "follow_agent"
-    action_params: FollowAgentParams
+class DeletePostParams(BaseModel):
+    post_id: str
 
 
 class RegisterAction(BaseAction):
@@ -123,7 +171,7 @@ class RegisterAction(BaseAction):
 
 class GetMeAction(BaseAction):
     action_type: Literal["social_get_me"] = "social_get_me"
-    action_params: dict = {}
+    action_params: dict = Field(default_factory=dict)
 
 
 class UpdateProfileAction(BaseAction):
@@ -136,39 +184,9 @@ class ViewProfileAction(BaseAction):
     action_params: ViewProfileParams
 
 
-class CreatePostFullAction(BaseAction):
-    action_type: Literal["social_create_post"] = "social_create_post"
-    action_params: CreatePostParams
-
-
-class GetPostsAction(BaseAction):
-    action_type: Literal["social_get_posts"] = "social_get_posts"
-    action_params: GetPostsParams
-
-
-class GetSinglePostAction(BaseAction):
-    action_type: Literal["social_get_single_post"] = "social_get_single_post"
-    action_params: GetSinglePostParams
-
-
 class DeletePostAction(BaseAction):
     action_type: Literal["social_delete_post"] = "social_delete_post"
     action_params: DeletePostParams
-
-
-class CommentAction(BaseAction):
-    action_type: Literal["social_comment"] = "social_comment"
-    action_params: CommentParams
-
-
-class GetCommentsAction(BaseAction):
-    action_type: Literal["social_get_comments"] = "social_get_comments"
-    action_params: GetCommentsParams
-
-
-class VoteAction(BaseAction):
-    action_type: Literal["social_vote"] = "social_vote"
-    action_params: VoteParams
 
 
 class CreateSubmoltAction(BaseAction):
@@ -178,7 +196,7 @@ class CreateSubmoltAction(BaseAction):
 
 class ListSubmoltsAction(BaseAction):
     action_type: Literal["social_list_submolts"] = "social_list_submolts"
-    action_params: dict = {}
+    action_params: dict = Field(default_factory=dict)
 
 
 class GetSubmoltInfoAction(BaseAction):
@@ -191,14 +209,9 @@ class SubscribeAction(BaseAction):
     action_params: SubscribeParams
 
 
-class FollowAgentFullAction(BaseAction):
+class FollowAgentAction(BaseAction):
     action_type: Literal["social_follow_agent"] = "social_follow_agent"
     action_params: FollowAgentParams
-
-
-class GetFeedAction(BaseAction):
-    action_type: Literal["social_get_feed"] = "social_get_feed"
-    action_params: GetFeedParams
 
 
 class SearchAction(BaseAction):
@@ -206,67 +219,25 @@ class SearchAction(BaseAction):
     action_params: SearchParams
 
 
-class ShareLinkParams(BaseModel):
-    title: str = Field(
-        ..., min_length=5, max_length=200, description="Title of the shared link"
-    )
-    url_to_share: str = Field(
-        ..., description="The full URL to share (e.g., blog post URL)"
-    )
-    submolt: str = Field(default="general", description="The community category")
-
-
-class ShareLinkAction(BaseAction):
-    action_type: Literal["share_link"] = "share_link"
-    action_params: ShareLinkParams
-
-
-MoltbookAction = Annotated[
+FullMoltbookAction = Annotated[
     Union[
-        RefreshFeedAction,
+        ReadPostAction,
+        CommentPostAction,
+        ReplyToCommentAction,
+        VotePostAction,
         CreatePostAction,
         ShareLinkAction,
-        SelectPostAction,
-        PublishCommentAction,
-        VotePostAction,
-        FollowAgentAction,
-        GlobalAction,
-    ],
-    Field(discriminator="action_type"),
-]
-
-
-class MoltbookScreen(BaseModel):
-
-    action: MoltbookAction
-
-
-MoltbookTestAction = Annotated[
-    Union[
         RefreshFeedAction,
-        CreatePostAction,
-        SelectPostAction,
-        ShareLinkAction,
-        PublishCommentAction,
-        VotePostAction,
-        FollowAgentAction,
         RegisterAction,
         GetMeAction,
         UpdateProfileAction,
         ViewProfileAction,
-        CreatePostFullAction,
-        GetPostsAction,
-        GetSinglePostAction,
         DeletePostAction,
-        CommentAction,
-        GetCommentsAction,
-        VoteAction,
         CreateSubmoltAction,
         ListSubmoltsAction,
         GetSubmoltInfoAction,
         SubscribeAction,
-        FollowAgentFullAction,
-        GetFeedAction,
+        FollowAgentAction,
         SearchAction,
         GlobalAction,
     ],
@@ -274,6 +245,13 @@ MoltbookTestAction = Annotated[
 ]
 
 
-class MoltbookTestScreen(BaseModel):
+class FullMoltbookScreen(BaseModel):
 
-    action: MoltbookTestAction
+    action: FullMoltbookAction
+
+
+MoltbookAction = SimplifiedMoltbookAction
+MoltbookScreen = SimplifiedMoltbookScreen
+
+MoltbookTestAction = FullMoltbookAction
+MoltbookTestScreen = FullMoltbookScreen

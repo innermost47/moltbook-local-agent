@@ -108,11 +108,33 @@ class MemoryHandler(BaseHandler):
             """
             )
 
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS agent_posts (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    post_id TEXT UNIQUE NOT NULL,
+                    title TEXT NOT NULL,
+                    submolt TEXT DEFAULT 'general',
+                    url TEXT,
+                    created_at TEXT NOT NULL,
+                    session_id INTEGER,
+                    FOREIGN KEY (session_id) REFERENCES sessions(id)
+                )
+            """
+            )
+
             self.conn.commit()
 
             cursor.execute(
                 "CREATE INDEX IF NOT EXISTS idx_category_date ON memory_entries(category, created_at DESC)"
             )
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_posts_created ON agent_posts(created_at DESC)"
+            )
+            cursor.execute(
+                "CREATE UNIQUE INDEX IF NOT EXISTS idx_posts_post_id ON agent_posts(post_id)"
+            )
+
             self.conn.commit()
 
             log.info("ℹ️ Memory system operational.")
@@ -538,6 +560,140 @@ class MemoryHandler(BaseHandler):
         except Exception as e:
             log.error(f"Failed to get recent learnings: {e}")
             return []
+
+    def save_agent_post(
+        self,
+        post_id: str,
+        title: str,
+        submolt: str = "general",
+        url: str = None,
+        session_id: int = None,
+    ) -> bool:
+        if not post_id or not title:
+            log.warning("Cannot save post: missing post_id or title")
+            return False
+
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute(
+                """
+                INSERT OR IGNORE INTO agent_posts 
+                (post_id, title, submolt, url, created_at, session_id)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    post_id,
+                    title,
+                    submolt or "general",
+                    url,
+                    datetime.now().isoformat(),
+                    session_id,
+                ),
+            )
+            self.conn.commit()
+
+            if cursor.rowcount > 0:
+                log.success(f"📝 Post saved to memory: '{title}' (ID: {post_id})")
+                return True
+            else:
+                log.debug(f"Post {post_id} already exists in database")
+                return False
+
+        except sqlite3.Error as e:
+            log.error(f"Failed to save agent post: {e}")
+            return False
+
+    def get_agent_posts(self, limit: int = 25) -> List[Dict[str, str]]:
+
+        if limit < 1 or limit > 100:
+            limit = 25
+
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute(
+                """
+                SELECT post_id, title, submolt, url, created_at
+                FROM agent_posts
+                ORDER BY created_at DESC
+                LIMIT ?
+                """,
+                (limit,),
+            )
+
+            posts = []
+            for row in cursor.fetchall():
+                posts.append(
+                    {
+                        "post_id": row["post_id"],
+                        "title": row["title"],
+                        "submolt": row["submolt"],
+                        "url": row["url"],
+                        "created_at": row["created_at"],
+                    }
+                )
+
+            return posts
+
+        except sqlite3.Error as e:
+            log.error(f"Failed to get agent posts: {e}")
+            return []
+
+    def get_agent_post_ids(self, limit: int = 25) -> List[str]:
+
+        if limit < 1 or limit > 100:
+            limit = 25
+
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute(
+                """
+                SELECT post_id FROM agent_posts
+                ORDER BY created_at DESC
+                LIMIT ?
+                """,
+                (limit,),
+            )
+
+            return [row["post_id"] for row in cursor.fetchall()]
+
+        except sqlite3.Error as e:
+            log.error(f"Failed to get agent post IDs: {e}")
+            return []
+
+    def is_agent_post(self, post_id: str) -> bool:
+
+        if not post_id:
+            return False
+
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute(
+                "SELECT 1 FROM agent_posts WHERE post_id = ? LIMIT 1", (post_id,)
+            )
+            return cursor.fetchone() is not None
+
+        except sqlite3.Error as e:
+            log.error(f"Failed to check if post is agent's: {e}")
+            return False
+
+    def delete_agent_post(self, post_id: str) -> bool:
+
+        if not post_id:
+            return False
+
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute("DELETE FROM agent_posts WHERE post_id = ?", (post_id,))
+            self.conn.commit()
+
+            if cursor.rowcount > 0:
+                log.info(f"🗑️ Post {post_id} removed from memory")
+                return True
+            return False
+
+        except sqlite3.Error as e:
+            log.error(f"Failed to delete agent post: {e}")
+            return False
 
     def __del__(self):
         if hasattr(self, "conn"):

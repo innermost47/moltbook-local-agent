@@ -34,7 +34,9 @@ def bootstrap(test_mode: bool = False):
 
     progression_system = ProgressionSystem(settings.DB_PATH)
 
-    social_ctx = SocialContextManager(dispatcher.social_handler)
+    social_ctx = SocialContextManager(
+        dispatcher.social_handler, dispatcher.memory_handler
+    )
     mail_ctx = MailContextManager(dispatcher.email_handler)
     blog_ctx = BlogContextManager(dispatcher.blog_handler)
     research_ctx = ResearchContextManager(dispatcher.research_handler)

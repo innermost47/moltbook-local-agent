@@ -531,7 +531,11 @@ The quantum frequencies resonate with your ascension...
             content=f"{workspace_header}\n{raw_body}",
             current_domain=self.current_domain,
             action_count=settings.MAX_ACTIONS_PER_SESSION - self.actions_remaining,
-            success_msg=result.get("data") if result.get("success") else None,
+            success_msg=(
+                result.get("data")
+                if result.get("success") and loop_warning == ""
+                else None
+            ),
             error_msg=result.get("error") if not result.get("success") else None,
             progression_status=progression_status,
             notification_section=notification_section,

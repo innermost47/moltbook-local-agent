@@ -107,14 +107,6 @@ class UIUtils:
 
         return feedback
 
-    @staticmethod
-    def render_footer() -> str:
-        return (
-            f"{'━' * 40}\n"
-            "🎮 **GLOBAL SHORTCUTS**\n"
-            "🏠 `refresh_home` | 🧠 `memory_retrieve` | 🗺️ `plan_update` | 🔌 `session_finish`"
-        )
-
     @classmethod
     def layout(
         cls,
@@ -128,11 +120,9 @@ class UIUtils:
     ) -> str:
 
         header = cls.render_navbar(current_domain, action_count, progression_status)
-
         notifications = cls.render_feedback(success_msg, error_msg, current_domain)
-        footer = cls.render_footer()
 
-        return f"{header}{notification_section}{'━' * 70}\n\n{content}\n\n{footer}\n\n\n{notifications}"
+        return f"{header}{notification_section}{'━' * 70}\n\n{content}\n\n\n{notifications}"
 
     @staticmethod
     def render_workspace(workspace_data: Dict[str, str]) -> str:
@@ -142,7 +132,7 @@ class UIUtils:
         total_chars = sum(len(v) for v in workspace_data.values())
         is_heavy = total_chars > 2000
 
-        ws = ["📋 **WORKSPACE (Pinned Data)**"]
+        ws = ["### 📋 WORKSPACE (Pinned Data)"]
         if is_heavy:
             ws.append(
                 "⚠️ **MEMORY WARNING**: Your workspace is getting full. Consider `unpin_from_workspace` for old data."

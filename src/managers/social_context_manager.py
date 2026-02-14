@@ -71,7 +71,7 @@ class SocialContextManager:
                 if isinstance(posts, list) and posts:
                     community_posts_display = "### 🌐 COMMUNITY FEED (Hot Posts)\n\n"
 
-                    for post in posts[:25]:
+                    for post in posts[:10]:
                         p_id = post.get("id", "unknown")
                         title = post.get("title", "Untitled")
                         author_data = post.get("author", {})
@@ -108,49 +108,41 @@ class SocialContextManager:
             "",
             "### 📋 HOW IT WORKS",
             "",
-            "**LIST VIEW** (current screen - READ ONLY):",
+            "**LIST VIEW (current screen — READ ONLY):**",
             "• Browse your posts + community posts",
-            "• Actions: Read posts, create new content, refresh",
-            "• NO voting or commenting from here - use `read_post` first!",
+            "• You CANNOT comment or vote from here",
+            "• You MUST open a post or create/share content",
             "",
-            "**FOCUS VIEW** (after using `read_post`):",
-            "• See full post content + top 25 comments",
-            "• If it's YOUR post: reply to comments only",
-            "• If it's SOMEONE ELSE's post: comment on post OR reply to comments, vote",
+            "**FOCUS VIEW (after `read_post`):**",
+            "• Full post + top comments",
+            "• YOUR post → reply to comments only",
+            "• OTHER post → comment, reply, vote",
             "",
-            "💡 **Navigation**: Use `read_post(post_id='...')` to interact with any post.",
+            "💡 To interact with any post: `read_post(post_id='...')`",
             "",
             "---",
             "",
             my_posts_display,
             community_posts_display,
             "",
-            "### 🛠️ AVAILABLE ACTIONS (LIST VIEW - READ ONLY)",
+            "### 🧭 EXECUTION PATHS (CHOOSE ONE)",
             "",
-            "⚠️ **YOU ARE IN SOCIAL LIST MODE - NO COMMENTING/VOTING FROM HERE**",
+            "**PATH 1 — Interact with an existing post:**",
+            "1️⃣ Pick a post ID from YOUR POSTS or COMMUNITY FEED",
+            "2️⃣ 👉 `read_post(post_id='...')`",
+            "3️⃣ In FOCUS VIEW: comment, reply, or vote",
             "",
-            "👉 `read_post(post_id='...')`",
-            "   - REQUIRED to comment/vote on any post",
-            "   - Switches to FOCUS view where you can interact",
+            "**PATH 2 — Create a new discussion:**",
+            "1️⃣ 👉 `create_post(title='...', content='...', submolt='...')`",
+            "2️⃣ Post appears in YOUR POSTS",
+            "3️⃣ Others can comment → you reply later",
             "",
-            "👉 `create_post(title='...', content='...', submolt='...')`",
-            "   - Create a new text post",
-            "   - submolt is optional (default: 'general')",
+            "**PATH 3 — Share external content (blog, link, etc):**",
+            "1️⃣ 👉 `share_link(title='...', url_to_share='...', submolt='...')`",
+            "2️⃣ Link appears in feed",
+            "3️⃣ Community can discuss it",
             "",
-            "👉 `share_link(title='...', url_to_share='...', submolt='...')`",
-            "   - Share a link (e.g., your blog post URL)",
-            "   - URL must start with http:// or https://",
             "",
-            "👉 `refresh_feed`",
-            "   - Refresh the community feed",
-            "",
-            "🏠 `refresh_home`",
-            "   - Return to dashboard",
-            "",
-            "⛔ **NOT AVAILABLE IN LIST VIEW:**",
-            "   • comment_post (use `read_post` first)",
-            "   • reply_to_comment (use `read_post` first)",
-            "   • vote_post (use `read_post` first)",
         ]
 
         return "\n".join(ctx)
@@ -192,9 +184,9 @@ Could not load post: `{item_id}`
                     comments = comm_result.get("data", [])
 
                     if comments:
-                        comments_display = "\n### 💬 TOP COMMENTS (25 max)\n\n"
+                        comments_display = "\n### 💬 TOP COMMENTS (10 max)\n\n"
 
-                        for c in comments[:25]:
+                        for c in comments[:10]:
                             c_id = c.get("id", "unknown")
                             c_author_data = c.get("author", {})
                             c_author = c_author_data.get("name", "Unknown")

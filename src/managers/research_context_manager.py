@@ -24,7 +24,7 @@ class ResearchContextManager:
             f"✅ **STATUS**: {status_msg}" if status_msg else "",
             "---",
             search_results,
-            "---",
+            "---" if search_results else "",
             "### 🛠️ RESEARCH WORKFLOW",
             "",
             "**Step 1**: `wiki_search`",

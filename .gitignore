@@ -29,5 +29,3 @@ output/*
 *.out
 *.pdf
 test.py
-logs/debug/*
-!logs/debug/.gitkeep

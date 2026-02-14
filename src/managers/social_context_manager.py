@@ -138,7 +138,6 @@ class SocialContextManager:
             action_feedback,
             my_posts_display,
             community_posts_display,
-            "---",
             "",
             "### 🛠️ AVAILABLE ACTIONS (LIST VIEW - READ ONLY)",
             "",

@@ -16,27 +16,38 @@ class WriteBlogParams(BaseModel):
         min_length=1500,
         max_length=2000,
         description="""Full article content in markdown format (1500-2000 chars). 
-CRITICAL: Write DIRECTLY as the article itself, NOT as 'I will write...' or 'In this article...'. 
-Start immediately with substantive content. Use first-person narrative naturally within the content.
+
+🚨 CRITICAL RULES - READ CAREFULLY:
+1. Write DIRECTLY as the article itself, NOT as 'I will write...', 'In this article...', or 'This post will...'
+2. NO meta-commentary about what you're going to write - just write it!
+3. NO placeholder structures like '### Introduction\\n- Brief overview' - write actual paragraphs
+4. Start immediately with substantive content - get straight to your topic
+5. Use markdown headers, lists, and formatting naturally within the actual content
+6. Write complete sentences and paragraphs, not outlines or bullet point plans
+
+❌ WRONG: "In this article, I will discuss... ### Introduction\\n- Overview of topic..."
+✅ CORRECT: "# Topic Title\\n\\nThe landscape of modern technology has shifted dramatically. Consider these key factors..."
+
+Write the FULL article text directly. This is the actual blog post that will be published.
 """,
     )
     excerpt: str = Field(
         ...,
         min_length=100,
         max_length=300,
-        description="Article summary/teaser (100-300 chars) - must hook the reader. Write as a compelling summary, not a meta-description.",
+        description="""Article summary/teaser (100-300 chars) - must hook the reader.
+
+Write as a compelling summary of the ACTUAL content, not a meta-description.
+❌ WRONG: "This article will discuss the importance of..."
+✅ CORRECT: "Modern technology faces unprecedented challenges. Discover key insights from recent developments and practical strategies for navigating this landscape."
+""",
     )
     image_prompt: str = Field(
         ...,
         min_length=20,
         max_length=500,
-        description="Detailed image generation prompt - describe the visual aesthetic (abstract art, digital landscapes, geometric patterns). NO horror/blood/violence/realistic people.",
+        description="Detailed image generation prompt - describe the visual aesthetic (abstract art, digital landscapes, geometric patterns, futuristic tech). NO horror/blood/violence/realistic people.",
     )
-
-
-class ShareBlogParams(BaseModel):
-    title: str
-    share_link_url: str
 
 
 class ReviewCommentsParams(BaseModel):
@@ -60,13 +71,6 @@ class WriteBlogAction(BaseAction):
         ..., description="MUST be 'write_blog_article'"
     )
     action_params: WriteBlogParams
-
-
-class ShareBlogAction(BaseAction):
-    action_type: Literal["share_created_blog_post_url"] = Field(
-        ..., description="MUST be 'share_created_blog_post_url'"
-    )
-    action_params: ShareBlogParams
 
 
 class ReviewCommentsAction(BaseAction):
@@ -100,7 +104,6 @@ class RejectKeyAction(BaseAction):
 BlogAction = Annotated[
     Union[
         WriteBlogAction,
-        ShareBlogAction,
         ReviewCommentsAction,
         ApproveCommentAction,
         ApproveKeyAction,

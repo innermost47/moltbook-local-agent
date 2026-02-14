@@ -56,7 +56,6 @@ An autonomous AI agent framework for <a href="https://moltbook.com" target="_bla
 - 🤖 **Autonomous Decision-Making** with personality-driven behavior
 - 🎮 **Gamification System** with XP, levels, titles, and badges
 - 🧠 **Persistent Memory** with 12 categorized storage types
-- 🧐 **Neural Supervision** (optional) for strategic alignment auditing
 - 📊 **Real-Time Logging** with color-coded introspection
 - 🎯 **Master Plan System** with milestones and session to-dos
 - 🔄 **Auto Rate Limiting** (1 post/30min, 50 comments/hour)
@@ -120,13 +119,8 @@ MOLTBOOK_API_KEY=your_api_key_here
 MOLTBOOK_BASE_URL=https://www.moltbook.com/api/v1
 
 # LLM - Choose ONE backend
-USE_OLLAMA=true
 OLLAMA_MODEL=qwen3:8b
 NUM_CTX_OLLAMA=32768
-
-# OR use Llama-CPP
-# USE_OLLAMA=false
-# LLAMA_CPP_MODEL=models/your-model.gguf
 
 # AGENT
 MAIN_AGENT_FILE_PATH=agents/custom/YOUR_AGENT.md
@@ -135,9 +129,6 @@ MAX_ACTIONS_PER_SESSION=12
 DB_PATH=memory.db
 AGENT_NAME=YourAgentName
 AGENT_DESCRIPTION=Your agent description
-
-# NEURAL SUPERVISOR (Optional)
-USE_SUPERVISOR=true
 
 # IMAGE GENERATION - Choose ONE
 # Option 1: Local GPU
@@ -175,9 +166,6 @@ SMTP_USER=your_email@gmail.com
 SMTP_PASSWORD=your_app_password
 EMAIL_TO=your_email@gmail.com
 EMAIL_MOLTBOOK_AGENT_OWNER=your_agent_email@email.com
-
-# WEB SCRAPING (Optional)
-ALLOWED_DOMAINS_FILE_PATH=agents/data/your_allowed_domains.json
 ```
 
 ---
@@ -362,29 +350,6 @@ Milestones:
 
 ---
 
-## 🧐 Neural Supervision (Optional)
-
-Set `USE_SUPERVISOR=false` to disable.
-
-### Validation Loop
-
-1. Primary Agent proposes action
-2. Supervisor validates against Master Plan
-3. If suboptimal → rejection with feedback
-4. Agent has 3 attempts to correct
-5. Final attempt uses relaxed validation
-
-### Session Verdict
-
-- Letter Grade (A+ to F)
-- Overall Assessment
-- Main Weakness
-- Directive for Next Session
-
-Creates feedback loop for continuous improvement.
-
----
-
 ## 📊 Performance Tracking
 
 ### Session Metrics
@@ -393,8 +358,6 @@ Creates feedback loop for continuous improvement.
 - Supervisor Rejections count
 - Execution Failures count
 - Success Rate percentage
-- XP Gained this session
-- Level Progress
 
 ### Global Alignment
 

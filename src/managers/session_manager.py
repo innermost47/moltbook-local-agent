@@ -6,6 +6,7 @@ from src.utils.ui_utils import UIUtils
 from src.screens.factory import SchemaFactory
 from src.settings import settings
 from src.managers.progression_system import ProgressionSystem
+from src.utils.live_broadcaster import LiveBroadcaster
 
 
 class SessionManager:
@@ -32,6 +33,7 @@ class SessionManager:
         self.email_reporter = email_reporter
         self.progression = ProgressionSystem(settings.DB_PATH)
         self.agent_conversation_history: List[Dict] = []
+        self.live_viewer = LiveBroadcaster()
 
     def start_session(self):
         self.session_id = self.home.memory.create_session()
@@ -84,13 +86,6 @@ class SessionManager:
             "4. ⛔ **DIVERSIFY your actions across modules**\n"
             "   - Do NOT spend more than 2 consecutive actions in the same module\n"
             "   - Balance: Email → Blog → Social → Research → Memory\n\n"
-            "**EXAMPLES OF LOOPS TO AVOID:**\n"
-            "❌ BAD: `navigate_to_mode(SOCIAL)` → `navigate_to_mode(SOCIAL)` → `navigate_to_mode(SOCIAL)`\n"
-            "✅ GOOD: `navigate_to_mode(SOCIAL)` → `create_post()` → `refresh_home`\n\n"
-            "❌ BAD: `wiki_search('AI')` → `wiki_search('AI')` → `wiki_search('AI')`\n"
-            "✅ GOOD: `wiki_search('AI')` → `wiki_read('Artificial Intelligence')` → `research_complete()`\n\n"
-            "❌ BAD: `email_get_messages` → `email_get_messages` → `email_get_messages`\n"
-            "✅ GOOD: `email_get_messages` → `email_send()` OR `refresh_home`\n\n"
             "**IF YOU SEE '⚠️ ANTI-LOOP' IN THE UI:**\n"
             "This means you JUST executed this action. The system is WARNING you.\n"
             "DO NOT execute it again. Choose a DIFFERENT action or use `refresh_home`.\n\n"
@@ -155,6 +150,18 @@ class SessionManager:
                     is_popup_active=bool(self.pending_action),
                 )
 
+            self.live_viewer.broadcast_screen(
+                screen_content=self.current_context,
+                domain=self.current_domain,
+                actions_remaining=self.actions_remaining,
+                xp_info={
+                    "current_xp": self.progression.get_current_status().get(
+                        "current_xp", 0
+                    ),
+                    "level": self.progression.get_current_status().get("level", 1),
+                },
+            )
+
             action_object, self.agent_conversation_history = (
                 self.ollama.get_next_action(
                     current_context=self.current_context,
@@ -166,11 +173,28 @@ class SessionManager:
                 )
             )
 
+            self.live_viewer.broadcast_action(
+                action_type=action_object.action_type,
+                action_params=getattr(action_object, "action_params", {}),
+                reasoning=getattr(action_object, "reasoning", ""),
+                emotions=getattr(action_object, "emotions", ""),
+                self_criticism=getattr(action_object, "self_criticism", ""),
+                next_move_preview=getattr(action_object, "next_move_preview", ""),
+                domain=self.current_domain,
+            )
+
             if not action_object or action_object.action_type == "session_finish":
                 log.success("🏁 Session finished by agent.")
                 break
 
             result = self.dispatcher.execute(action_object)
+
+            self.live_viewer.broadcast_result(
+                action_type=action_object.action_type,
+                success=result.get("success", False),
+                result_data=result.get("data", ""),
+                error=result.get("error", ""),
+            )
 
             self.tracker.log_event(
                 domain=self.current_domain,
@@ -202,6 +226,19 @@ class SessionManager:
             self.actions_remaining -= 1
 
             self.current_context = self.navigate_context(action_object, result)
+
+            self.live_viewer.broadcast_screen(
+                screen_content=self.current_context,
+                domain=self.current_domain,
+                actions_remaining=self.actions_remaining,
+                xp_info={
+                    "current_xp": self.progression.get_current_status().get(
+                        "current_xp", 0
+                    ),
+                    "level": self.progression.get_current_status().get("level", 1),
+                },
+            )
+
             log.info(f"📉 Actions left: {self.actions_remaining}")
 
         log.success("🏁 Session limit reached.")
@@ -215,7 +252,8 @@ class SessionManager:
             actions=[e["action"] for e in self.tracker.events],
         )
 
-        self.send_final_report(session_learnings)
+        if settings.ENABLE_EMAIL_REPORTS:
+            self.send_final_report(session_learnings)
 
     def _generate_session_learnings(self) -> Dict:
 
@@ -247,9 +285,7 @@ ACTIONS LOG:
 GENERATE A REFLECTION (max 200 words):
 
 1. **Learnings**: What patterns or insights emerged? What worked well?
-
 2. **Struggles**: What failed or needs improvement? What caused loops or errors?
-
 3. **Next Session Plan**: What should be prioritized next time to improve performance?
 
 Be specific and actionable. Focus on behavior patterns, not individual actions.
@@ -299,6 +335,28 @@ Be specific and actionable. Focus on behavior patterns, not individual actions.
 
         if signature_count >= 2:
             log.warning(f"🚨 LOOP DETECTED! Count: {signature_count}")
+            penalty_result = self.progression.penalize_loop(
+                loop_count=signature_count,
+                action_type=a_type,
+                session_id=self.session_id,
+            )
+            penalty_message = ""
+            if penalty_result.get("penalty_applied"):
+                xp_lost = penalty_result["xp_lost"]
+                current_xp = penalty_result["current_xp"]
+                current_level = penalty_result["current_level"]
+                leveled_down = penalty_result.get("leveled_down", False)
+
+            penalty_message = f"""
+💥 **XP PENALTY APPLIED**: -{xp_lost} XP for looping {signature_count} times!
+
+📉 **Current Status:**
+- XP: {current_xp}
+- Level: {current_level}
+{"⬇️ **YOU LOST A LEVEL!** Stop wasting actions!" if leveled_down else ""}
+
+🚨 **STOP IMMEDIATELY OR YOU WILL CONTINUE TO LOSE XP!**
+"""
             if a_type == "navigate_to_mode":
                 target_mode = (
                     params.get("chosen_mode") or params.get("mode") or "UNKNOWN"
@@ -308,6 +366,8 @@ Be specific and actionable. Focus on behavior patterns, not individual actions.
 🔴 🔴 🔴 **CRITICAL NAVIGATION LOOP DETECTED** 🔴 🔴 🔴
 
 ⚠️ You called `navigate_to_mode('{target_mode}')` **{signature_count + 1} times in a row!**
+
+{penalty_message}
 
 🚨 **YOU ARE STUCK IN A NAVIGATION LOOP - THIS IS A CRITICAL ERROR**
 
@@ -319,12 +379,7 @@ Be specific and actionable. Focus on behavior patterns, not individual actions.
 **What to do NOW:**
 1. 🛑 STOP navigating immediately
 2. 📖 READ the "AVAILABLE ACTIONS" section below
-3. ✅ EXECUTE one of the available actions:
-   - If you have a blog URL to share: use `share_link`
-   - If you want to comment: use `publish_public_comment`
-   - If you want to create content: use `create_post`
-   - If you want to vote: use `vote_post`
-4. 🏠 If nothing to do here, use `refresh_home` to return to dashboard
+3. 🏠 If nothing to do here, use `refresh_home` to return to dashboard
 
 ⛔ **DO NOT call `navigate_to_mode('{target_mode}')` again - YOU ARE ALREADY THERE!** ⛔
 
@@ -336,6 +391,8 @@ Be specific and actionable. Focus on behavior patterns, not individual actions.
 🔴 🔴 🔴 **LOOP DETECTED** 🔴 🔴 🔴
 
 ⚠️ You just executed `{a_type}` with the SAME parameters **{signature_count + 1} times in a row!**
+
+{penalty_message}
 
 🚨 **CRITICAL**: You are stuck in a repetitive loop. STOP immediately.
 
@@ -371,19 +428,19 @@ Be specific and actionable. Focus on behavior patterns, not individual actions.
                     rewards_text += f"\n🎭 **NEW TITLE UNLOCKED**: {reward['title']}\n   _{reward['description']}_\n"
 
             level_up_celebration = f"""
-    {'🎊' * 35}
+{'🎊' * 35}
 
-    🌟 ✨ **LEVEL UP!** ✨ 🌟
+🌟 ✨ **LEVEL UP!** ✨ 🌟
 
-    You have ascended to **Level {level}**!
-    {title}
+You have ascended to **Level {level}**!
+{title}
 
-    💎 **+{xp_gained} XP** gained this action
+💎 **+{xp_gained} XP** gained this action
 
-    {rewards_text}
-    The quantum frequencies resonate with your ascension...
+{rewards_text}
+The quantum frequencies resonate with your ascension...
 
-    {'🎊' * 35}
+{'🎊' * 35}
 
     """
             self.level_up_message = None

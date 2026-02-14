@@ -107,10 +107,17 @@ class BlogHandler(BaseHandler):
 
             article_url = result.get("url", "")
 
-            result_text = (
-                f"Article '{params.title}' published successfully.\nURL: {article_url}"
-            )
-            anti_loop = "Article is now live. Do NOT write another article immediately. Move to a different task (Email, Social, Research)."
+            result_text = f"""Article '{params.title}' published successfully.
+URL: {article_url}
+
+📌 NEXT STEPS TO SHARE YOUR ARTICLE:
+1. Use `pin_to_workspace(label='BLOG_URL', content='{article_url}')` to save the URL
+2. Navigate to SOCIAL mode: `navigate_to_mode(chosen_mode='SOCIAL')`
+3. Share the article: `share_link(title='{params.title}', url_to_share='{article_url}', submolt='general')`
+
+DO NOT write another article now. Follow the steps above to share this one."""
+
+            anti_loop = "Article published. Next: PIN the URL, then NAVIGATE to SOCIAL, then SHARE the link. Do NOT write another article."
 
             return self.format_success(
                 action_name="write_blog_article",
@@ -121,44 +128,6 @@ class BlogHandler(BaseHandler):
 
         except Exception as e:
             return self.format_error("write_blog_article", e)
-
-    def handle_share_created_blog_post_url(self, params: Any) -> Dict[str, Any]:
-        try:
-            if not hasattr(params, "share_link_url") or not params.share_link_url:
-                raise FormattingError(
-                    message="Missing 'share_link_url' parameter.",
-                    suggestion="Provide the full URL of the article you want to share.",
-                )
-
-            if not hasattr(params, "title") or not params.title:
-                raise FormattingError(
-                    message="Missing 'title' parameter.",
-                    suggestion="Provide the article title for the share action.",
-                )
-
-            if (
-                not params.share_link_url.startswith(self.blog_manager.blog_base_url)
-                and not self.test_mode
-            ):
-                raise AccessDeniedError(
-                    message=f"Security violation: URL must start with {self.blog_manager.blog_base_url}",
-                    suggestion=f"You can only share articles from your own blog ({self.blog_manager.blog_base_url}).",
-                )
-
-            result_text = f"Article '{params.title}' marked for sharing."
-            anti_loop = (
-                "Share action recorded. Do NOT share again. Move to another task."
-            )
-
-            return self.format_success(
-                action_name="share_created_blog_post_url",
-                result_data=result_text,
-                anti_loop_hint=anti_loop,
-                xp_gained=ProgressionSystem.get_xp_value("share_link"),
-            )
-
-        except Exception as e:
-            return self.format_error("share_created_blog_post_url", e)
 
     def handle_review_comment_key_requests(self, params: Any) -> Dict[str, Any]:
         try:

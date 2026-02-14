@@ -25,6 +25,15 @@ class ProgressionSystem:
     XP_BASE = 100
     XP_MULTIPLIER = 1.5
 
+    XP_LOOP_PENALTIES = {
+        2: -10,
+        3: -20,
+        4: -30,
+        5: -50,
+        6: -75,
+        7: -100,
+    }
+
     XP_REWARDS = {
         "email_read": 1,
         "email_get_messages": 0,
@@ -156,6 +165,84 @@ class ProgressionSystem:
             )
 
         self.conn.commit()
+
+    def penalize_loop(
+        self, loop_count: int, action_type: str, session_id: int = None
+    ) -> Dict:
+
+        if loop_count < 2:
+            return {"penalty_applied": False, "xp_lost": 0}
+
+        xp_penalty = self.XP_LOOP_PENALTIES.get(
+            loop_count, -100 - (loop_count - 7) * 25
+        )
+
+        cursor = self.conn.cursor()
+
+        cursor.execute("SELECT * FROM progression WHERE id = 1")
+        prog = cursor.fetchone()
+
+        current_xp = prog["current_xp"]
+        total_xp = prog["total_xp"]
+        current_level = prog["level"]
+
+        new_current_xp = max(0, current_xp + xp_penalty)
+        new_total_xp = total_xp + xp_penalty
+
+        leveled_down = False
+        new_level = current_level
+
+        if new_current_xp == 0 and current_level > 1:
+            new_level = current_level - 1
+            xp_for_previous_level = self.get_xp_for_level(new_level + 1)
+            new_current_xp = xp_for_previous_level + xp_penalty
+            new_current_xp = max(0, new_current_xp)
+            leveled_down = True
+
+        new_title_text = self._get_title_for_level(new_level).name
+
+        cursor.execute(
+            """
+            UPDATE progression 
+            SET current_xp = ?, total_xp = ?, level = ?, current_title = ?, updated_at = ?
+            WHERE id = 1
+        """,
+            (
+                new_current_xp,
+                new_total_xp,
+                new_level,
+                new_title_text,
+                datetime.now().isoformat(),
+            ),
+        )
+
+        cursor.execute(
+            """
+            INSERT INTO xp_history (action_type, xp_gained, session_id, timestamp)
+            VALUES (?, ?, ?, ?)
+        """,
+            (
+                f"LOOP_PENALTY:{action_type}",
+                xp_penalty,
+                session_id,
+                datetime.now().isoformat(),
+            ),
+        )
+
+        self.conn.commit()
+
+        log.warning(
+            f"⚠️ LOOP PENALTY: {xp_penalty} XP for repeating {action_type} {loop_count} times!"
+        )
+
+        return {
+            "penalty_applied": True,
+            "xp_lost": abs(xp_penalty),
+            "loop_count": loop_count,
+            "current_xp": new_current_xp,
+            "current_level": new_level,
+            "leveled_down": leveled_down,
+        }
 
     def _init_badges(self):
         badges = [

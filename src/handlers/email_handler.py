@@ -186,10 +186,16 @@ class EmailHandler(BaseHandler):
                     suggestion="Provide email body content in 'content' field.",
                 )
 
+            if not hasattr(params, "reply_to_uid") or not params.reply_to_uid:
+                raise FormattingError(
+                    message="Missing 'reply_to_uid' parameter.",
+                    suggestion="Provide the UID of the email you're replying to (required to auto-mark as read).",
+                )
+
             recipient = params.to
-            subject = getattr(params, "subject", "Automated Update")
+            subject = params.subject
             content = params.content
-            reply_to_uid = getattr(params, "reply_to_uid", None)
+            reply_to_uid = params.reply_to_uid
 
             if "@" not in recipient or "." not in recipient.split("@")[-1]:
                 raise FormattingError(
@@ -218,25 +224,22 @@ class EmailHandler(BaseHandler):
                 log.success(f"📤 Email dispatched to {recipient}")
 
                 auto_mark_message = ""
-                if reply_to_uid:
-                    try:
-                        self.mailbox.flag(reply_to_uid, MailMessageFlags.SEEN, True)
-                        log.info(
-                            f"✓ Original email {reply_to_uid} automatically marked as read"
-                        )
-                        auto_mark_message = (
-                            f"\n✓ Original email (UID {reply_to_uid}) marked as read."
-                        )
-                    except Exception as mark_error:
-                        log.warning(
-                            f"⚠️ Could not auto-mark email as read: {mark_error}"
-                        )
-                        auto_mark_message = (
-                            f"\n⚠️ Note: Could not auto-mark original email as read."
-                        )
+                try:
+                    self.mailbox.flag(reply_to_uid, MailMessageFlags.SEEN, True)
+                    log.info(
+                        f"✓ Original email {reply_to_uid} automatically marked as read"
+                    )
+                    auto_mark_message = (
+                        f"\n✓ Original email (UID {reply_to_uid}) marked as read."
+                    )
+                except Exception as mark_error:
+                    log.warning(f"⚠️ Could not auto-mark email as read: {mark_error}")
+                    auto_mark_message = (
+                        f"\n⚠️ Note: Could not auto-mark original email as read."
+                    )
 
                 result_text = f"Email sent successfully to {recipient}.\nSubject: {subject}{auto_mark_message}"
-                anti_loop = f"Email to {recipient} SENT. Do NOT send the same email again. Move to another task."
+                anti_loop = f"Email to {recipient} SENT and original email marked as read. Do NOT send the same email again. Move to another task."
 
                 return self.format_success(
                     action_name="email_send",

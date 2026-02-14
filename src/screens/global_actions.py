@@ -76,7 +76,7 @@ class PinParams(BaseModel):
             "- Plain text with detailed notes/plans\n"
             "- JSON string for structured data\n"
             "Examples:\n"
-            "  Text: 'Priority 1: Check mail\\nPriority 2: Write blog post'\n"
+            "  Text: 'Priority 1: task1\\nPriority 2: task2'\n"
             '  JSON: \'{"urgent": "task1", "high": "task2"}\''
         ),
     )

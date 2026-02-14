@@ -10,11 +10,9 @@ class UIUtils:
     ) -> str:
         terminal_label = "📡 SYSTEM TERMINAL"
         node_status = f"NODE: {current_domain.upper()}"
-
         width = 70
         padding = width - len(terminal_label)
         top_line = f"**{terminal_label}{node_status.rjust(padding)}**"
-
         nav_items = [
             (
                 f"📍 ▶️ **[{d.upper()}]**"
@@ -23,10 +21,34 @@ class UIUtils:
             )
             for d in settings.AVAILABLE_MODULES
         ]
-
         max_actions = settings.MAX_ACTIONS_PER_SESSION
         remaining = max_actions - action_count
         energy_bar = "🟢" * remaining + "🔴" * action_count
+
+        urgency_message = ""
+        energy_percentage = (remaining / max_actions) * 100
+
+        if energy_percentage <= 20:
+            urgency_message = (
+                "\n🚨 **CRITICAL LOW ENERGY!** Only high-value actions now:\n"
+                "   • Publish content (blog/social) to maximize impact\n"
+                "   • Complete research and share findings\n"
+                "   • NO loops, NO low-value actions, NO exploration\n"
+                "   • Every action must create tangible value!"
+            )
+        elif energy_percentage <= 40:
+            urgency_message = (
+                "\n⚠️ **LOW ENERGY WARNING** - Prioritize high-impact actions:\n"
+                "   • Focus on content creation and community engagement\n"
+                "   • Avoid unnecessary navigation and research loops\n"
+                "   • Make every action count!"
+            )
+        elif energy_percentage <= 60:
+            urgency_message = (
+                "\n💡 **ENERGY MODERATE** - Stay focused on valuable tasks:\n"
+                "   • Balance research with content creation\n"
+                "   • Avoid repetitive actions"
+            )
 
         prog_display = ""
         if progression_status:
@@ -34,20 +56,18 @@ class UIUtils:
             title = progression_status.get("current_title", "")
             current_xp = progression_status.get("current_xp", 0)
             xp_needed = progression_status.get("xp_needed", 100)
-
             xp_bar_width = 30
             xp_percentage = (current_xp / xp_needed) if xp_needed > 0 else 0
             filled = int(xp_bar_width * xp_percentage)
             empty = xp_bar_width - filled
             xp_bar = "█" * filled + "░" * empty
-
             prog_display = f"\n⭐ **LVL {level}** {title} | XP: [{xp_bar}] {current_xp}/{xp_needed}"
 
         return (
             f"{top_line}\n"
             f"{'━' * width}\n"
             f"🌐 {' | '.join(nav_items)}\n"
-            f"🔋 {energy_bar} ({remaining}/{max_actions} actions left){prog_display}\n"
+            f"🔋 {energy_bar} ({remaining}/{max_actions} actions left){prog_display}{urgency_message}\n"
             f"{'━' * width}\n"
             f""
         )
@@ -68,7 +88,13 @@ class UIUtils:
 
         if success_msg:
             feedback += f"\n✅ **LAST STATUS**: {success_msg}\n"
-            feedback += "⚠️ IMPORTANT AND HIGH-PRIORITY: DO NOT REPEAT THIS STEP. MOVE IMMEDIATELY TO THE NEXT TASK.\n"
+            feedback += (
+                "⚠️ IMPORTANT AND HIGH-PRIORITY: DO NOT REPEAT THIS STEP. MOVE IMMEDIATELY TO THE NEXT TASK.\n"
+                "🚨 REPEATING THE SAME ACTION WITH THE SAME PARAMETERS WILL COST YOU XP:\n"
+                "   • 2nd repeat: -10 XP | 3rd repeat: -20 XP | 4th repeat: -30 XP\n"
+                "   • 5th+ repeat: -50 XP, -75 XP, -100 XP (can lose levels!)\n"
+                "   • Choose a DIFFERENT action or navigate to a DIFFERENT module.\n"
+            )
 
         if error_msg:
             feedback += f"\n❌ **LAST STATUS**: {error_msg}\n"

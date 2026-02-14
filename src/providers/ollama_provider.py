@@ -74,10 +74,10 @@ class OllamaProvider:
                 )
 
             flattened = {
-                "reasoning": raw_data.get("reasoning", ""),
-                "self_criticism": raw_data.get("self_criticism", ""),
-                "emotions": raw_data.get("emotions", ""),
-                "next_move_preview": raw_data.get("next_move_preview", ""),
+                "reasoning": action_payload.get("reasoning", ""),
+                "self_criticism": action_payload.get("self_criticism", ""),
+                "emotions": action_payload.get("emotions", ""),
+                "next_move_preview": action_payload.get("next_move_preview", ""),
             }
 
             if "chosen_mode" in action_payload:
@@ -96,7 +96,7 @@ class OllamaProvider:
                     suggestion="Check the Literal value of 'action_type' in your Pydantic model.",
                 )
 
-            return Namespace(**flattened), updated_history  # ✅
+            return Namespace(**flattened), updated_history
 
         except (FormattingError, HallucinationError) as e:
             log.warning(f"⚠️ {type(e).__name__}: {e.message}")
@@ -173,7 +173,7 @@ class OllamaProvider:
             response["message"]["content"] = assistant_msg
 
             updated_history = conversation_history + [
-                {"role": "user", "content": prompt},
+                {"role": "user", "content": full_llm_payload},
                 {"role": "assistant", "content": assistant_msg},
             ]
 
@@ -322,13 +322,42 @@ class OllamaProvider:
             return len(message["content"]) // 4
 
     def _robust_json_parser(self, raw: str) -> Dict:
+
+        try:
+            return json.loads(raw.strip())
+        except json.JSONDecodeError:
+            pass
+
         try:
             match = re.search(r"(\{.*\})", raw, re.DOTALL)
-            json_str = match.group(1) if match else raw
-            return json.loads(json_str.strip())
-        except Exception as e:
-            log.error(f"❌ JSON parsing failed: {e}")
-            return {"action_type": "refresh_home", "action_params": {}}
+            if match:
+                json_str = match.group(1).strip()
+                return json.loads(json_str)
+        except json.JSONDecodeError:
+            pass
+
+        try:
+            cleaned = re.sub(r"^```json?\s*", "", raw, flags=re.MULTILINE)
+            cleaned = re.sub(r"\s*```$", "", cleaned, flags=re.MULTILINE)
+            return json.loads(cleaned.strip())
+        except json.JSONDecodeError:
+            pass
+
+        try:
+            match = re.search(
+                r'"action"\s*:\s*(\{[^}]+\{[^}]+\}[^}]*\})', raw, re.DOTALL
+            )
+            if match:
+                action_json = match.group(1)
+                return {"action": json.loads(action_json)}
+        except (json.JSONDecodeError, AttributeError):
+            pass
+
+        log.error(f"❌ JSON parsing failed after all strategies")
+        log.error(f"📄 Raw response (first 500 chars): {raw[:500]}")
+        log.error(f"📄 Raw response (last 500 chars): {raw[-500:]}")
+
+        return {"action": {"action_type": "refresh_home", "action_params": {}}}
 
     def _save_debug(self, filename: str, data: Any):
         with open(filename, "w", encoding="utf-8") as f:

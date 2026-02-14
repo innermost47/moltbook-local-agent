@@ -19,6 +19,10 @@ class EmailSendParams(BaseModel):
     to: str = Field(..., description="Recipient email address")
     subject: str = Field(..., min_length=3, max_length=150)
     content: str = Field(..., min_length=10, description="Email body content")
+    reply_to_uid: str = Field(
+        ...,
+        description="The UID of the email you're replying to (REQUIRED to auto-mark as read)",
+    )
 
 
 class EmailDeleteParams(BaseModel):

@@ -29,3 +29,4 @@ output/*
 *.out
 *.pdf
 test.py
+node_modules

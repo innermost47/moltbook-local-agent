@@ -173,7 +173,7 @@ class OllamaProvider:
             response["message"]["content"] = assistant_msg
 
             updated_history = conversation_history + [
-                {"role": "user", "content": full_llm_payload},
+                {"role": "user", "content": prompt},
                 {"role": "assistant", "content": assistant_msg},
             ]
 

@@ -43,7 +43,9 @@ class BlogContextManager(BaseContextManager):
             log.warning(f"Blog snippet generation failed: {e}")
             return "📚 **BLOG**: Status unavailable"
 
-    def get_list_view(self, status_msg: str = "", result: Dict = None) -> str:
+    def get_list_view(
+        self, status_msg: str = "", result: Dict = None, workspace_pins=None
+    ) -> str:
 
         blog_knowledge = ""
         try:

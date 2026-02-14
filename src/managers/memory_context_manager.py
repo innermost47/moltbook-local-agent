@@ -2,9 +2,10 @@ from typing import Dict
 from argparse import Namespace
 from src.settings import settings
 from src.utils import log
+from src.managers.base_context_manager import BaseContextManager
 
 
-class MemoryContextManager:
+class MemoryContextManager(BaseContextManager):
     def __init__(self, memory_handler):
         self.handler = memory_handler
 
@@ -15,7 +16,9 @@ class MemoryContextManager:
             log.warning(f"Memory snippet generation failed: {e}")
             return "🧠 **MEMORY**: Status unavailable"
 
-    def get_list_view(self, status_msg: str = "", result: Dict = None) -> str:
+    def get_list_view(
+        self, status_msg: str = "", result: Dict = None, workspace_pins=None
+    ) -> str:
 
         last_state_info = ""
         try:

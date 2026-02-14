@@ -1,8 +1,9 @@
 from typing import Dict
 from src.utils import log
+from src.managers.base_context_manager import BaseContextManager
 
 
-class PlanContextManager:
+class PlanContextManager(BaseContextManager):
     def __init__(self, plan_handler):
         self.handler = plan_handler
 
@@ -19,7 +20,9 @@ class PlanContextManager:
             log.warning(f"Plan snippet generation failed: {e}")
             return "🗺️ **PLAN**: Status unavailable"
 
-    def get_list_view(self, status_msg: str = "", result: Dict = None) -> str:
+    def get_list_view(
+        self, status_msg: str = "", result: Dict = None, workspace_pins=None
+    ) -> str:
 
         plan_display = ""
         try:

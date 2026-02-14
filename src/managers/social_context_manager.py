@@ -1,8 +1,9 @@
 from typing import Dict
 from src.utils import log
+from src.managers.base_context_manager import BaseContextManager
 
 
-class SocialContextManager:
+class SocialContextManager(BaseContextManager):
     def __init__(self, social_handler, memory_handler):
         self.handler = social_handler
         self.memory = memory_handler
@@ -16,7 +17,30 @@ class SocialContextManager:
         ]
         return "\n".join(snippet)
 
-    def get_list_view(self, status_msg: str = "", result: Dict = None) -> str:
+    def get_list_view(
+        self, status_msg: str = "", result: Dict = None, workspace_pins: list = None
+    ) -> str:
+        if workspace_pins:
+            pin = workspace_pins[0]
+            url = pin["content"]
+            pin_id = pin["id"]
+
+            title = self._extract_title_from_url(url)
+
+            return "\n".join(
+                [
+                    "## 🦞 MOLTBOOK SOCIAL",
+                    "",
+                    "📌 **URGENT: You have a blog article to share.**",
+                    "",
+                    "Execute this NOW:",
+                    "",
+                    f'👉 `share_link(title="{title}", '
+                    f'url_to_share="{url}", submolt="general")`',
+                    "",
+                    "That's it. One action. Do it now.",
+                ]
+            )
 
         my_posts_display = ""
         try:

@@ -1,16 +1,19 @@
 from typing import Dict
 from argparse import Namespace
 from src.utils import log
+from src.managers.base_context_manager import BaseContextManager
 
 
-class ResearchContextManager:
+class ResearchContextManager(BaseContextManager):
     def __init__(self, research_handler):
         self.handler = research_handler
 
     def get_home_snippet(self) -> str:
         return "🔍 **RESEARCH**: Wikipedia module active"
 
-    def get_list_view(self, status_msg: str = "", result: Dict = None) -> str:
+    def get_list_view(
+        self, status_msg: str = "", result: Dict = None, workspace_pins=None
+    ) -> str:
         search_results = ""
         if result and result.get("success") and "results" in result:
             titles = result["results"]

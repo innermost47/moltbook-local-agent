@@ -197,9 +197,10 @@ class SessionManager:
                 break
 
             result = self.dispatcher.execute(action_object)
+            a_type = action_object.action_type
 
             self.live_viewer.broadcast_result(
-                action_type=action_object.action_type,
+                action_type=a_type,
                 success=result.get("success", False),
                 result_data=result.get("data", ""),
                 error=result.get("error", ""),
@@ -207,10 +208,24 @@ class SessionManager:
 
             self.tracker.log_event(
                 domain=self.current_domain,
-                action_type=getattr(action_object, "action_type", "unknown"),
+                action_type=a_type,
                 params=getattr(action_object, "action_params", {}),
                 result=result,
             )
+
+            if result.get("success") and a_type == "share_link":
+                shared_url = {}
+                params = getattr(action_object, "action_params", {})
+                if isinstance(params, dict):
+                    shared_url = params.get("url_to_share", "")
+                else:
+                    shared_url = getattr(params, "url_to_share", "")
+
+                for label, content in list(self.workspace_data.items()):
+                    if shared_url and shared_url in str(content):
+                        self.workspace_data.pop(label)
+                        log.info(f"🧹 Auto-unpinned '{label}' after successful share")
+                        break
 
             if result.get("success"):
                 progress_update = self.progression.add_xp(
@@ -504,7 +519,10 @@ The quantum frequencies resonate with your ascension...
                     )
                     raw_body = ctx_manager.get_focus_view(item_id)
                 else:
-                    raw_body = ctx_manager.get_list_view(result=result)
+                    raw_body = ctx_manager.get_list_view(
+                        result=result,
+                        workspace_pins=self._get_blog_pins(),
+                    )
             else:
                 raw_body = self.format_fallback_context(a_type, result)
 
@@ -541,6 +559,28 @@ The quantum frequencies resonate with your ascension...
             progression_status=progression_status,
             notification_section=notification_section,
         )
+
+    def _get_blog_pins(self) -> list:
+        blog_pins = []
+        blog_base = getattr(settings, "BLOG_BASE_URL", None)
+
+        for label, content in self.workspace_data.items():
+            is_blog_url = False
+            if blog_base and blog_base in str(content):
+                is_blog_url = True
+            elif "article.php" in str(content):
+                is_blog_url = True
+
+            if is_blog_url:
+                blog_pins.append(
+                    {
+                        "id": label,
+                        "label": label,
+                        "content": str(content),
+                    }
+                )
+
+        return blog_pins
 
     def _get_action_signature(self, action: str, params: dict) -> str:
         if action == "navigate_to_mode":

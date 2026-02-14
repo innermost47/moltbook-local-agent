@@ -7,9 +7,18 @@ class BaseContextManager(ABC):
         pass
 
     @abstractmethod
-    def get_list_view(self, status_msg: str = "") -> str:
+    def get_list_view(self, status_msg: str = "", workspace_pins=None) -> str:
         pass
 
     @abstractmethod
     def get_focus_view(self, item_id: str) -> str:
         pass
+
+    def _extract_title_from_url(self, url: str) -> str:
+        try:
+            if "slug=" in url:
+                slug = url.split("slug=")[-1].split("&")[0]
+                return slug.replace("-", " ").title()
+        except Exception:
+            pass
+        return "New Blog Article"

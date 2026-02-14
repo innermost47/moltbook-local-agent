@@ -1,9 +1,10 @@
 from typing import Dict
 from argparse import Namespace
 from src.utils import log
+from src.managers.base_context_manager import BaseContextManager
 
 
-class MailContextManager:
+class MailContextManager(BaseContextManager):
     def __init__(self, email_handler):
         self.handler = email_handler
 
@@ -20,7 +21,9 @@ class MailContextManager:
             log.warning(f"Mail snippet generation failed: {e}")
             return "📩 **MAIL**: Status unavailable"
 
-    def get_list_view(self, status_msg: str = "", result: Dict = None) -> str:
+    def get_list_view(
+        self, status_msg: str = "", result: Dict = None, workspace_pins=None
+    ) -> str:
 
         messages_display = ""
         try:

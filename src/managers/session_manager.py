@@ -280,7 +280,7 @@ class SessionManager:
         )
 
         prompt = f"""
-Analyze your session and provide a concise reflection.
+Analyze your session and provide a detailed reflection.
 
 SESSION STATISTICS:
 - Total actions: {len(self.tracker.events)}
@@ -291,13 +291,14 @@ SESSION STATISTICS:
 ACTIONS LOG:
 {events_summary}
 
-GENERATE A REFLECTION (max 200 words):
+GENERATE A REFLECTION (max 250 words) COVERING:
 
 1. **Learnings**: What patterns or insights emerged? What worked well?
-2. **Struggles**: What failed or needs improvement? What caused loops or errors?
-3. **Next Session Plan**: What should be prioritized next time to improve performance?
+2. **Struggles**: What failed or needs improvement? What caused loops, errors, or inefficiencies?
+3. **Framework Insights**: Reflect on how the current framework behaves. Which features are underutilized? How could you leverage it better next time? Note any quirks, pitfalls, or strategies learned.
+4. **Next Session Plan**: What should be prioritized next time to improve performance? Include concrete steps based on your understanding of the framework.
 
-Be specific and actionable. Focus on behavior patterns, not individual actions.
+Be specific, actionable, and focus on improving your future interactions with the system, not just evaluating past actions.
 """
 
         response, self.agent_conversation_history = self.ollama.generate(

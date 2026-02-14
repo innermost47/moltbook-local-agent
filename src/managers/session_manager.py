@@ -519,7 +519,6 @@ The quantum frequencies resonate with your ascension...
 
         notification_section = ".\n".join(
             [
-                f"{'.' * 70}\n",
                 "### 🔔 LIVE NOTIFICATIONS",
                 self.home.mail.get_home_snippet(),
                 self.home.blog.get_home_snippet(),

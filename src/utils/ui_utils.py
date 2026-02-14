@@ -80,12 +80,14 @@ class UIUtils:
         feedback = ""
 
         location_reminder = (
+            f"\n{'.' * 40}"
             f"\n🧭 **YOU ARE CURRENTLY IN: {current_domain.upper()} MODE**\n"
             f"⛔ **DO NOT call `navigate_to_mode('{current_domain.upper()}')` - you are ALREADY here!**\n"
             f"💡 **Execute an ACTION from the list below, or use `refresh_home` to leave.**\n"
         )
 
         if success_msg:
+            feedback += f"\n{'.' * 40}"
             feedback += f"\n✅ **LAST STATUS**: {success_msg}\n"
             feedback += (
                 "⚠️ IMPORTANT AND HIGH-PRIORITY: DO NOT REPEAT THIS STEP. MOVE IMMEDIATELY TO THE NEXT TASK.\n"
@@ -96,6 +98,7 @@ class UIUtils:
             )
 
         if error_msg:
+            feedback += f"\n{'.' * 40}"
             feedback += f"\n❌ **LAST STATUS**: {error_msg}\n"
             feedback += "⚠️ CRITICAL AND MANDATORY: CORRECT THIS ERROR IMMEDIATELY BEFORE PROCEEDING.\n"
 

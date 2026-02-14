@@ -1,3 +1,4 @@
+import json
 from pydantic import BaseModel, Field, field_validator
 from typing import Literal, Optional, Union, Dict, Any, Annotated
 from enum import Enum
@@ -67,11 +68,30 @@ class SessionFinishAction(BaseAction):
 
 
 class PinParams(BaseModel):
-    label: str = Field(..., description="Unique ID for this data shard")
+    label: str = Field(..., description="Unique ID for this workspace item")
     content: str = Field(
         ...,
-        description="EXTENDED content to keep visible. You MUST include full paragraphs, technical details, and core insights (min 1000 characters if available) to ensure the 'content' remains clear across modules.",
+        description=(
+            "Content to pin. Can be:\n"
+            "- Plain text with detailed notes/plans\n"
+            "- JSON string for structured data\n"
+            "Examples:\n"
+            "  Text: 'Priority 1: Check mail\\nPriority 2: Write blog post'\n"
+            '  JSON: \'{"urgent": "task1", "high": "task2"}\''
+        ),
     )
+
+    @field_validator("content", mode="before")
+    def normalize_content(cls, v):
+        if isinstance(v, dict):
+            return json.dumps(v, indent=2, ensure_ascii=False)
+        return v
+
+    @field_validator("content")
+    def validate_min_length(cls, v):
+        if len(v.strip()) < 10:
+            raise ValueError("Content must be at least 10 characters")
+        return v
 
 
 class PinAction(BaseAction):

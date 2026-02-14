@@ -1,4 +1,5 @@
-from typing import Dict, Any
+import os
+from typing import Dict, Any, List
 from argparse import Namespace
 from src.utils import log
 from src.utils.ui_utils import UIUtils
@@ -30,13 +31,14 @@ class SessionManager:
         self.tracker = tracker
         self.email_reporter = email_reporter
         self.progression = ProgressionSystem(settings.DB_PATH)
+        self.agent_conversation_history: List[Dict] = []
 
     def start_session(self):
         self.session_id = self.home.memory.create_session()
         log.info(
             f"🚀 Session {self.session_id} started. Budget: {self.actions_remaining}"
         )
-
+        self._initialize_conversation_history()
         initial_body = self.home.build_home_screen(self.session_id)
 
         self.current_context = UIUtils.layout(
@@ -46,6 +48,82 @@ class SessionManager:
         )
 
         self.run_loop()
+
+    def _initialize_conversation_history(self):
+        system_content = self._load_system_prompt()
+
+        STRICT_JSON_SUFFIX = (
+            "### 🌐 ENVIRONMENT & OPPORTUNITIES\n"
+            "You have access to multiple modules to expand your actions beyond mere research:\n"
+            "- **Research (wiki_read, wiki_search)**: Collect knowledge, but remember, the goal is to apply it.\n"
+            "- **Workspace (pin_to_workspace, memory_retrieve)**: Organize and retrieve your findings; use them as reference to inform posts, emails, or collaborations.\n"
+            "- **Blog & Social (Moltbook)**: Share your insights, create posts, comment on others, and engage with the community.\n"
+            "- **Email**: Send and respond to messages; integrate information from research or workspace notes when relevant.\n\n"
+            "### 🎯 RECOMMENDED STRATEGY\n"
+            "1. Conduct focused research, but DO NOT linger in repetitive reading loops.\n"
+            "2. Apply your knowledge to create new content: blog entries, social posts, comments.\n"
+            "3. Regularly retrieve your memories to enhance context and avoid redundant work.\n"
+            "4. Balance your time across modules—research, content creation, social interaction, and email—to fully leverage your environment.\n"
+            "5. Always prioritize actions that move you forward: share, engage, create, and learn in a diversified manner.\n\n"
+            "### ⚠️ CRITICAL ANTI-LOOP RULES (ABSOLUTE PRIORITY)\n\n"
+            "**YOU ARE STUCK IN A LOOP IF:**\n"
+            "- You call the SAME action MORE THAN ONCE without getting new information\n"
+            "- You see '⚠️ ANTI-LOOP' or 'DO NOT REPEAT' in the UI and ignore it\n"
+            "- You navigate to a module you're ALREADY IN\n"
+            "- The UI says 'ACTION JUST EXECUTED' and you immediately repeat it\n\n"
+            "**MANDATORY BEHAVIOR - READ CAREFULLY:**\n"
+            "1. ⛔ **NEVER call `navigate_to_mode` if you're ALREADY in that mode**\n"
+            "   - Check the NODE label: if it says 'NODE: SOCIAL', you are IN social mode\n"
+            "   - Execute an action (create_post, comment, vote) instead of navigating again\n\n"
+            "2. ⛔ **NEVER repeat the same action twice in a row**\n"
+            "   - If you just did `wiki_search`, do NOT do `wiki_search` again immediately\n"
+            "   - Move to `wiki_read`, then `research_complete`, then to another module\n\n"
+            "3. ⛔ **READ the UI feedback BEFORE deciding your next action**\n"
+            "   - If it says 'Successfully navigated to X', you are IN X - do NOT navigate again\n"
+            "   - If it says 'Action COMPLETE', choose a DIFFERENT action or module\n\n"
+            "4. ⛔ **DIVERSIFY your actions across modules**\n"
+            "   - Do NOT spend more than 2 consecutive actions in the same module\n"
+            "   - Balance: Email → Blog → Social → Research → Memory\n\n"
+            "**EXAMPLES OF LOOPS TO AVOID:**\n"
+            "❌ BAD: `navigate_to_mode(SOCIAL)` → `navigate_to_mode(SOCIAL)` → `navigate_to_mode(SOCIAL)`\n"
+            "✅ GOOD: `navigate_to_mode(SOCIAL)` → `create_post()` → `refresh_home`\n\n"
+            "❌ BAD: `wiki_search('AI')` → `wiki_search('AI')` → `wiki_search('AI')`\n"
+            "✅ GOOD: `wiki_search('AI')` → `wiki_read('Artificial Intelligence')` → `research_complete()`\n\n"
+            "❌ BAD: `email_get_messages` → `email_get_messages` → `email_get_messages`\n"
+            "✅ GOOD: `email_get_messages` → `email_send()` OR `refresh_home`\n\n"
+            "**IF YOU SEE '⚠️ ANTI-LOOP' IN THE UI:**\n"
+            "This means you JUST executed this action. The system is WARNING you.\n"
+            "DO NOT execute it again. Choose a DIFFERENT action or use `refresh_home`.\n\n"
+            "**WHAT TO DO WHEN STUCK:**\n"
+            "1. Check the current NODE (top of UI) - you are ALREADY there\n"
+            "2. Read the 'AVAILABLE ACTIONS' list\n"
+            "3. Choose ONE action from that list (NOT navigate_to_mode)\n"
+            "4. If nothing to do, use `refresh_home` and go to a DIFFERENT module\n\n"
+            "**REMEMBER:**\n"
+            "- Every wasted action on loops means LESS time for productive work\n"
+            "- Diversification = Better performance = Higher success rate\n"
+            "- The UI tells you EXACTLY what NOT to do - listen to it\n"
+        )
+
+        full_system_content = system_content + STRICT_JSON_SUFFIX
+
+        self.agent_conversation_history = [
+            {"role": "system", "content": full_system_content}
+        ]
+
+        log.info(f"✅ System prompt loaded for {settings.AGENT_NAME}")
+
+    def _load_system_prompt(self) -> str:
+
+        if os.path.exists(settings.MAIN_AGENT_FILE_PATH):
+            with open(settings.MAIN_AGENT_FILE_PATH, "r", encoding="utf-8") as f:
+                return f.read()
+        elif os.path.exists(settings.BASE_AGENT_FILE_PATH):
+            with open(settings.BASE_AGENT_FILE_PATH, "r", encoding="utf-8") as f:
+                return f.read()
+        else:
+            log.warning("⚠️ No system prompt file found. Running without instructions.")
+            return ""
 
     def run_loop(self):
         while self.actions_remaining > 0:
@@ -77,11 +155,15 @@ class SessionManager:
                     is_popup_active=bool(self.pending_action),
                 )
 
-            action_object = self.ollama.get_next_action(
-                self.current_context,
-                self.actions_remaining,
-                schema=current_schema,
-                agent_name=settings.AGENT_NAME,
+            action_object, self.agent_conversation_history = (
+                self.ollama.get_next_action(
+                    current_context=self.current_context,
+                    conversation_history=self.agent_conversation_history,
+                    actions_left=self.actions_remaining,
+                    schema=current_schema,
+                    agent_name=settings.AGENT_NAME,
+                    debug_filename="debug.json",
+                )
             )
 
             if not action_object or action_object.action_type == "session_finish":
@@ -129,7 +211,7 @@ class SessionManager:
         self.home.memory.archive_session(
             session_id=self.session_id,
             summary=session_learnings,
-            history=self.ollama.conversation_history,
+            history=self.agent_conversation_history,
             actions=[e["action"] for e in self.tracker.events],
         )
 
@@ -173,8 +255,10 @@ GENERATE A REFLECTION (max 200 words):
 Be specific and actionable. Focus on behavior patterns, not individual actions.
 """
 
-        response = self.ollama.generate(
-            prompt=prompt, save_to_history=False, temperature=0.3
+        response, self.agent_conversation_history = self.ollama.generate(
+            prompt=prompt,
+            conversation_history=self.agent_conversation_history,
+            temperature=0.3,
         )
 
         reflection = response.get("message", {}).get(

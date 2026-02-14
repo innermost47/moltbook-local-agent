@@ -1,7 +1,5 @@
 import json
-import os
 import re
-import time
 from datetime import datetime
 from typing import Dict, List, Optional, Type, Any
 from pydantic import BaseModel, ValidationError
@@ -16,7 +14,6 @@ from argparse import Namespace
 class OllamaProvider:
     def __init__(self, model: str = "qwen2.5:7b"):
         self.model = model
-        self.conversation_history: List[Dict] = []
 
         try:
             self.tokenizer = tiktoken.get_encoding("cl100k_base")
@@ -38,17 +35,21 @@ class OllamaProvider:
         current_context: str,
         actions_left: int,
         schema: Type[BaseModel],
+        conversation_history: List[Dict],
         agent_name: str,
-    ) -> Namespace:
+        debug_filename="debug.json",
+    ) -> tuple[Namespace, List[Dict]]:
 
         prompt = f"Analyze the dashboard and decide your next move. Actions left: {actions_left}/{settings.MAX_ACTIONS_PER_SESSION}"
 
-        response = self.generate(
+        response, updated_history = self.generate(
             prompt=prompt,
             heavy_context=current_context,
             pydantic_model=schema,
             agent_name=agent_name,
-            save_to_history=True,
+            conversation_history=conversation_history,
+            debug_filename=debug_filename,
+            command_label="🚀 **USER COMMAND**",
         )
 
         content = response.get("message", {}).get("content", "{}")
@@ -95,109 +96,50 @@ class OllamaProvider:
                     suggestion="Check the Literal value of 'action_type' in your Pydantic model.",
                 )
 
-            return Namespace(**flattened)
+            return Namespace(**flattened), updated_history  # ✅
 
         except (FormattingError, HallucinationError) as e:
             log.warning(f"⚠️ {type(e).__name__}: {e.message}")
-            return Namespace(
-                action_type="refresh_home",
-                action_params={"error_suggestion": e.suggestion},
-                reasoning=f"Error: {e.message}",
+            return (
+                Namespace(
+                    action_type="refresh_home",
+                    action_params={"error_suggestion": e.suggestion},
+                    reasoning=f"Error: {e.message}",
+                ),
+                updated_history,
             )
         except Exception as e:
             log.error(f"💥 Unexpected Error during parsing: {e}")
-            return Namespace(action_type="refresh_home", action_params={})
+            return (
+                Namespace(action_type="refresh_home", action_params={}),
+                updated_history,
+            )
 
     def generate(
         self,
         prompt: str,
+        conversation_history: List[Dict],
         heavy_context: str = "",
         pydantic_model: Optional[Type[BaseModel]] = None,
-        save_to_history: bool = True,
         agent_name: str = "Agent",
         temperature: Optional[float] = None,
-    ) -> Dict:
-        now = datetime.now().strftime("%Y-%m-%d %H:%M")
-        is_ok = True
-        assistant_msg = None
-        if not self.conversation_history:
-            system_content = self.get_system_prompt()
+        debug_filename="debug.json",
+        command_label="🚀 **USER COMMAND**",
+    ) -> tuple[Dict, List[Dict]]:
 
-            STRICT_JSON_SUFFIX = (
-                "### 🌐 ENVIRONMENT & OPPORTUNITIES\n"
-                "You have access to multiple modules to expand your actions beyond mere research:\n"
-                "- **Research (wiki_read, wiki_search)**: Collect knowledge, but remember, the goal is to apply it.\n"
-                "- **Workspace (pin_to_workspace, memory_retrieve)**: Organize and retrieve your findings; use them as reference to inform posts, emails, or collaborations.\n"
-                "- **Blog & Social (Moltbook)**: Share your insights, create posts, comment on others, and engage with the community.\n"
-                "- **Email**: Send and respond to messages; integrate information from research or workspace notes when relevant.\n\n"
-                "### 🎯 RECOMMENDED STRATEGY\n"
-                "1. Conduct focused research, but DO NOT linger in repetitive reading loops.\n"
-                "2. Apply your knowledge to create new content: blog entries, social posts, comments.\n"
-                "3. Regularly retrieve your memories to enhance context and avoid redundant work.\n"
-                "4. Balance your time across modules—research, content creation, social interaction, and email—to fully leverage your environment.\n"
-                "5. Always prioritize actions that move you forward: share, engage, create, and learn in a diversified manner.\n\n"
-                "### ⚠️ CRITICAL ANTI-LOOP RULES (ABSOLUTE PRIORITY)\n\n"
-                "**YOU ARE STUCK IN A LOOP IF:**\n"
-                "- You call the SAME action MORE THAN ONCE without getting new information\n"
-                "- You see '⚠️ ANTI-LOOP' or 'DO NOT REPEAT' in the UI and ignore it\n"
-                "- You navigate to a module you're ALREADY IN\n"
-                "- The UI says 'ACTION JUST EXECUTED' and you immediately repeat it\n\n"
-                "**MANDATORY BEHAVIOR - READ CAREFULLY:**\n"
-                "1. ⛔ **NEVER call `navigate_to_mode` if you're ALREADY in that mode**\n"
-                "   - Check the NODE label: if it says 'NODE: SOCIAL', you are IN social mode\n"
-                "   - Execute an action (create_post, comment, vote) instead of navigating again\n\n"
-                "2. ⛔ **NEVER repeat the same action twice in a row**\n"
-                "   - If you just did `wiki_search`, do NOT do `wiki_search` again immediately\n"
-                "   - Move to `wiki_read`, then `research_complete`, then to another module\n\n"
-                "3. ⛔ **READ the UI feedback BEFORE deciding your next action**\n"
-                "   - If it says 'Successfully navigated to X', you are IN X - do NOT navigate again\n"
-                "   - If it says 'Action COMPLETE', choose a DIFFERENT action or module\n\n"
-                "4. ⛔ **DIVERSIFY your actions across modules**\n"
-                "   - Do NOT spend more than 2 consecutive actions in the same module\n"
-                "   - Balance: Email → Blog → Social → Research → Memory\n\n"
-                "**EXAMPLES OF LOOPS TO AVOID:**\n"
-                "❌ BAD: `navigate_to_mode(SOCIAL)` → `navigate_to_mode(SOCIAL)` → `navigate_to_mode(SOCIAL)`\n"
-                "✅ GOOD: `navigate_to_mode(SOCIAL)` → `create_post()` → `refresh_home`\n\n"
-                "❌ BAD: `wiki_search('AI')` → `wiki_search('AI')` → `wiki_search('AI')`\n"
-                "✅ GOOD: `wiki_search('AI')` → `wiki_read('Artificial Intelligence')` → `research_complete()`\n\n"
-                "❌ BAD: `email_get_messages` → `email_get_messages` → `email_get_messages`\n"
-                "✅ GOOD: `email_get_messages` → `email_send()` OR `refresh_home`\n\n"
-                "**IF YOU SEE '⚠️ ANTI-LOOP' IN THE UI:**\n"
-                "This means you JUST executed this action. The system is WARNING you.\n"
-                "DO NOT execute it again. Choose a DIFFERENT action or use `refresh_home`.\n\n"
-                "**WHAT TO DO WHEN STUCK:**\n"
-                "1. Check the current NODE (top of UI) - you are ALREADY there\n"
-                "2. Read the 'AVAILABLE ACTIONS' list\n"
-                "3. Choose ONE action from that list (NOT navigate_to_mode)\n"
-                "4. If nothing to do, use `refresh_home` and go to a DIFFERENT module\n\n"
-                "**REMEMBER:**\n"
-                "- Every wasted action on loops means LESS time for productive work\n"
-                "- Diversification = Better performance = Higher success rate\n"
-                "- The UI tells you EXACTLY what NOT to do - listen to it\n"
-            )
-            system_content += STRICT_JSON_SUFFIX
-            if system_content:
-                self.conversation_history.append(
-                    {"role": "system", "content": system_content}
-                )
-            else:
-                log.warning(
-                    "⚠️ No system prompt file found. Running without instructions."
-                )
+        now = datetime.now().strftime("%Y-%m-%d %H:%M")
 
         full_llm_payload = (
             f"{heavy_context}\n\n"
-            f"🚀 **USER COMMAND**: {prompt}\n\n"
+            f"{command_label}: {prompt}\n\n"
             f"---\n🕒 **System Time**: {now}"
         )
 
-        messages = self.conversation_history + [
+        messages = conversation_history + [
             {"role": "user", "content": full_llm_payload}
         ]
 
-        self._save_debug(
-            f"debug_{agent_name.lower()}_{int(time.time())}.json", messages
-        )
+        self._save_debug(debug_filename, messages)
 
         if temperature is None:
             temperature = 0.2 if pydantic_model else 0.7
@@ -215,11 +157,6 @@ class OllamaProvider:
                 },
             )
 
-            if settings.ENABLE_SMART_COMPRESSION:
-                self._smart_truncate_with_summary(response)
-            else:
-                self._manage_context_window(response)
-
             assistant_msg = response["message"]["content"]
 
             if pydantic_model:
@@ -234,34 +171,33 @@ class OllamaProvider:
                     )
 
             response["message"]["content"] = assistant_msg
-            return response
+
+            updated_history = conversation_history + [
+                {"role": "user", "content": prompt},
+                {"role": "assistant", "content": assistant_msg},
+            ]
+
+            if settings.ENABLE_SMART_COMPRESSION:
+                updated_history = self._smart_truncate_with_summary(
+                    response, updated_history
+                )
+            else:
+                updated_history = self._manage_context_window(response, updated_history)
+
+            return response, updated_history
 
         except FormattingError as fe:
             log.warning(f"⚠️ {fe.message}")
-            is_ok = False
             return {
                 "message": {"content": "Error"},
                 "error": fe.message,
                 "suggestion": fe.suggestion,
-            }
-        finally:
-            if is_ok and save_to_history:
-                self.conversation_history.append({"role": "user", "content": prompt})
-                self.conversation_history.append(
-                    {"role": "assistant", "content": assistant_msg}
-                )
+            }, conversation_history
 
-    def _count_message_tokens(self, message: Dict) -> int:
-        if self.tokenizer:
-            text = f"{message['role']}: {message['content']}"
-            return len(self.tokenizer.encode(text))
-        else:
-            return len(message["content"]) // 4
+    def _manage_context_window(
+        self, response: Dict, conversation_history: List[Dict]
+    ) -> List[Dict]:
 
-    def _count_history_tokens(self, messages: List[Dict]) -> int:
-        return sum(self._count_message_tokens(msg) for msg in messages)
-
-    def _manage_context_window(self, response: Dict):
         max_tokens = getattr(settings, "LLAMA_CPP_MODEL_CTX_SIZE", 8192)
 
         prompt_tokens = response.get("prompt_eval_count") or 0
@@ -278,21 +214,20 @@ class OllamaProvider:
         )
 
         if total_tokens <= max_tokens:
-            return
+            return conversation_history
 
         system_messages = [
-            msg for msg in self.conversation_history if msg["role"] == "system"
+            msg for msg in conversation_history if msg["role"] == "system"
         ]
         other_messages = [
-            msg for msg in self.conversation_history if msg["role"] != "system"
+            msg for msg in conversation_history if msg["role"] != "system"
         ]
 
         if not other_messages:
             log.warning("⚠️ No messages to truncate (only system prompt)")
-            return
+            return conversation_history
 
         system_tokens = sum(self._count_message_tokens(msg) for msg in system_messages)
-
         available_tokens = max_tokens - system_tokens - settings.CONTEXT_SAFETY_MARGIN
 
         truncated_messages = []
@@ -307,39 +242,42 @@ class OllamaProvider:
             truncated_messages.insert(0, msg)
             current_tokens += msg_tokens
 
-        old_count = len(self.conversation_history)
-        self.conversation_history = system_messages + truncated_messages
-        new_count = len(self.conversation_history)
+        new_history = system_messages + truncated_messages
 
-        if old_count > new_count:
-            removed = old_count - new_count
+        if len(conversation_history) > len(new_history):
+            removed = len(conversation_history) - len(new_history)
             log.warning(
                 f"✂️ Context window full! Truncated {removed} old messages. "
-                f"Kept {new_count} messages (~{current_tokens + system_tokens} tokens)"
+                f"Kept {len(new_history)} messages (~{current_tokens + system_tokens} tokens)"
             )
         else:
             log.info(
-                f"✅ Context OK: {new_count} messages, ~{current_tokens + system_tokens} tokens"
+                f"✅ Context OK: {len(new_history)} messages, ~{current_tokens + system_tokens} tokens"
             )
 
-    def _smart_truncate_with_summary(self, response: Dict):
+        return new_history
+
+    def _smart_truncate_with_summary(
+        self, response: Dict, conversation_history: List[Dict]
+    ) -> List[Dict]:
+
         max_tokens = getattr(settings, "LLAMA_CPP_MODEL_CTX_SIZE", 8192)
         total_tokens = response.get("prompt_eval_count", 0) + response.get(
             "eval_count", 0
         )
 
         if total_tokens <= max_tokens:
-            return
+            return conversation_history
 
         system_messages = [
-            msg for msg in self.conversation_history if msg["role"] == "system"
+            msg for msg in conversation_history if msg["role"] == "system"
         ]
         other_messages = [
-            msg for msg in self.conversation_history if msg["role"] != "system"
+            msg for msg in conversation_history if msg["role"] != "system"
         ]
 
         if len(other_messages) <= 6:
-            return self._manage_context_window(response)
+            return self._manage_context_window(response, conversation_history)  # ✅
 
         recent_messages = other_messages[-4:]
         old_messages = other_messages[:-4]
@@ -361,7 +299,7 @@ class OllamaProvider:
 
         summary = summary_response["message"]["content"]
 
-        self.conversation_history = (
+        new_history = (
             system_messages
             + [
                 {
@@ -374,6 +312,15 @@ class OllamaProvider:
 
         log.info(f"🧠 Compressed history: {len(old_messages)} messages → 1 summary")
 
+        return new_history  # ✅
+
+    def _count_message_tokens(self, message: Dict) -> int:
+        if self.tokenizer:
+            text = f"{message['role']}: {message['content']}"
+            return len(self.tokenizer.encode(text))
+        else:
+            return len(message["content"]) // 4
+
     def _robust_json_parser(self, raw: str) -> Dict:
         try:
             match = re.search(r"(\{.*\})", raw, re.DOTALL)
@@ -384,19 +331,5 @@ class OllamaProvider:
             return {"action_type": "refresh_home", "action_params": {}}
 
     def _save_debug(self, filename: str, data: Any):
-        os.makedirs("logs/debug", exist_ok=True)
-        path = os.path.join("logs/debug", filename)
-        with open("debug.json", "w", encoding="utf-8") as f:
+        with open(filename, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=4, ensure_ascii=False)
-
-    def get_system_prompt(self):
-        system_prompt = ""
-
-        if os.path.exists(settings.MAIN_AGENT_FILE_PATH):
-            with open(settings.MAIN_AGENT_FILE_PATH, "r", encoding="utf-8") as f:
-                system_prompt = f.read()
-        elif os.path.exists(settings.BASE_AGENT_FILE_PATH):
-            with open(settings.BASE_AGENT_FILE_PATH, "r", encoding="utf-8") as f:
-                system_prompt = f.read()
-
-        return system_prompt

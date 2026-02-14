@@ -393,7 +393,7 @@ class EmailHandler(BaseHandler):
         except Exception as e:
             return self.format_error("email_mark_as_read", e)
 
-    def handle_archive_email(self, params: Any) -> Dict:
+    def handle_email_archive(self, params: Any) -> Dict:
         try:
             if not hasattr(params, "uid") or not params.uid:
                 raise FormattingError(
@@ -446,7 +446,7 @@ class EmailHandler(BaseHandler):
         except Exception as e:
             return self.format_error("email_archive", e)
 
-    def handle_delete_email(self, params: Any) -> Dict:
+    def handle_email_delete(self, params: Any) -> Dict:
         try:
             if not hasattr(params, "uid") or not params.uid:
                 raise FormattingError(

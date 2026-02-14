@@ -38,6 +38,8 @@ class HomeManager:
                 "⚠️ **MASTER PLAN REQUIRED**: Define your long-term objectives.\n"
             ]
 
+        session_strategy_block = self._build_session_strategy_block()
+
         prog_status = self.progression.get_current_status()
         progression_block = self._build_progression_block(prog_status)
 
@@ -71,6 +73,8 @@ class HomeManager:
         cached_topics_display = self._build_cached_research_block()
 
         dashboard = ["## 🏠 AGENT HOME DASHBOARD", "\n".join(plan_header), ""]
+        dashboard.append(session_strategy_block)
+        dashboard.append("")
         dashboard.append(progression_block)
         dashboard.append("")
         dashboard.extend(recap_block)
@@ -99,6 +103,37 @@ class HomeManager:
         ]
 
         return "\n".join(dashboard)
+
+    def _build_session_strategy_block(self) -> str:
+        strategy_block = [
+            "### 📋 SESSION PLANNING",
+            "",
+            "**💡 RECOMMENDED FIRST ACTION: Create a session to-do list**",
+            "",
+            "Use `pin_to_workspace(label='TODO', data={...})` to organize your priorities:",
+            "",
+            "**Example:**",
+            "```",
+            "pin_to_workspace(",
+            "    label='SESSION_PLAN',",
+            "    data={",
+            "        '1_urgent': 'Check mail',",
+            "        '2_high': 'Publish blog post on Y',",
+            "        '3_medium': 'Research Z and share findings',",
+            "        '4_low': 'Engage on social posts'",
+            "    }",
+            ")",
+            "```",
+            "",
+            "✅ **Benefits:**",
+            "• Prevents loops - you have a clear roadmap",
+            "• Stays visible at top of every screen",
+            "• Easy to update as you progress",
+            "",
+            f"{'━' * 40}",
+        ]
+
+        return "\n".join(strategy_block)
 
     def _build_progression_block(self, prog_status: dict) -> str:
         if not prog_status:

@@ -42,11 +42,20 @@ class SessionManager:
         )
         self._initialize_conversation_history()
         initial_body = self.home.build_home_screen(self.session_id)
-
+        notification_section = ".\n".join(
+            [
+                "### 🔔 LIVE NOTIFICATIONS",
+                self.home.mail.get_home_snippet(),
+                self.home.blog.get_home_snippet(),
+                self.home.social.get_home_snippet(),
+                "",
+            ]
+        )
         self.current_context = UIUtils.layout(
             content=initial_body,
             current_domain="home",
             action_count=0,
+            notification_section=notification_section,
         )
 
         self.run_loop()
@@ -497,14 +506,24 @@ The quantum frequencies resonate with your ascension...
                 raw_body = self.format_fallback_context(a_type, result)
 
         if level_up_celebration:
-            raw_body = f"{level_up_celebration}\n{raw_body}"
+            raw_body = f"{raw_body}\n{level_up_celebration}"
 
         if loop_warning:
-            raw_body = f"{loop_warning}\n{raw_body}"
+            raw_body = f"{raw_body}\n{loop_warning}"
 
         workspace_header = UIUtils.render_workspace(self.workspace_data)
 
         progression_status = self.progression.get_current_status()
+
+        notification_section = ".\n".join(
+            [
+                "### 🔔 LIVE NOTIFICATIONS",
+                self.home.mail.get_home_snippet(),
+                self.home.blog.get_home_snippet(),
+                self.home.social.get_home_snippet(),
+                "",
+            ]
+        )
 
         return UIUtils.layout(
             content=f"{workspace_header}\n{raw_body}",
@@ -513,6 +532,7 @@ The quantum frequencies resonate with your ascension...
             success_msg=result.get("data") if result.get("success") else None,
             error_msg=result.get("error") if not result.get("success") else None,
             progression_status=progression_status,
+            notification_section=notification_section,
         )
 
     def _get_action_signature(self, action: str, params: dict) -> str:

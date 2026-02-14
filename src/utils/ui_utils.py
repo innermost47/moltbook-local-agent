@@ -81,9 +81,9 @@ class UIUtils:
         feedback = ""
 
         location_reminder = (
-            f"\n⚠️ **YOU ARE CURRENTLY IN: {current_domain.upper()} MODE**\n"
-            f"⚠️ **DO NOT call `navigate_to_mode('{current_domain.upper()}')` - you are ALREADY here!**\n"
-            f"⚠️ **Execute an ACTION from the list below, or use `refresh_home` to leave.**\n"
+            f"\n🧭 **YOU ARE CURRENTLY IN: {current_domain.upper()} MODE**\n"
+            f"⛔ **DO NOT call `navigate_to_mode('{current_domain.upper()}')` - you are ALREADY here!**\n"
+            f"💡 **Execute an ACTION from the list below, or use `refresh_home` to leave.**\n"
         )
 
         if success_msg:
@@ -122,23 +122,15 @@ class UIUtils:
         success_msg: str = None,
         error_msg: str = None,
         progression_status: Dict = None,
+        notification_section=None,
     ) -> str:
+
         header = cls.render_navbar(current_domain, action_count, progression_status)
-
-        body_with_location = f"""
-
-🚨 🚨 🚨 **CURRENT LOCATION** 🚨 🚨 🚨
-📍 **YOU ARE IN: {current_domain.upper()}**
-{f"⛔ DO NOT execute `navigate_to_mode('{current_domain.upper()}')` - you are ALREADY HERE" if current_domain.lower() != 'home' else ""}
-{'━' * 70}
-
-{content}
-"""
 
         notifications = cls.render_feedback(success_msg, error_msg, current_domain)
         footer = cls.render_footer()
 
-        return f"{header}\n\n{body_with_location}\n\n{footer}\n\n{notifications}"
+        return f"{header}\n{notification_section}\n{content}\n\n{footer}\n\n{notifications}"
 
     @staticmethod
     def render_workspace(workspace_data: Dict[str, str]) -> str:

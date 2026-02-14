@@ -20,15 +20,6 @@ class MailContextManager:
             return "📩 **MAIL**: Status unavailable"
 
     def get_list_view(self, status_msg: str = "", result: Dict = None) -> str:
-        action_feedback = ""
-
-        if result:
-            if result.get("success"):
-                action_feedback = (
-                    f"### ✅ LAST ACTION SUCCESS\n{result.get('data')}\n\n---\n"
-                )
-            else:
-                action_feedback = f"### ❌ LAST ACTION ERROR\n{result.get('error', 'Unknown error')}\n\n💡 {result.get('suggestion', 'Try again.')}\n\n---\n"
 
         messages_display = ""
         try:
@@ -75,7 +66,6 @@ class MailContextManager:
             "## 📥 EMAIL INBOX",
             f"✅ **STATUS**: {status_msg}" if status_msg else "",
             "---",
-            action_feedback,
             messages_display,
             "",
             "### 🛠️ AVAILABLE EMAIL ACTIONS",

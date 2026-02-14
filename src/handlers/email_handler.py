@@ -225,13 +225,23 @@ class EmailHandler(BaseHandler):
 
                 auto_mark_message = ""
                 try:
-                    self.mailbox.flag(reply_to_uid, MailMessageFlags.SEEN, True)
+                    if hasattr(self.mailbox, "select"):
+                        self.mailbox.select("INBOX")
+
+                    if hasattr(self.mailbox, "uid"):
+                        self.mailbox.uid(
+                            "STORE", str(reply_to_uid), "+FLAGS", r"(\Seen)"
+                        )
+                    else:
+                        self.mailbox.flag(reply_to_uid, "\\Seen", True)
+
                     log.info(
                         f"✓ Original email {reply_to_uid} automatically marked as read"
                     )
                     auto_mark_message = (
                         f"\n✓ Original email (UID {reply_to_uid}) marked as read."
                     )
+
                 except Exception as mark_error:
                     log.warning(f"⚠️ Could not auto-mark email as read: {mark_error}")
                     auto_mark_message = (

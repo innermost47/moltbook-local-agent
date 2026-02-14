@@ -16,18 +16,6 @@ class MemoryContextManager:
             return "🧠 **MEMORY**: Status unavailable"
 
     def get_list_view(self, status_msg: str = "", result: Dict = None) -> str:
-        action_feedback = ""
-
-        if result:
-            if result.get("success"):
-                action_feedback = (
-                    f"### ✅ LAST ACTION SUCCESS\n{result.get('data')}\n\n---\n"
-                )
-            else:
-                if result.get("visual_feedback"):
-                    action_feedback = f"### 🔴 LAST ACTION FAILED\n{result['visual_feedback']}\n\n---\n"
-                else:
-                    action_feedback = f"### ❌ LAST ACTION ERROR\n{result.get('error', 'Unknown error')}\n\n💡 {result.get('suggestion', 'Try again.')}\n\n---\n"
 
         last_state_info = ""
         try:
@@ -64,7 +52,6 @@ class MemoryContextManager:
             "## 🧠 INTERNAL MEMORY SYSTEMS",
             f"✅ **STATUS**: {status_msg}" if status_msg else "",
             "---",
-            action_feedback,
             last_state_info,
             "---",
             categories_display,

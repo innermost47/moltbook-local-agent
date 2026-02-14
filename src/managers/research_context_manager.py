@@ -11,33 +11,19 @@ class ResearchContextManager:
         return "🔍 **RESEARCH**: Wikipedia module active"
 
     def get_list_view(self, status_msg: str = "", result: Dict = None) -> str:
-        action_feedback = ""
-
-        if result:
-            if result.get("success"):
-                if "results" in result:
-                    titles = result["results"]
-                    action_feedback = "### 📑 SEARCH RESULTS\n\n"
-                    for title in titles:
-                        action_feedback += f"• `{title}`\n"
-                    action_feedback += (
-                        "\n👉 Use `wiki_read` with one of these titles.\n\n"
-                    )
-                else:
-                    action_feedback = (
-                        f"### ✅ LAST ACTION SUCCESS\n{result.get('data')}\n\n"
-                    )
-            else:
-                if result.get("visual_feedback"):
-                    action_feedback = f"### 🔴 LAST ACTION FAILED\n{result['visual_feedback']}\n\n---\n"
-                else:
-                    action_feedback = f"### ❌ LAST ACTION ERROR\n{result.get('error', 'Unknown error')}\n\n💡 {result.get('suggestion', 'Try again.')}\n\n---\n"
+        search_results = ""
+        if result and result.get("success") and "results" in result:
+            titles = result["results"]
+            search_results = "### 📑 SEARCH RESULTS\n\n"
+            for title in titles:
+                search_results += f"• `{title}`\n"
+            search_results += "\n👉 Use `wiki_read` with one of these titles.\n\n"
 
         ctx = [
             "## 🔍 RESEARCH CENTER",
             f"✅ **STATUS**: {status_msg}" if status_msg else "",
             "---",
-            action_feedback if action_feedback else "_No active research data._\n",
+            search_results,
             "---",
             "### 🛠️ RESEARCH WORKFLOW",
             "",

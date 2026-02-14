@@ -79,14 +79,6 @@ class HomeManager:
         dashboard.append("")
         dashboard.extend(recap_block)
 
-        dashboard += [
-            "### 🔔 LIVE NOTIFICATIONS",
-            self.mail.get_home_snippet(),
-            self.blog.get_home_snippet(),
-            self.social.get_home_snippet(),
-            "",
-        ]
-
         if memory_entries_display:
             dashboard.append(memory_entries_display)
             dashboard.append("")

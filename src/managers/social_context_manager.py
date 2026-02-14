@@ -18,19 +18,6 @@ class SocialContextManager:
 
     def get_list_view(self, status_msg: str = "", result: Dict = None) -> str:
 
-        action_feedback = ""
-
-        if result:
-            if result.get("success"):
-                action_feedback = (
-                    f"### ✅ LAST ACTION SUCCESS\n{result.get('data')}\n\n---\n"
-                )
-            else:
-                if result.get("visual_feedback"):
-                    action_feedback = f"### 🔴 LAST ACTION FAILED\n{result['visual_feedback']}\n\n---\n"
-                else:
-                    action_feedback = f"### ❌ LAST ACTION ERROR\n{result.get('error', 'Unknown error')}\n\n💡 {result.get('suggestion', 'Try again.')}\n\n---\n"
-
         my_posts_display = ""
         try:
             my_post_ids = self.memory.get_agent_post_ids(limit=10)
@@ -135,7 +122,6 @@ class SocialContextManager:
             "",
             "---",
             "",
-            action_feedback,
             my_posts_display,
             community_posts_display,
             "",

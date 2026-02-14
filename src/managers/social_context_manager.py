@@ -106,6 +106,11 @@ class SocialContextManager:
             "",
             "⚠️ You are ALREADY in SOCIAL mode. Do NOT call `navigate_to_mode('SOCIAL')` again!",
             "",
+            "💡 RULE: If you have a pinned item containing a blog post URL, "
+            "share it in SOCIAL mode first using `share_link(title='...', url_to_share='...', submolt='...')`, "
+            "then unpin it with `unpin_from_workspace(pin_id='...')`. "
+            "This must be done before any other SOCIAL actions.",
+            "",
             "### 🧭 EXECUTION PATHS (CHOOSE ONE)",
             "",
             "**PATH 1 — Interact with an existing post:**",
@@ -126,9 +131,8 @@ class SocialContextManager:
             "---",
             my_posts_display,
             community_posts_display,
-            "",
-            "🏠 Use `refresh_home` to exit SOCIAL mode.",
         ]
+
         return "\n".join(ctx)
 
     def get_focus_view(self, item_id: str) -> str:
@@ -143,7 +147,6 @@ class SocialContextManager:
 Could not load post: `{item_id}`
 
 👉 Use `refresh_feed` to return to the list view.
-🏠 Use `refresh_home` to return to dashboard.
 """
 
             post = api_result.get("data", {})

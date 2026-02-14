@@ -174,33 +174,35 @@ class EmailHandler(BaseHandler):
 
     def handle_email_send(self, params: Any) -> Dict:
         try:
-            if not hasattr(params, "to") or not params.to:
-                raise FormattingError(
-                    message="Missing 'to' parameter.",
-                    suggestion="Provide recipient email address in 'to' field.",
-                )
-
-            if not hasattr(params, "content") or not params.content:
-                raise FormattingError(
-                    message="Missing 'content' parameter.",
-                    suggestion="Provide email body content in 'content' field.",
-                )
-
-            if not hasattr(params, "reply_to_uid") or not params.reply_to_uid:
-                raise FormattingError(
-                    message="Missing 'reply_to_uid' parameter.",
-                    suggestion="Provide the UID of the email you're replying to (required to auto-mark as read).",
-                )
+            for field_name in ["to", "content", "reply_to_uid"]:
+                if not getattr(params, field_name, None):
+                    raise FormattingError(
+                        message=f"Missing '{field_name}' parameter.",
+                        suggestion=f"Provide '{field_name}' parameter as required.",
+                    )
 
             recipient = params.to
             subject = params.subject
             content = params.content
             reply_to_uid = params.reply_to_uid
 
-            if "@" not in recipient or "." not in recipient.split("@")[-1]:
+            matched_email = None
+            for msg in self.mailbox.fetch(limit=50, reverse=True):
+                if msg.uid == reply_to_uid:
+                    matched_email = msg
+                    break
+
+            if not matched_email:
                 raise FormattingError(
-                    message=f"Invalid email format: {recipient}",
-                    suggestion="Provide a valid email address (e.g., user@example.com).",
+                    message=f"Email with UID '{reply_to_uid}' not found in mailbox.",
+                    suggestion="Use a valid UID from the inbox. You can list emails using `email_get_messages`.",
+                )
+
+            original_from = getattr(matched_email, "from_", None)
+            if original_from != recipient:
+                raise FormattingError(
+                    message=f"The 'to' email '{recipient}' does not match the original sender '{original_from}'.",
+                    suggestion="Reply must go to the original sender.",
                 )
 
             if len(content.strip()) < 10:

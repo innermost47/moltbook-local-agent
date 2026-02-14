@@ -21,7 +21,10 @@ class EmailSendParams(BaseModel):
     content: str = Field(..., min_length=10, description="Email body content")
     reply_to_uid: str = Field(
         ...,
-        description="The UID of the email you're replying to (REQUIRED to auto-mark as read)",
+        description=(
+            "⚠️ REQUIRED: UID of the email you are replying to. "
+            "Sending new emails without replying is strictly forbidden."
+        ),
     )
 
 

@@ -420,8 +420,6 @@ Be specific and actionable. Focus on behavior patterns, not individual actions.
 
 ⛔ **DO NOT repeat `{a_type}` with the same parameters again** ⛔
 
-{'━' * 70}
-
 """
 
         level_up_celebration = ""

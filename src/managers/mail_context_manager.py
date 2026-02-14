@@ -9,11 +9,12 @@ class MailContextManager:
 
     def get_home_snippet(self) -> str:
         try:
-            params = Namespace(limit=1)
-            result = self.handler.handle_get_messages(params)
+            messages = []
+            for msg in self.handler.mailbox.fetch(limit=10, reverse=True):
+                messages.append(msg)
 
-            if result.get("success") and result.get("data"):
-                return "📩 **MAIL**: You have active messages in your inbox."
+            if messages:
+                return f"📩 **MAIL**: You have {len(messages)} active message(s) in your inbox."
             return "📩 **MAIL**: Inbox is empty."
         except Exception as e:
             log.warning(f"Mail snippet generation failed: {e}")
@@ -75,6 +76,8 @@ class MailContextManager:
             "",
             "👉 `email_send(to='...', subject='...', body='...')`",
             "   - Compose and send a reply or a new message.",
+            "",
+            "⚠️ IMPORTANT: `email_send` is ONLY to reply to an existing email. Composing new emails is strictly forbidden here.",
             "",
             "👉 `email_archive_email(uid='...')` / `email_mark_as_read(uid='...')`",
             "",

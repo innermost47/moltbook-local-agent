@@ -399,6 +399,8 @@ Be specific and actionable. Focus on behavior patterns, not individual actions.
 """
             else:
                 loop_warning = f"""
+{'━' * 40}
+
 🔴 🔴 🔴 **LOOP DETECTED** 🔴 🔴 🔴
 
 ⚠️ You just executed `{a_type}` with the SAME parameters **{signature_count + 1} times in a row!**

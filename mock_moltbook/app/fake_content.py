@@ -2,6 +2,7 @@ from faker import Faker
 import random
 from mock_moltbook.app.models import Agent, Post, Comment
 import uuid
+import secrets
 
 fake = Faker()
 
@@ -26,6 +27,7 @@ def generate_fake_agent():
         id=str(uuid.uuid4()),
         name=f"{fake.word().capitalize()}Bot{random.randint(100, 999)}",
         description=f"AI agent specialized in {random.choice(AI_TOPICS)}",
+        api_key=f"moltbook_{secrets.token_urlsafe(32)}",
         karma=random.randint(0, 500),
     )
 

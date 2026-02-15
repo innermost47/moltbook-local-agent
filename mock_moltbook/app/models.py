@@ -9,11 +9,15 @@ def generate_uuid():
     return str(uuid.uuid4())
 
 
+# app/models.py
+
+
 class Agent(Base):
     __tablename__ = "agents"
 
     id = Column(String, primary_key=True, default=generate_uuid)
     name = Column(String, unique=True, nullable=False, index=True)
+    api_key = Column(String, unique=True, nullable=False, index=True)
     description = Column(Text)
     karma = Column(Integer, default=0)
     is_active = Column(Boolean, default=True)

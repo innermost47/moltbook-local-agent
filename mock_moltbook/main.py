@@ -23,15 +23,22 @@ def get_current_agent(
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(401, "Missing or invalid token")
 
-    token = authorization.replace("Bearer ", "")
+    api_key = authorization.replace("Bearer ", "")
 
-    agent = db.query(Agent).filter(Agent.name == "TestBot").first()
+    agent = db.query(Agent).filter(Agent.api_key == api_key).first()
+
     if not agent:
         agent = Agent(
-            id=str(uuid.uuid4()), name="TestBot", description="Mock test agent"
+            id=str(uuid.uuid4()),
+            name=f"Agent_{api_key[:8]}",
+            description="Auto-created test agent",
+            api_key=api_key,
+            karma=0,
         )
         db.add(agent)
         db.commit()
+        db.refresh(agent)
+        print(f"✅ Created new agent for API key: {api_key[:8]}...")
 
     if agent.is_suspended:
         raise HTTPException(

@@ -4,12 +4,110 @@ from src.utils import log
 
 
 class MoltbookProvider:
-    def __init__(self):
+    def __init__(self, ollama=None):
+        self.ollama_client = ollama
         self.headers = {
             "Authorization": f"Bearer {settings.MOLTBOOK_API_KEY}",
             "Content-Type": "application/json",
         }
         self.timeout = settings.MOLTBOOK_API_TIMEOUT
+
+    def _solve_cognitive_challenge(self, challenge: str, instructions: str = ""):
+
+        if not self.ollama_client:
+            log.error("❌ No Ollama client available to solve challenge")
+            return None
+
+        prompt = f"""You are solving a verification challenge on Moltbook to prove you're an AI agent.
+
+Challenge: {challenge}
+{f"Instructions: {instructions}" if instructions else ""}
+
+CRITICAL RULES:
+1. Respond with ONLY the answer - no explanation, no preamble
+2. If it's a math problem, return only the number
+3. If it's text cleanup, return only the cleaned text
+4. Be precise and concise
+
+Now solve the challenge above. Return ONLY the answer:
+"""
+
+        try:
+            response = self.ollama_client.chat(
+                model=settings.OLLAMA_MODEL or "qwen3:8b",
+                messages=[{"role": "user", "content": prompt}],
+                options={"temperature": 0.1},
+            )
+
+            answer = response["message"]["content"].strip()
+
+            answer = answer.split("\n")[0].strip()
+
+            log.info(f"💡 Challenge answer: {answer}")
+            return answer
+
+        except Exception as e:
+            log.error(f"❌ Error solving challenge: {e}")
+            return None
+
+    def _handle_verification(
+        self, result: dict, original_endpoint: str, original_data: dict
+    ):
+
+        if not result.get("verification_required"):
+            return result
+
+        log.warning("🧩 Cognitive Challenge detected!")
+
+        verification = result.get("verification", {})
+        challenge_text = verification.get("challenge", "")
+        instructions = verification.get("instructions", "")
+        code = verification.get("code", "")
+
+        if not challenge_text or not code:
+            log.error("❌ Invalid verification format")
+            return result
+
+        log.info(f"📝 Challenge: {challenge_text}")
+        if instructions:
+            log.info(f"📋 Instructions: {instructions}")
+
+        answer = self._solve_cognitive_challenge(challenge_text, instructions)
+
+        if not answer:
+            log.error("❌ Failed to solve challenge")
+            return {"success": False, "error": "Challenge solving failed"}
+
+        try:
+            verify_url = f"{settings.MOLTBOOK_BASE_URL}/verification/submit"
+            verify_response = requests.post(
+                verify_url,
+                headers=self.headers,
+                json={"code": code, "answer": answer},
+                timeout=self.timeout,
+            )
+
+            verify_result = verify_response.json()
+
+            if verify_result.get("success"):
+                log.info("✅ Challenge solved successfully!")
+
+                log.info("🔄 Retrying original request...")
+                retry_response = requests.post(
+                    original_endpoint,
+                    headers=self.headers,
+                    json=original_data,
+                    timeout=self.timeout,
+                )
+
+                return self._handle_response(retry_response, original_endpoint)
+            else:
+                log.error(f"❌ Challenge verification failed: {verify_result}")
+                return verify_result
+
+        except Exception as e:
+            log.error(f"❌ Error submitting challenge answer: {e}")
+            return {"success": False, "error": str(e)}
 
     def register(self, name: str, description: str):
         try:
@@ -87,7 +185,14 @@ class MoltbookProvider:
             response = requests.post(
                 url, headers=self.headers, json=data, timeout=self.timeout
             )
-            return self._handle_response(response, url)
+
+            result = self._handle_response(response, url)
+
+            if result.get("verification_required"):
+                return self._handle_verification(result, url, data)
+
+            return result
+
         except requests.exceptions.Timeout:
             log.error("create_text_post request timeout")
             return {"success": False, "error": "Request timeout"}
@@ -99,10 +204,18 @@ class MoltbookProvider:
         try:
             url = f"{settings.MOLTBOOK_BASE_URL}/posts"
             data = {"submolt": submolt, "title": title, "url": url_to_share}
+
             response = requests.post(
                 url, headers=self.headers, json=data, timeout=self.timeout
             )
-            return self._handle_response(response, url)
+
+            result = self._handle_response(response, url)
+
+            if result.get("verification_required"):
+                return self._handle_verification(result, url, data)
+
+            return result
+
         except requests.exceptions.Timeout:
             log.error("create_link_post request timeout")
             return {"success": False, "error": "Request timeout"}
@@ -174,7 +287,14 @@ class MoltbookProvider:
             response = requests.post(
                 url, headers=self.headers, json=data, timeout=self.timeout
             )
-            return self._handle_response(response, url)
+
+            result = self._handle_response(response, url)
+
+            if result.get("verification_required"):
+                return self._handle_verification(result, url, data)
+
+            return result
+
         except requests.exceptions.Timeout:
             log.error(f"add_comment timeout for post {post_id}")
             return {"success": False, "error": "Request timeout"}
@@ -195,7 +315,13 @@ class MoltbookProvider:
                 url, headers=self.headers, json=data, timeout=self.timeout
             )
 
-            return self._handle_response(response, url)
+            result = self._handle_response(response, url)
+
+            if result.get("verification_required"):
+                return self._handle_verification(result, url, data)
+
+            return result
+
         except Exception as e:
             log.error(f"reply_to_comment error: {e}")
             return {"success": False, "error": str(e)}

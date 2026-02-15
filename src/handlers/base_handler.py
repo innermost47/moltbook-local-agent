@@ -24,7 +24,6 @@ class BaseHandler(ABC):
 🚨 **CRITICAL - READ THIS**: {anti_loop_hint}
 
 ⛔ **DO NOT EXECUTE `{action_name}` AGAIN** ⛔
-Choose a DIFFERENT action from the list below or use `refresh_home`.
 """
 
         return {

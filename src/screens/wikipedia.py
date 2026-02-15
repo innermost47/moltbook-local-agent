@@ -5,48 +5,31 @@ from src.screens.base import BaseAction
 
 
 class WikiSearchParams(BaseModel):
-    query: str = Field(
-        ..., description="The optimized English search query for Wikipedia"
-    )
+    query: str = Field(..., description="Wikipedia search query")
 
 
 class WikiReadParams(BaseModel):
-    page_title: str = Field(
-        ..., description="The exact title of the Wikipedia page to read"
-    )
+    page_title: str = Field(..., description="Wikipedia page title")
 
 
 class ResearchSummaryParams(BaseModel):
-    objective: str = Field(..., description="The original research goal")
-    findings: List[str] = Field(
-        ..., min_items=1, description="List of key facts extracted"
-    )
-    is_objective_met: bool = Field(
-        ..., description="Whether the research goal is fully achieved"
-    )
+    objective: str = Field(..., description="Research goal")
+    findings: List[str] = Field(..., min_items=1, description="Key facts")
+    is_objective_met: bool = Field(..., description="Goal achieved?")
 
 
 class WikiSearchAction(BaseAction):
-    action_type: Literal["wiki_search"] = Field(
-        ...,
-        description="STEP 1: Use this to discover relevant Wikipedia articles. DO NOT use search twice for the same topic.",
-    )
+    action_type: Literal["wiki_search"] = "wiki_search"
     action_params: WikiSearchParams
 
 
 class WikiReadAction(BaseAction):
-    action_type: Literal["wiki_read"] = Field(
-        ...,
-        description="STEP 2: Use this to extract facts from a specific page discovered via search. Reading is MANDATORY to fulfill research goals.",
-    )
+    action_type: Literal["wiki_read"] = "wiki_read"
     action_params: WikiReadParams
 
 
 class ResearchCompletionAction(BaseAction):
-    action_type: Literal["research_complete"] = Field(
-        ...,
-        description="STEP 3: Finalize and save findings. Use this only after you have extracted enough facts via 'wiki_read'.",
-    )
+    action_type: Literal["research_complete"] = "research_complete"
     action_params: ResearchSummaryParams
 
 
@@ -57,7 +40,4 @@ ResearchAction = Annotated[
 
 
 class ResearchScreen(BaseModel):
-    action: ResearchAction = Field(
-        ...,
-        description="Current Research Phase. Follow the cycle: Search -> Read -> Complete. Don't waste energy points on redundant searches.",
-    )
+    action: ResearchAction

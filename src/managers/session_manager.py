@@ -3,7 +3,8 @@ from typing import Dict, Any, List
 from argparse import Namespace
 from src.utils import log
 from src.utils.ui_utils import UIUtils
-from src.screens.factory import SchemaFactory
+from src.screens.schema_factory import SchemaFactory
+from src.screens.tool_factory import ToolFactory
 from src.settings import settings
 from src.managers.progression_system import ProgressionSystem
 from src.utils.live_broadcaster import LiveBroadcaster
@@ -97,12 +98,11 @@ class SessionManager:
             "   - Balance: Email → Blog → Social → Research → Memory\n\n"
             "**IF YOU SEE '⚠️ ANTI-LOOP' IN THE UI:**\n"
             "This means you JUST executed this action. The system is WARNING you.\n"
-            "DO NOT execute it again. Choose a DIFFERENT action or use `refresh_home`.\n\n"
+            "DO NOT execute it again.\n\n"
             "**WHAT TO DO WHEN STUCK:**\n"
             "1. Check the current NODE (top of UI) - you are ALREADY there\n"
             "2. Read the 'AVAILABLE ACTIONS' list\n"
-            "3. Choose ONE action from that list (NOT navigate_to_mode)\n"
-            "4. If nothing to do, use `refresh_home` and go to a DIFFERENT module\n\n"
+            "3. Choose ONE action from that list (NOT navigate_to_mode)\n\n"
             "**REMEMBER:**\n"
             "- Every wasted action on loops means LESS time for productive work\n"
             "- Diversification = Better performance = Higher success rate\n"
@@ -132,14 +132,22 @@ class SessionManager:
     def run_loop(self):
         while self.actions_remaining > 0:
             has_plan = self.dispatcher.plan_handler.has_active_plan()
-
+            current_schema = None
+            tools = None
             if not has_plan:
                 log.warning("⚠️ System Locked: Waiting for Master Plan...")
                 self.current_domain = "plan"
 
-                current_schema = SchemaFactory.get_schema_for_context(
-                    domain="plan", is_popup_active=False
-                )
+                if settings.USE_TOOLS_MODE:
+                    tools = ToolFactory.get_tools_for_domain(
+                        domain="plan",
+                        include_globals=True,
+                        allow_memory=True,
+                    )
+                else:
+                    current_schema = SchemaFactory.get_schema_for_context(
+                        domain="plan", is_popup_active=False
+                    )
 
                 self.current_context = UIUtils.render_modal_overlay(
                     title="Neural Alignment Required",
@@ -154,10 +162,17 @@ class SessionManager:
                     },
                 )
             else:
-                current_schema = SchemaFactory.get_schema_for_context(
-                    domain=self.current_domain,
-                    is_popup_active=bool(self.pending_action),
-                )
+                if settings.USE_TOOLS_MODE:
+                    tools = ToolFactory.get_tools_for_domain(
+                        domain=self.current_domain,
+                        include_globals=True,
+                        allow_memory=True,
+                    )
+                else:
+                    current_schema = SchemaFactory.get_schema_for_context(
+                        domain=self.current_domain,
+                        is_popup_active=bool(self.pending_action),
+                    )
 
             self.live_viewer.broadcast_screen(
                 screen_content=self.current_context,
@@ -177,6 +192,7 @@ class SessionManager:
                     conversation_history=self.agent_conversation_history,
                     actions_left=self.actions_remaining,
                     schema=current_schema,
+                    tools=tools,
                     agent_name=settings.AGENT_NAME,
                     debug_filename="debug.json",
                 )
@@ -408,7 +424,6 @@ Be specific, actionable, and focus on improving your future interactions with th
 **What to do NOW:**
 1. 🛑 STOP navigating immediately
 2. 📖 READ the "AVAILABLE ACTIONS" section below
-3. 🏠 If nothing to do here, use `refresh_home` to return to dashboard
 
 ⛔ **DO NOT call `navigate_to_mode('{target_mode}')` again - YOU ARE ALREADY THERE!** ⛔
 
@@ -432,7 +447,6 @@ Be specific, actionable, and focus on improving your future interactions with th
 **What to do NOW:**
 1. READ the UI feedback below carefully
 2. Choose a DIFFERENT action from the available options
-3. If you're stuck or nothing to do here, use `refresh_home` to go to another module
 
 ⛔ **DO NOT repeat `{a_type}` with the same parameters again** ⛔
 

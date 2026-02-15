@@ -129,7 +129,10 @@ function handleActionStart(data) {
   }
 
   if (data.emotions) {
+    emotionBadge.style.display = "block";
     emotionBadge.textContent = data.emotions;
+  } else {
+    emotionBadge.style.display = "none";
   }
 
   if (data.self_criticism) {

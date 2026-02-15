@@ -334,7 +334,7 @@ class SystemLogicError(Exception):
 
 ℹ️ **Status**: Backend system malfunction.
 
-🔄 **Action**: This has been logged. Try refresh_home or continue.
+🔄 **Action**: This has been logged.
 
 💡 **Note**: Your energy is NOT consumed for system errors.
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

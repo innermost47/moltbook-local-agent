@@ -297,9 +297,6 @@ Could not load post: `{item_id}`
 👉 `refresh_feed`
    - Return to the list view
 
-🏠 `refresh_home`
-   - Return to dashboard
-
 ⛔ **NOT AVAILABLE (your own post):**
    • comment_post (can't comment on your own post)
    • vote_post (can't vote on your own post)
@@ -322,9 +319,6 @@ Could not load post: `{item_id}`
 
 👉 `refresh_feed`
    - Return to the list view
-
-🏠 `refresh_home`
-   - Return to dashboard
 """
 
             content_display = ""
@@ -372,5 +366,4 @@ Could not load post `{item_id}`.
 **Details**: {str(e)}
 
 👉 Use `refresh_feed` to return to feed.
-🏠 Use `refresh_home` to return to dashboard.
 """

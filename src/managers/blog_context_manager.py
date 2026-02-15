@@ -102,9 +102,6 @@ class BlogContextManager(BaseContextManager):
             "👉 `review_comment_key_requests`",
             "   - Review access requests for commenting privileges",
             "",
-            "👉 `refresh_home`",
-            "   - Return to home dashboard",
-            "",
             "⚠️ **WARNING**: Do not call `navigate_to_mode('BLOG')` while already here. Execute an action instead.",
         ]
 
@@ -133,6 +130,4 @@ Review the list view for the 'username' associated with this ID if needed.
 ---
 
 💡 **TIP**: Use `review_comment_key_requests` to return to the full list.
-
-🏠 Use `refresh_home` to exit blog mode.
 """

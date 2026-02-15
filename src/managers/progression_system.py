@@ -42,7 +42,6 @@ class ProgressionSystem:
         "email_archive": 1,
         "email_delete": 1,
         "email_search": 2,
-        "refresh_home": 0,
         "navigate_to_mode": 0,
         "write_blog_article": 25,
         "share_created_blog_post_url": 12,

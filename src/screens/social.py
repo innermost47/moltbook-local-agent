@@ -5,8 +5,7 @@ from src.screens.base import BaseAction
 
 
 class ReadPostParams(BaseModel):
-
-    post_id: str = Field(..., description="The ID of the post to read in full detail")
+    post_id: str = Field(..., description="Post ID")
 
 
 class ReadPostAction(BaseAction):
@@ -15,11 +14,8 @@ class ReadPostAction(BaseAction):
 
 
 class CommentPostParams(BaseModel):
-
-    post_id: str = Field(..., description="The ID of the post to comment on")
-    content: str = Field(
-        ..., min_length=3, description="Your comment content (minimum 3 characters)"
-    )
+    post_id: str = Field(..., description="Post ID")
+    content: str = Field(..., min_length=3, description="Comment text (min 3 chars)")
 
 
 class CommentPostAction(BaseAction):
@@ -28,14 +24,9 @@ class CommentPostAction(BaseAction):
 
 
 class ReplyToCommentParams(BaseModel):
-
-    post_id: str = Field(..., description="The ID of the post containing the comment")
-    parent_comment_id: str = Field(
-        ..., description="The ID of the comment you're replying to"
-    )
-    content: str = Field(
-        ..., min_length=3, description="Your reply content (minimum 3 characters)"
-    )
+    post_id: str = Field(..., description="Post ID")
+    parent_comment_id: str = Field(..., description="Comment ID to reply to")
+    content: str = Field(..., min_length=3, description="Reply text (min 3 chars)")
 
 
 class ReplyToCommentAction(BaseAction):
@@ -44,10 +35,9 @@ class ReplyToCommentAction(BaseAction):
 
 
 class VotePostParams(BaseModel):
-
-    post_id: str = Field(..., description="The ID of the post to vote on")
+    post_id: str = Field(..., description="Post ID")
     vote_type: Literal["upvote", "downvote"] = Field(
-        ..., description="Type of vote: 'upvote' or 'downvote'"
+        ..., description="upvote or downvote"
     )
 
 
@@ -57,16 +47,11 @@ class VotePostAction(BaseAction):
 
 
 class CreatePostParams(BaseModel):
-
     title: str = Field(
-        ..., min_length=5, max_length=200, description="Post title (5-200 characters)"
+        ..., min_length=5, max_length=200, description="Title (5-200 chars)"
     )
-    content: str = Field(
-        ..., min_length=10, description="Post content (minimum 10 characters)"
-    )
-    submolt: str = Field(
-        default="general", description="The community category (default: 'general')"
-    )
+    content: str = Field(..., min_length=10, description="Content (min 10 chars)")
+    submolt: str = Field(default="general", description="Category (default: general)")
 
 
 class CreatePostAction(BaseAction):
@@ -75,16 +60,9 @@ class CreatePostAction(BaseAction):
 
 
 class ShareLinkParams(BaseModel):
-
-    title: str = Field(
-        ..., min_length=5, max_length=200, description="Title of the shared link"
-    )
-    url_to_share: str = Field(
-        ..., description="The full URL to share (must start with http:// or https://)"
-    )
-    submolt: str = Field(
-        default="general", description="The community category (default: 'general')"
-    )
+    title: str = Field(..., min_length=5, max_length=200, description="Link title")
+    url_to_share: str = Field(..., description="URL (http:// or https://)")
+    submolt: str = Field(default="general", description="Category (default: general)")
 
 
 class ShareLinkAction(BaseAction):
@@ -93,7 +71,6 @@ class ShareLinkAction(BaseAction):
 
 
 class RefreshFeedParams(BaseModel):
-
     pass
 
 

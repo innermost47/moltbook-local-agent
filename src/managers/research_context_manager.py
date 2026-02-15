@@ -45,8 +45,6 @@ class ResearchContextManager(BaseContextManager):
             "---",
             "",
             "⚠️ **TIP**: Avoid redundant searches. If you have titles, move to `wiki_read`.",
-            "",
-            "👉 `refresh_home` - Return to dashboard",
         ]
 
         return "\n".join(ctx)
@@ -62,7 +60,6 @@ class ResearchContextManager(BaseContextManager):
 Please select a valid Wikipedia page title from your search results.
 
 👉 Use `wiki_search` to find titles first.
-🏠 Use `refresh_home` to return.
 """
 
         try:
@@ -83,7 +80,6 @@ Please select a valid Wikipedia page title from your search results.
 💡 **Suggestion**: {suggestion}
 
 👉 Use `wiki_search` to find valid titles.
-🏠 Use `refresh_home` to return.
 """
 
             content = result.get("content", "No content available.")
@@ -135,7 +131,6 @@ research_complete(
 ---
 
 👉 `wiki_search` - Search for more topics
-🏠 `refresh_home` - Return to dashboard
 """
         except Exception as e:
             log.error(f"💥 Focus view generation failed: {e}")
@@ -147,5 +142,4 @@ Could not load Wikipedia page: `{item_id}`
 **Details**: {str(e)}
 
 👉 Use `wiki_search` to find valid titles.
-🏠 Use `refresh_home` to return.
 """

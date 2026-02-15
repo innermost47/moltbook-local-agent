@@ -6,7 +6,7 @@ from src.screens.blog import BlogScreen
 from src.screens.email import EmailScreen
 from src.screens.master_plan import StrategyScreen, StrictPlanScreen
 from src.screens.wikipedia import ResearchScreen
-from src.screens.global_actions import ConfirmAction, RefreshHomeAction
+from src.screens.global_actions import ConfirmAction
 from src.settings import AvailableModule
 from src.utils import log
 from src.screens.base import BaseAction
@@ -19,7 +19,7 @@ class SchemaFactory:
         if is_popup_active:
 
             class ConfirmLock(BaseModel):
-                action: Union[ConfirmAction, RefreshHomeAction]
+                action: Union[ConfirmAction]
 
             return ConfirmLock
 
@@ -43,7 +43,7 @@ class SchemaFactory:
 
         base_schema = screens.get(target, HomeScreen)
 
-        if target in ["blog", "email", "mail", "social", "research", "wikipedia"]:
+        if target not in ["plan", "master_plan"]:
             return SchemaFactory._restrict_navigation(
                 base_schema, current_domain=target
             )

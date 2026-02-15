@@ -20,7 +20,7 @@ from src.utils.exceptions import (
 
 
 class ActionDispatcher:
-    def __init__(self, test_mode: bool = False):
+    def __init__(self, test_mode: bool = False, ollama=None):
         self.test_mode = test_mode
         chroma_client = chromadb.PersistentClient(path="./data/chroma_db")
         collection = chroma_client.get_or_create_collection(name="knowledge")
@@ -32,10 +32,12 @@ class ActionDispatcher:
             settings.AGENT_MAIL_BOX_PASSWORD,
             test_mode,
         )
-        self.social_handler = SocialHandler(test_mode)
         self.research_handler = ResearchHandler(collection, test_mode)
         self.memory_handler = MemoryHandler(
             db_path=settings.DB_PATH, test_mode=test_mode
+        )
+        self.social_handler = SocialHandler(
+            self.memory_handler, test_mode, ollama=ollama
         )
         self.plan_handler = PlanHandler(self.memory_handler)
 

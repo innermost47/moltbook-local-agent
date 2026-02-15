@@ -34,10 +34,11 @@ class OllamaProvider:
         self,
         current_context: str,
         actions_left: int,
-        schema: Type[BaseModel],
         conversation_history: List[Dict],
         agent_name: str,
         debug_filename="debug.json",
+        schema: Type[BaseModel] = None,
+        tools=None,
     ) -> tuple[Namespace, List[Dict]]:
 
         prompt = f"Analyze the dashboard and decide your next move. Actions left: {actions_left}/{settings.MAX_ACTIONS_PER_SESSION}"
@@ -46,25 +47,75 @@ class OllamaProvider:
             prompt=prompt,
             heavy_context=current_context,
             pydantic_model=schema,
+            tools=tools,
             agent_name=agent_name,
             conversation_history=conversation_history,
             debug_filename=debug_filename,
             command_label="🚀 **USER COMMAND**",
         )
 
-        content = response.get("message", {}).get("content", "{}")
+        message = response.get("message", {})
+
+        if tools and message.get("tool_calls"):
+            return self._parse_tool_call(message, updated_history)
+        else:
+            return self._parse_schema_response(message, schema, updated_history)
+
+    def _parse_tool_call(
+        self, message: Dict, updated_history: List[Dict]
+    ) -> tuple[Namespace, List[Dict]]:
+
+        tool_calls = message.get("tool_calls", [])
+
+        if not tool_calls:
+            log.error("❌ No tool_calls in response")
+            return (
+                Namespace(action_type="session_finish", action_params={}),
+                updated_history,
+            )
+
+        tool_call = tool_calls[0]
+        function = tool_call.get("function", {})
+
+        action_type = function.get("name")
+        action_params = function.get("arguments", {})
+
+        if isinstance(action_params, str):
+            try:
+                action_params = json.loads(action_params)
+            except json.JSONDecodeError:
+                log.error(f"❌ Failed to parse tool arguments: {action_params}")
+                action_params = {}
+
+        reasoning = message.get("thinking", "") or message.get("content", "")
+
+        flattened = {
+            "action_type": action_type,
+            "action_params": action_params,
+            "reasoning": reasoning,
+            "self_criticism": "",
+            "emotions": "",
+            "next_move_preview": "",
+        }
+
+        log.info(f"🔧 Tool called: {action_type} with params: {action_params}")
+
+        return Namespace(**flattened), updated_history
+
+    def _parse_schema_response(
+        self, message: Dict, schema: Type[BaseModel], updated_history: List[Dict]
+    ) -> tuple[Namespace, List[Dict]]:
+
+        content = message.get("content", "{}")
 
         try:
             raw_data = self._robust_json_parser(content)
-            if (
-                not raw_data
-                or raw_data.get("action_type") == "refresh_home"
-                and "reasoning" not in raw_data
-            ):
+            if not raw_data:
                 raise FormattingError(
                     message="The LLM returned an empty or invalid JSON structure.",
                     suggestion="Please respect the JSON schema provided in the system instructions.",
                 )
+
             action_payload = raw_data.get("action") or raw_data.get("selection")
 
             if not action_payload:
@@ -121,6 +172,7 @@ class OllamaProvider:
         conversation_history: List[Dict],
         heavy_context: str = "",
         pydantic_model: Optional[Type[BaseModel]] = None,
+        tools=None,
         agent_name: str = "Agent",
         temperature: Optional[float] = None,
         debug_filename="debug.json",
@@ -142,7 +194,7 @@ class OllamaProvider:
         self._save_debug(debug_filename, messages)
 
         if temperature is None:
-            temperature = 0.2 if pydantic_model else 0.7
+            temperature = 0.2 if pydantic_model or tools else 0.7
 
         try:
             log.info(f"⚡ {agent_name} analyzes the interface...")
@@ -155,26 +207,64 @@ class OllamaProvider:
                     "temperature": temperature,
                     "num_ctx": getattr(settings, "LLAMA_CPP_MODEL_CTX_SIZE", 8192),
                 },
+                tools=tools if tools else None,
             )
 
-            assistant_msg = response["message"]["content"]
+            message = response["message"]
 
-            if pydantic_model:
-                try:
-                    data_dict = self._robust_json_parser(assistant_msg)
-                    validated = pydantic_model.model_validate(data_dict)
-                    assistant_msg = validated.model_dump_json()
-                except ValidationError as e:
-                    raise FormattingError(
-                        message=f"JSON structure does not match {pydantic_model.__name__}.",
-                        suggestion="Ensure all required fields are present and correctly typed.",
-                    )
+            if tools and message.get("tool_calls"):
+                tool_calls_serializable = []
+                for tc in message.get("tool_calls", []):
+                    if hasattr(tc, "__dict__"):
+                        tc_dict = {
+                            "id": getattr(tc, "id", None),
+                            "function": {
+                                "name": (
+                                    getattr(tc.function, "name", None)
+                                    if hasattr(tc, "function")
+                                    else None
+                                ),
+                                "arguments": (
+                                    getattr(tc.function, "arguments", {})
+                                    if hasattr(tc, "function")
+                                    else {}
+                                ),
+                            },
+                        }
+                    else:
+                        tc_dict = tc
+                    tool_calls_serializable.append(tc_dict)
 
-            response["message"]["content"] = assistant_msg
+                assistant_msg = {
+                    "role": "assistant",
+                    "content": message.get("thinking", "")
+                    or message.get("content", ""),
+                    "tool_calls": tool_calls_serializable,
+                }
+            else:
+                assistant_msg = {
+                    "role": "assistant",
+                    "content": message.get("content", ""),
+                }
+
+                if pydantic_model:
+                    try:
+                        data_dict = self._robust_json_parser(assistant_msg)
+                        validated = pydantic_model.model_validate(data_dict)
+                        assistant_msg = validated.model_dump_json()
+                    except ValidationError as e:
+                        raise FormattingError(
+                            message=f"JSON structure does not match {pydantic_model.__name__}.",
+                            suggestion="Ensure all required fields are present and correctly typed.",
+                        )
 
             updated_history = conversation_history + [
                 {"role": "user", "content": prompt},
-                {"role": "assistant", "content": assistant_msg},
+                (
+                    assistant_msg
+                    if isinstance(assistant_msg, dict)
+                    else {"role": "assistant", "content": assistant_msg}
+                ),
             ]
 
             if settings.ENABLE_SMART_COMPRESSION:

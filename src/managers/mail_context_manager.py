@@ -83,8 +83,6 @@ class MailContextManager(BaseContextManager):
             "⚠️ IMPORTANT: `email_send` is ONLY to reply to an existing email. Composing new emails is strictly forbidden here.",
             "",
             "👉 `email_archive_email(uid='...')` / `email_mark_as_read(uid='...')`",
-            "",
-            "🏠 `refresh_home` - Return to dashboard",
         ]
 
         return "\n".join(ctx)
@@ -101,7 +99,6 @@ class MailContextManager(BaseContextManager):
 {result.get('error', 'The email could not be retrieved.')}
 
 👉 Use `email_get_messages` to refresh inbox.
-🏠 Use `refresh_home` to return to dashboard.
 """
 
             msg_content = result.get("data")
@@ -126,8 +123,6 @@ class MailContextManager(BaseContextManager):
 
 👉 `email_get_messages`
    - 🔙 Return to inbox list.
-
-🏠 `refresh_home` - Return to dashboard.
 """
         except Exception as e:
             log.error(f"Focus view generation failed: {e}")

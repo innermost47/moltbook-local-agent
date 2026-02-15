@@ -12,20 +12,14 @@ class MemoryOrder(str, Enum):
 
 
 class MemoryStoreParams(BaseModel):
-    memory_category: MemoryCategory = Field(
-        ..., description="The category for this sonic resonance"
-    )
-    memory_content: str = Field(
-        ..., min_length=10, description="Le contenu factuel ou stratégique à mémoriser"
-    )
+    memory_category: MemoryCategory = Field(..., description="Memory category")
+    memory_content: str = Field(..., min_length=10, description="Content to store")
 
     @field_validator("memory_content")
     def no_placeholders(cls, v):
         forbidden = ["[INSERT]", "[TODO]", "[PLACEHOLDER]", "YOUR_", "INSERT_"]
         if any(p.lower() in v.lower() for p in forbidden):
-            raise ValueError(
-                "Les placeholders ne sont pas autorisés dans la mémoire. Sois spécifique."
-            )
+            raise ValueError("No placeholders allowed. Be specific.")
         return v
 
 
@@ -36,16 +30,12 @@ class MemoryRetrieveParams(BaseModel):
 
 
 class MemoryStoreAction(BaseAction):
-    action_type: Literal["memory_store"] = Field(
-        ..., description="MUST be 'memory_store'"
-    )
+    action_type: Literal["memory_store"] = "memory_store"
     action_params: MemoryStoreParams
 
 
 class MemoryRetrieveAction(BaseAction):
-    action_type: Literal["memory_retrieve"] = Field(
-        ..., description="MUST be 'memory_retrieve'"
-    )
+    action_type: Literal["memory_retrieve"] = "memory_retrieve"
     action_params: MemoryRetrieveParams
 
 
@@ -53,33 +43,14 @@ class RefreshHomeParams(BaseModel):
     pass
 
 
-class RefreshHomeAction(BaseAction):
-    action_type: Literal["refresh_home"] = Field(
-        ..., description="MUST be 'refresh_home'"
-    )
-    action_params: RefreshHomeParams = Field(default_factory=dict)
-
-
 class SessionFinishAction(BaseAction):
-    action_type: Literal["session_finish"] = Field(
-        ..., description="MUST be 'session_finish'"
-    )
+    action_type: Literal["session_finish"] = "session_finish"
     action_params: Dict[str, Any] = Field(default_factory=dict)
 
 
 class PinParams(BaseModel):
-    label: str = Field(..., description="Unique ID for this workspace item")
-    content: str = Field(
-        ...,
-        description=(
-            "Content to pin. Can be:\n"
-            "- Plain text with detailed notes/plans\n"
-            "- JSON string for structured data\n"
-            "Examples:\n"
-            "  Text: 'Priority 1: task1\\nPriority 2: task2'\n"
-            '  JSON: \'{"urgent": "task1", "high": "task2"}\''
-        ),
-    )
+    label: str = Field(..., description="Unique ID")
+    content: str = Field(..., description="Text or JSON string to pin")
 
     @field_validator("content", mode="before")
     def normalize_content(cls, v):
@@ -90,14 +61,12 @@ class PinParams(BaseModel):
     @field_validator("content")
     def validate_min_length(cls, v):
         if len(v.strip()) < 10:
-            raise ValueError("Content must be at least 10 characters")
+            raise ValueError("Content min 10 chars")
         return v
 
 
 class PinAction(BaseAction):
-    action_type: Literal["pin_to_workspace"] = Field(
-        ..., description="MUST be 'pin_to_workspace'"
-    )
+    action_type: Literal["pin_to_workspace"] = "pin_to_workspace"
     action_params: PinParams
 
 
@@ -107,22 +76,16 @@ class ConfirmParams(BaseModel):
 
 
 class ConfirmAction(BaseAction):
-    action_type: Literal["confirm_action"] = Field(
-        ..., description="MUST be 'confirm_action'"
-    )
+    action_type: Literal["confirm_action"] = "confirm_action"
     action_params: ConfirmParams
 
 
 class UnpinParams(BaseModel):
-    label: str = Field(
-        ..., description="The unique ID/Label of the data to remove from the workspace"
-    )
+    label: str = Field(..., description="ID to remove")
 
 
 class UnpinAction(BaseAction):
-    action_type: Literal["unpin_from_workspace"] = Field(
-        ..., description="MUST be 'unpin_from_workspace'"
-    )
+    action_type: Literal["unpin_from_workspace"] = "unpin_from_workspace"
     action_params: UnpinParams
 
 
@@ -132,9 +95,7 @@ class NavigateParams(BaseModel):
 
 
 class NavigateAction(BaseAction):
-    action_type: Literal["navigate_to_mode"] = Field(
-        ..., description="MUST be 'navigate_to_mode'"
-    )
+    action_type: Literal["navigate_to_mode"] = "navigate_to_mode"
     action_params: NavigateParams
 
 
@@ -142,7 +103,6 @@ GlobalAction = Annotated[
     Union[
         PinAction,
         UnpinAction,
-        RefreshHomeAction,
         SessionFinishAction,
         MemoryStoreAction,
         MemoryRetrieveAction,

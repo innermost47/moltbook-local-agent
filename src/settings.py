@@ -142,8 +142,9 @@ class Settings(BaseSettings):
         "unpin_from_workspace",
         "memory_store",
         "memory_retrieve",
-        "refresh_home",
     }
+
+    USE_TOOLS_MODE: bool
 
     model_config = SettingsConfigDict(
         env_file=Path(__file__).resolve().parent.parent / ".env",

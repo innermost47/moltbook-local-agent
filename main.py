@@ -30,7 +30,7 @@ def bootstrap(test_mode: bool = False):
     session_tracker = SessionTracker()
     email_reporter = EmailReporter()
 
-    dispatcher = ActionDispatcher(test_mode=test_mode)
+    dispatcher = ActionDispatcher(ollama=ollama, test_mode=test_mode)
 
     progression_system = ProgressionSystem(settings.DB_PATH)
 

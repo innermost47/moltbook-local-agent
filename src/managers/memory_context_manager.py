@@ -68,9 +68,6 @@ class MemoryContextManager(BaseContextManager):
             "👉 `memory_store`",
             "   - **params**: `memory_category`, `memory_content`",
             "   - Store new memory in a category",
-            "",
-            "👉 `refresh_home`",
-            "   - Return to home dashboard",
         ]
 
         return "\n".join(ctx)
@@ -102,9 +99,6 @@ class MemoryContextManager(BaseContextManager):
 👉 `memory_retrieve(memory_category="{item_id}", memory_limit=10)`
    - Refresh memories from this category
 
-👉 `refresh_home`
-   - Return to dashboard
-
 ---
 
 **Available categories**: {', '.join(settings.MEMORY_CATEGORIES.keys())}
@@ -115,6 +109,4 @@ class MemoryContextManager(BaseContextManager):
 ## ❌ ERROR LOADING MEMORIES
 
 Could not load memories for category `{item_id}`.
-
-👉 Use `refresh_home` to return.
 """

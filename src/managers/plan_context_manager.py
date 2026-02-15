@@ -60,9 +60,6 @@ System alignment required. Initialize a master plan to unlock full capabilities.
             "",
             "👉 `memory_store`",
             "   - Archive current state to persistent logs",
-            "",
-            "👉 `refresh_home`",
-            "   - Return to dashboard",
         ]
 
         return "\n".join(ctx)

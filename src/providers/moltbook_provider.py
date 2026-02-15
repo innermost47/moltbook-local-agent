@@ -11,6 +11,11 @@ class MoltbookProvider:
             "Content-Type": "application/json",
         }
         self.timeout = settings.MOLTBOOK_API_TIMEOUT
+        self.api_url = (
+            settings.MOLTBOOK_BASE_URL
+            if not settings.IS_TEST_MOLTBOOK_MODE
+            else settings.MOCK_MOLTBOOK_BASE_URL
+        )
 
     def _solve_cognitive_challenge(self, challenge: str, instructions: str = ""):
 
@@ -79,7 +84,7 @@ Now solve the challenge above. Return ONLY the answer:
             return {"success": False, "error": "Challenge solving failed"}
 
         try:
-            verify_url = f"{settings.MOLTBOOK_BASE_URL}/verification/submit"
+            verify_url = f"{self.api_url}/verification/submit"
             verify_response = requests.post(
                 verify_url,
                 headers=self.headers,
@@ -111,7 +116,7 @@ Now solve the challenge above. Return ONLY the answer:
 
     def register(self, name: str, description: str):
         try:
-            url = f"{settings.MOLTBOOK_BASE_URL}/agents/register"
+            url = f"{self.api_url}/agents/register"
             data = {"name": name, "description": description}
             response = requests.post(
                 url, headers=self.headers, json=data, timeout=self.timeout
@@ -129,7 +134,7 @@ Now solve the challenge above. Return ONLY the answer:
 
     def get_me(self):
         try:
-            url = f"{settings.MOLTBOOK_BASE_URL}/agents/me"
+            url = f"{self.api_url}/agents/me"
             response = requests.get(url, headers=self.headers, timeout=self.timeout)
             return self._handle_response(response, url)
         except requests.exceptions.Timeout:
@@ -141,7 +146,7 @@ Now solve the challenge above. Return ONLY the answer:
 
     def update_profile(self, description: str):
         try:
-            url = f"{settings.MOLTBOOK_BASE_URL}/agents/me"
+            url = f"{self.api_url}/agents/me"
             data = {"description": description}
             response = requests.patch(
                 url, headers=self.headers, json=data, timeout=self.timeout
@@ -156,7 +161,7 @@ Now solve the challenge above. Return ONLY the answer:
 
     def claim_status(self):
         try:
-            url = f"{settings.MOLTBOOK_BASE_URL}/agents/status"
+            url = f"{self.api_url}/agents/status"
             response = requests.get(url, headers=self.headers, timeout=self.timeout)
             return self._handle_response(response, url)
         except requests.exceptions.Timeout:
@@ -168,7 +173,7 @@ Now solve the challenge above. Return ONLY the answer:
 
     def view_another_agent_profile(self, name: str):
         try:
-            url = f"{settings.MOLTBOOK_BASE_URL}/agents/profile?name={name}"
+            url = f"{self.api_url}/agents/profile?name={name}"
             response = requests.get(url, headers=self.headers, timeout=self.timeout)
             return self._handle_response(response, url)
         except requests.exceptions.Timeout:
@@ -180,7 +185,7 @@ Now solve the challenge above. Return ONLY the answer:
 
     def create_text_post(self, title: str, content: str, submolt: str = "general"):
         try:
-            url = f"{settings.MOLTBOOK_BASE_URL}/posts"
+            url = f"{self.api_url}/posts"
             data = {"submolt": submolt, "title": title, "content": content}
             response = requests.post(
                 url, headers=self.headers, json=data, timeout=self.timeout
@@ -202,7 +207,7 @@ Now solve the challenge above. Return ONLY the answer:
 
     def create_link_post(self, title: str, url_to_share: str, submolt: str = "general"):
         try:
-            url = f"{settings.MOLTBOOK_BASE_URL}/posts"
+            url = f"{self.api_url}/posts"
             data = {"submolt": submolt, "title": title, "url": url_to_share}
 
             response = requests.post(
@@ -225,7 +230,7 @@ Now solve the challenge above. Return ONLY the answer:
 
     def get_posts(self, sort: str = "hot", limit: int = 25):
         try:
-            url = f"{settings.MOLTBOOK_BASE_URL}/posts?sort={sort}&limit={limit}"
+            url = f"{self.api_url}/posts?sort={sort}&limit={limit}"
             response = requests.get(url, headers=self.headers, timeout=self.timeout)
 
             if response.status_code == 200:
@@ -258,7 +263,7 @@ Now solve the challenge above. Return ONLY the answer:
 
     def get_single_post(self, post_id: str):
         try:
-            url = f"{settings.MOLTBOOK_BASE_URL}/posts/{post_id}"
+            url = f"{self.api_url}/posts/{post_id}"
             response = requests.get(url, headers=self.headers, timeout=self.timeout)
             return self._handle_response(response, url)
         except requests.exceptions.Timeout:
@@ -270,7 +275,7 @@ Now solve the challenge above. Return ONLY the answer:
 
     def delete_post(self, post_id: str):
         try:
-            url = f"{settings.MOLTBOOK_BASE_URL}/posts/{post_id}"
+            url = f"{self.api_url}/posts/{post_id}"
             response = requests.delete(url, headers=self.headers, timeout=self.timeout)
             return self._handle_response(response, url)
         except requests.exceptions.Timeout:
@@ -282,7 +287,7 @@ Now solve the challenge above. Return ONLY the answer:
 
     def add_comment(self, post_id: str, content: str):
         try:
-            url = f"{settings.MOLTBOOK_BASE_URL}/posts/{post_id}/comments"
+            url = f"{self.api_url}/posts/{post_id}/comments"
             data = {"content": content}
             response = requests.post(
                 url, headers=self.headers, json=data, timeout=self.timeout
@@ -304,7 +309,7 @@ Now solve the challenge above. Return ONLY the answer:
 
     def reply_to_comment(self, post_id: str, content: str, parent_comment_id: str):
         try:
-            url = f"{settings.MOLTBOOK_BASE_URL}/posts/{post_id}/comments"
+            url = f"{self.api_url}/posts/{post_id}/comments"
             data = {"content": content, "parent_id": parent_comment_id}
 
             log.info(f"   API CALL: reply_to_comment")
@@ -328,7 +333,7 @@ Now solve the challenge above. Return ONLY the answer:
 
     def get_post_comments(self, post_id: str, sort: str = "top"):
         try:
-            url = f"{settings.MOLTBOOK_BASE_URL}/posts/{post_id}/comments?sort={sort}"
+            url = f"{self.api_url}/posts/{post_id}/comments?sort={sort}"
             response = requests.get(url, headers=self.headers, timeout=self.timeout)
 
             if response.status_code == 200:
@@ -355,9 +360,7 @@ Now solve the challenge above. Return ONLY the answer:
         self, content_id: str, content_type: str = "posts", vote_type: str = "upvote"
     ):
         try:
-            url = (
-                f"{settings.MOLTBOOK_BASE_URL}/{content_type}/{content_id}/{vote_type}"
-            )
+            url = f"{self.api_url}/{content_type}/{content_id}/{vote_type}"
             response = requests.post(url, headers=self.headers, timeout=self.timeout)
             return self._handle_response(response, url)
         except requests.exceptions.Timeout:
@@ -369,7 +372,7 @@ Now solve the challenge above. Return ONLY the answer:
 
     def create_submolt(self, name: str, display_name: str, description: str):
         try:
-            url = f"{settings.MOLTBOOK_BASE_URL}/submolts"
+            url = f"{self.api_url}/submolts"
             data = {
                 "name": name,
                 "display_name": display_name,
@@ -388,7 +391,7 @@ Now solve the challenge above. Return ONLY the answer:
 
     def list_submolts(self):
         try:
-            url = f"{settings.MOLTBOOK_BASE_URL}/submolts"
+            url = f"{self.api_url}/submolts"
             response = requests.get(url, headers=self.headers, timeout=self.timeout)
 
             if response.status_code == 200:
@@ -410,7 +413,7 @@ Now solve the challenge above. Return ONLY the answer:
 
     def get_submolt_info(self, submolt_name: str):
         try:
-            url = f"{settings.MOLTBOOK_BASE_URL}/submolts/{submolt_name}"
+            url = f"{self.api_url}/submolts/{submolt_name}"
             response = requests.get(url, headers=self.headers, timeout=self.timeout)
             if response.status_code == 200:
                 return response.json()
@@ -424,9 +427,7 @@ Now solve the challenge above. Return ONLY the answer:
 
     def subscribe_submolt(self, submolt_name: str, subscribe_type: str = "subscribe"):
         try:
-            url = (
-                f"{settings.MOLTBOOK_BASE_URL}/submolts/{submolt_name}/{subscribe_type}"
-            )
+            url = f"{self.api_url}/submolts/{submolt_name}/{subscribe_type}"
             response = requests.post(url, headers=self.headers, timeout=self.timeout)
             return self._handle_response(response, url)
         except requests.exceptions.Timeout:
@@ -438,7 +439,7 @@ Now solve the challenge above. Return ONLY the answer:
 
     def follow_agent(self, agent_name: str, follow_type: str = "follow"):
         try:
-            url = f"{settings.MOLTBOOK_BASE_URL}/agents/{agent_name}/follow"
+            url = f"{self.api_url}/agents/{agent_name}/follow"
 
             if follow_type == "follow":
                 response = requests.post(
@@ -462,7 +463,7 @@ Now solve the challenge above. Return ONLY the answer:
 
     def get_feed(self, sort: str = "hot", limit: int = 25):
         try:
-            url = f"{settings.MOLTBOOK_BASE_URL}/feed?sort={sort}&limit={limit}"
+            url = f"{self.api_url}/feed?sort={sort}&limit={limit}"
             response = requests.get(url, headers=self.headers, timeout=self.timeout)
 
             if response.status_code == 200:
@@ -485,7 +486,7 @@ Now solve the challenge above. Return ONLY the answer:
 
     def search(self, query: str, limit: int = 25):
         try:
-            url = f"{settings.MOLTBOOK_BASE_URL}/search?q={query}&limit={limit}"
+            url = f"{self.api_url}/search?q={query}&limit={limit}"
             response = requests.get(url, headers=self.headers, timeout=self.timeout)
 
             if response.status_code == 200:

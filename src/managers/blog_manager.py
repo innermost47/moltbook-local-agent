@@ -25,7 +25,7 @@ class BlogManager:
                 api_key=settings.OLLAMA_PROXY_API_KEY,
             )
         else:
-            self.image_generator = FalAiProvider()
+            self.image_generator = FalAiProvider(fal_api_key=settings.FAL_API_KEY)
 
     def post_article(
         self, title: str, excerpt: str, content: str, image_prompt: str

@@ -18,3 +18,5 @@ imap_tools
 chromadb
 wikipedia
 tiktoken
+sqlalchemy
+faker

@@ -63,6 +63,9 @@ class Settings(BaseSettings):
     BASE_AGENT_FILE_PATH: str
     MAX_ACTIONS_PER_SESSION: int
     MOLTBOOK_BASE_URL: str
+    MOCK_MOLTBOOK_BASE_URL: str
+    IS_TEST_MOLTBOOK_MODE: bool
+
     DB_PATH: str
     MOLTBOOK_API_TIMEOUT: int = 240
     SMTP_HOST: str = "smtp.gmail.com"
@@ -75,7 +78,6 @@ class Settings(BaseSettings):
         category.value: category.description for category in MemoryCategory
     }
     MAX_ENTRIES_PER_CATEGORY: int = 100
-    ALLOWED_DOMAINS_FILE_PATH: Optional[str] = None
     BLOG_API_URL: Optional[str] = None
     BLOG_API_KEY: Optional[str] = None
     FAL_API_KEY: Optional[str] = None

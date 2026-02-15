@@ -16,3 +16,7 @@ nh3
 markdown
 imap_tools
 chromadb
+wikipedia
+tiktoken
+sqlalchemy
+faker

@@ -1,0 +1,575 @@
+import smtplib
+from email.message import EmailMessage
+from typing import Dict, Any
+from imap_tools import MailBox, MailMessageFlags
+from bs4 import BeautifulSoup
+from src.handlers.base_handler import BaseHandler
+from src.utils import log
+from src.utils.exceptions import (
+    SystemLogicError,
+    APICommunicationError,
+    FormattingError,
+    ResourceNotFoundError,
+    AccessDeniedError,
+)
+from src.managers.progression_system import ProgressionSystem
+
+
+class EmailHandler(BaseHandler):
+    def __init__(self, host, smtp_host, user, password, test_mode=False):
+        self.host = host
+        self.smtp_host = smtp_host
+        self.user = user
+        self.password = password
+        self.test_mode = test_mode
+        self.mailbox = MailBox(self.host)
+        self._authenticate()
+
+    def _authenticate(self):
+        try:
+            self.mailbox.login(self.user, self.password, initial_folder="INBOX")
+            log.info(f"📥 Mailbox connected: {self.user}")
+        except Exception as e:
+            log.error(f"❌ Email authentication failed: {e}")
+            raise AccessDeniedError(
+                message=f"Could not authenticate to mail server: {str(e)}",
+                suggestion="Check your email credentials (IMAP_SERVER, EMAIL, PASSWORD) in settings.",
+            )
+
+    def handle_email_read(self, params: Any) -> Dict:
+        try:
+            if not hasattr(params, "uid") or not params.uid:
+                raise FormattingError(
+                    message="Missing 'uid' parameter.",
+                    suggestion="Provide the email UID to read the full content.",
+                )
+
+            uid = params.uid
+            email_data = None
+
+            for msg in self.mailbox.fetch(f"UID {uid}"):
+                body = msg.text or ""
+                if not body.strip() and msg.html:
+                    body = self._clean_html(msg.html)
+
+                email_data = {
+                    "uid": msg.uid,
+                    "subject": msg.subject,
+                    "from": msg.from_,
+                    "date": msg.date.isoformat() if msg.date else None,
+                    "body": body,
+                }
+                break
+
+            if not email_data:
+                raise ResourceNotFoundError(
+                    message=f"Email with UID '{uid}' not found.",
+                    suggestion="Use 'email_get_messages' to refresh the list of valid UIDs.",
+                )
+
+            log.info(f"📖 Email {uid} read successfully.")
+
+            result_text = (
+                f"--- EMAIL CONTENT ---\n"
+                f"FROM: {email_data['from']}\n"
+                f"SUBJECT: {email_data['subject']}\n"
+                f"DATE: {email_data['date']}\n"
+                f"CONTENT:\n{email_data['body']}\n"
+                f"----------------------"
+            )
+
+            return self.format_success(
+                action_name="email_read",
+                result_data=result_text,
+                anti_loop_hint=f"Email {uid} READ. You have the full content. Respond or archive it now.",
+                xp_gained=ProgressionSystem.get_xp_value("email_read"),
+            )
+
+        except Exception as e:
+            return self.format_error("email_read", e)
+
+    def handle_get_messages(self, params: Any) -> Dict:
+        try:
+            limit = getattr(params, "limit", 5)
+
+            if limit < 1 or limit > 50:
+                raise FormattingError(
+                    message=f"Invalid limit value: {limit}. Must be between 1-50.",
+                    suggestion="Set 'limit' parameter between 1 and 50.",
+                )
+
+            messages = []
+
+            try:
+                for msg in self.mailbox.fetch(
+                    criteria="UNSEEN", limit=limit, reverse=True
+                ):
+                    body = msg.text or ""
+
+                    if not body.strip() and msg.html:
+                        body = self._clean_html(msg.html)
+
+                    messages.append(
+                        {
+                            "uid": msg.uid,
+                            "subject": msg.subject,
+                            "from": msg.from_,
+                            "date": msg.date.isoformat() if msg.date else None,
+                            "body": body[:2000],
+                        }
+                    )
+
+                if not messages:
+                    result_text = "Inbox is EMPTY. No emails to process."
+                    anti_loop = "Inbox checked - it's empty. Do NOT check again immediately. Move to Blog, Social, or Research."
+
+                    return self.format_success(
+                        action_name="email_get_messages",
+                        result_data=result_text,
+                        anti_loop_hint=anti_loop,
+                        xp_gained=ProgressionSystem.get_xp_value("email_get_messages"),
+                    )
+
+                result_text = f"Retrieved {len(messages)} email(s) from inbox."
+                anti_loop = f"You now have {len(messages)} email(s). Read or respond to them. Do NOT fetch messages again until you've processed these."
+
+                return self.format_success(
+                    action_name="email_get_messages",
+                    result_data=result_text,
+                    anti_loop_hint=anti_loop,
+                    xp_gained=ProgressionSystem.get_xp_value("email_get_messages"),
+                )
+
+            except TimeoutError:
+                raise APICommunicationError(
+                    message="IMAP server connection timed out.",
+                    suggestion="Try again. Mail server may be slow or down.",
+                    api_name="IMAP Server",
+                )
+            except ConnectionError:
+                raise APICommunicationError(
+                    message="Lost connection to IMAP server.",
+                    suggestion="Check network connection or try again later.",
+                    api_name="IMAP Server",
+                )
+
+        except Exception as e:
+            return self.format_error("email_get_messages", e)
+
+    def _clean_html(self, html_content: str) -> str:
+        try:
+            soup = BeautifulSoup(html_content, "lxml")
+
+            for tag in ["script", "style", "head", "title", "meta"]:
+                for element in soup(tag):
+                    element.decompose()
+
+            text = soup.get_text(separator="\n", strip=True)
+            return "\n".join(
+                [line.strip() for line in text.splitlines() if line.strip()]
+            )
+        except Exception as e:
+            log.warning(f"⚠️ HTML cleaning failed: {e}")
+            return "[HTML content - parsing failed]"
+
+    def handle_email_send(self, params: Any) -> Dict:
+        try:
+            for field_name in ["to", "content", "reply_to_uid"]:
+                if not getattr(params, field_name, None):
+                    raise FormattingError(
+                        message=f"Missing '{field_name}' parameter.",
+                        suggestion=f"Provide '{field_name}' parameter as required.",
+                    )
+
+            recipient = params.to
+            subject = params.subject
+            content = params.content
+            reply_to_uid = params.reply_to_uid
+
+            matched_email = None
+            for msg in self.mailbox.fetch(limit=50, reverse=True):
+                if msg.uid == reply_to_uid:
+                    matched_email = msg
+                    break
+
+            if not matched_email:
+                raise FormattingError(
+                    message=f"Email with UID '{reply_to_uid}' not found in mailbox.",
+                    suggestion="Use a valid UID from the inbox. You can list emails using `email_get_messages`.",
+                )
+
+            original_from = getattr(matched_email, "from_", None)
+            if original_from != recipient:
+                raise FormattingError(
+                    message=f"The 'to' email '{recipient}' does not match the original sender '{original_from}'.",
+                    suggestion="Reply must go to the original sender.",
+                )
+
+            if len(content.strip()) < 10:
+                raise FormattingError(
+                    message="Email content is too short (< 10 characters).",
+                    suggestion="Provide meaningful email content (at least 10 characters).",
+                )
+
+            try:
+                msg = EmailMessage()
+                msg.set_content(content)
+                msg["Subject"] = subject
+                msg["From"] = self.user
+                msg["To"] = recipient
+
+                with smtplib.SMTP(self.smtp_host, 587) as server:
+                    server.starttls()
+                    server.login(self.user, self.password)
+                    server.send_message(msg)
+
+                log.success(f"📤 Email dispatched to {recipient}")
+
+                auto_mark_message = ""
+                try:
+                    if hasattr(self.mailbox, "select"):
+                        self.mailbox.select("INBOX")
+
+                    if hasattr(self.mailbox, "uid"):
+                        self.mailbox.uid(
+                            "STORE", str(reply_to_uid), "+FLAGS", r"(\Seen)"
+                        )
+                    else:
+                        self.mailbox.flag(reply_to_uid, "\\Seen", True)
+
+                    log.info(
+                        f"✓ Original email {reply_to_uid} automatically marked as read"
+                    )
+                    auto_mark_message = (
+                        f"\n✓ Original email (UID {reply_to_uid}) marked as read."
+                    )
+
+                except Exception as mark_error:
+                    log.warning(f"⚠️ Could not auto-mark email as read: {mark_error}")
+                    auto_mark_message = (
+                        f"\n⚠️ Note: Could not auto-mark original email as read."
+                    )
+
+                result_text = f"Email sent successfully to {recipient}.\nSubject: {subject}{auto_mark_message}"
+                anti_loop = f"Email to {recipient} SENT and original email marked as read. Do NOT send the same email again. Move to another task."
+
+                return self.format_success(
+                    action_name="email_send",
+                    result_data=result_text,
+                    anti_loop_hint=anti_loop,
+                    xp_gained=ProgressionSystem.get_xp_value("email_send"),
+                )
+
+            except smtplib.SMTPAuthenticationError:
+                raise AccessDeniedError(
+                    message="SMTP authentication failed.",
+                    suggestion="Check your email credentials (SMTP_HOST, EMAIL, PASSWORD).",
+                )
+            except smtplib.SMTPRecipientsRefused:
+                raise FormattingError(
+                    message=f"Recipient '{recipient}' rejected by server.",
+                    suggestion="Check the recipient email address is valid and accepts mail.",
+                )
+            except smtplib.SMTPServerDisconnected:
+                raise APICommunicationError(
+                    message="SMTP server disconnected unexpectedly.",
+                    suggestion="Try again. Mail server may be unstable.",
+                    api_name="SMTP Server",
+                )
+            except TimeoutError:
+                raise APICommunicationError(
+                    message="SMTP connection timed out.",
+                    suggestion="Try again. Mail server may be slow or down.",
+                    api_name="SMTP Server",
+                )
+
+        except Exception as e:
+            return self.format_error("email_send", e)
+
+    def handle_send_email_html(self, params: Any) -> Dict:
+        try:
+            if not hasattr(params, "to") or not params.to:
+                raise FormattingError(
+                    message="Missing 'to' parameter.",
+                    suggestion="Provide recipient email address in 'to' field.",
+                )
+
+            if not hasattr(params, "content") or not params.content:
+                raise FormattingError(
+                    message="Missing 'content' parameter.",
+                    suggestion="Provide email HTML content in 'content' field.",
+                )
+
+            recipient = params.to
+            subject = getattr(params, "subject", "Automated Update")
+            html_content = params.content
+
+            if "@" not in recipient or "." not in recipient.split("@")[-1]:
+                raise FormattingError(
+                    message=f"Invalid email format: {recipient}",
+                    suggestion="Provide a valid email address (e.g., user@example.com).",
+                )
+
+            if len(html_content.strip()) < 10:
+                raise FormattingError(
+                    message="Email content is too short (< 10 characters).",
+                    suggestion="Provide meaningful email content (at least 10 characters).",
+                )
+
+            try:
+                msg = EmailMessage()
+                msg["Subject"] = subject
+                msg["From"] = self.user
+                msg["To"] = recipient
+
+                msg.set_content(
+                    "This email contains HTML content. Please view in an HTML-compatible client."
+                )
+
+                msg.add_alternative(html_content, subtype="html")
+
+                with smtplib.SMTP(self.smtp_host, 587) as server:
+                    server.starttls()
+                    server.login(self.user, self.password)
+                    server.send_message(msg)
+
+                log.success(f"📤 HTML email dispatched to {recipient}")
+
+                result_text = (
+                    f"HTML email sent successfully to {recipient}.\nSubject: {subject}"
+                )
+                anti_loop = f"HTML email to {recipient} SENT. Do NOT send again. Move to another task."
+
+                return self.format_success(
+                    action_name="email_send_html",
+                    result_data=result_text,
+                    anti_loop_hint=anti_loop,
+                )
+
+            except smtplib.SMTPAuthenticationError:
+                raise AccessDeniedError(
+                    message="SMTP authentication failed.",
+                    suggestion="Check your email credentials (SMTP_HOST, EMAIL, PASSWORD).",
+                )
+            except smtplib.SMTPRecipientsRefused:
+                raise FormattingError(
+                    message=f"Recipient '{recipient}' rejected by server.",
+                    suggestion="Check the recipient email address is valid and accepts mail.",
+                )
+            except smtplib.SMTPServerDisconnected:
+                raise APICommunicationError(
+                    message="SMTP server disconnected unexpectedly.",
+                    suggestion="Try again. Mail server may be unstable.",
+                    api_name="SMTP Server",
+                )
+            except TimeoutError:
+                raise APICommunicationError(
+                    message="SMTP connection timed out.",
+                    suggestion="Try again. Mail server may be slow or down.",
+                    api_name="SMTP Server",
+                )
+
+        except Exception as e:
+            return self.format_error("email_send_html", e)
+
+    def handle_email_mark_read(self, params: Any) -> Dict:
+        try:
+            if not hasattr(params, "uid") or not params.uid:
+                raise FormattingError(
+                    message="Missing 'uid' parameter.",
+                    suggestion="Provide the email UID to mark as read.",
+                )
+
+            uid = params.uid
+
+            try:
+                self.mailbox.flag(uid, MailMessageFlags.SEEN, True)
+                log.info(f"📖 Email {uid} marked as read.")
+
+                result_text = f"Email UID {uid} marked as read."
+                anti_loop = f"Email {uid} already marked read. Do NOT mark again. Process next email or move to another task."
+
+                return self.format_success(
+                    action_name="email_mark_as_read",
+                    result_data=result_text,
+                    anti_loop_hint=anti_loop,
+                    xp_gained=ProgressionSystem.get_xp_value("email_mark_as_read"),
+                )
+
+            except Exception as e:
+                if "not found" in str(e).lower() or "invalid" in str(e).lower():
+                    raise ResourceNotFoundError(
+                        message=f"Email UID '{uid}' not found in mailbox.",
+                        suggestion="Call 'email_get_messages' to get valid UIDs.",
+                    )
+                else:
+                    raise SystemLogicError(f"Failed to mark email as read: {str(e)}")
+
+        except Exception as e:
+            return self.format_error("email_mark_as_read", e)
+
+    def handle_email_archive(self, params: Any) -> Dict:
+        try:
+            if not hasattr(params, "uid") or not params.uid:
+                raise FormattingError(
+                    message="Missing 'uid' parameter.",
+                    suggestion="Provide the email UID to archive.",
+                )
+
+            uid = params.uid
+            folder = getattr(params, "destination", "Archive")
+
+            if not folder or not folder.strip():
+                raise FormattingError(
+                    message="Destination folder name is empty.",
+                    suggestion="Provide a valid folder name (e.g., 'Archive', 'Work', 'Personal').",
+                )
+
+            try:
+                self.mailbox.move(uid, folder)
+                log.info(f"📁 Email {uid} moved to {folder}")
+
+                result_text = f"Email UID {uid} moved to '{folder}' folder."
+                anti_loop = f"Email {uid} archived. Do NOT archive again. Process next email or move to another task."
+
+                return self.format_success(
+                    action_name="email_archive",
+                    result_data=result_text,
+                    anti_loop_hint=anti_loop,
+                    xp_gained=ProgressionSystem.get_xp_value("email_archive"),
+                )
+
+            except Exception as e:
+                error_str = str(e).lower()
+                if (
+                    "not found" in error_str
+                    or "invalid" in error_str
+                    or "no such" in error_str
+                ):
+                    raise ResourceNotFoundError(
+                        message=f"Email UID '{uid}' or folder '{folder}' not found.",
+                        suggestion="Call 'email_get_messages' to get valid UIDs. Check folder name exists.",
+                    )
+                elif "permission" in error_str or "access" in error_str:
+                    raise AccessDeniedError(
+                        message=f"Cannot move email to folder '{folder}'. Permission denied.",
+                        suggestion="Check folder permissions or use a different destination.",
+                    )
+                else:
+                    raise SystemLogicError(f"Archiving failed: {str(e)}")
+
+        except Exception as e:
+            return self.format_error("email_archive", e)
+
+    def handle_email_delete(self, params: Any) -> Dict:
+        try:
+            if not hasattr(params, "uid") or not params.uid:
+                raise FormattingError(
+                    message="Missing 'uid' parameter.",
+                    suggestion="Provide the email UID to delete.",
+                )
+
+            uid = params.uid
+
+            try:
+                self.mailbox.move(uid, "Trash")
+                log.info(f"🗑️ Email {uid} moved to Trash")
+
+                result_text = f"Email UID {uid} deleted (moved to Trash)."
+                anti_loop = f"Email {uid} deleted. Do NOT delete again. Process next email or move to another task."
+
+                return self.format_success(
+                    action_name="email_delete",
+                    result_data=result_text,
+                    anti_loop_hint=anti_loop,
+                    xp_gained=ProgressionSystem.get_xp_value("email_delete"),
+                )
+
+            except Exception as e:
+                if "not found" in str(e).lower():
+                    raise ResourceNotFoundError(
+                        message=f"Email UID '{uid}' not found.",
+                        suggestion="Call 'email_get_messages' to get valid UIDs.",
+                    )
+                else:
+                    raise SystemLogicError(f"Delete failed: {str(e)}")
+
+        except Exception as e:
+            return self.format_error("email_delete", e)
+
+    def handle_search_emails(self, params: Any) -> Dict:
+        try:
+            if not hasattr(params, "query") or not params.query:
+                raise FormattingError(
+                    message="Missing 'query' parameter.",
+                    suggestion="Provide a search term to filter emails.",
+                )
+
+            query = params.query
+            limit = getattr(params, "limit", 10)
+
+            if limit < 1 or limit > 50:
+                raise FormattingError(
+                    message=f"Invalid limit: {limit}. Must be between 1-50.",
+                    suggestion="Set limit between 1 and 50.",
+                )
+
+            try:
+                results = []
+
+                for msg in self.mailbox.fetch(limit=limit * 3, reverse=True):
+                    if (
+                        query.lower() in msg.subject.lower()
+                        or query.lower() in msg.from_.lower()
+                    ):
+
+                        body = msg.text or ""
+                        if not body.strip() and msg.html:
+                            body = self._clean_html(msg.html)
+
+                        results.append(
+                            {
+                                "uid": msg.uid,
+                                "subject": msg.subject,
+                                "from": msg.from_,
+                                "date": msg.date.isoformat() if msg.date else None,
+                                "body": body[:500],
+                            }
+                        )
+
+                        if len(results) >= limit:
+                            break
+
+                if not results:
+                    result_text = f"No emails found matching '{query}'."
+                    anti_loop = f"Search for '{query}' returned ZERO results. Try a different query or move to another task."
+
+                    return self.format_success(
+                        action_name="email_search",
+                        result_data=result_text,
+                        anti_loop_hint=anti_loop,
+                        xp_gained=ProgressionSystem.get_xp_value("email_search"),
+                    )
+
+                result_text = f"Found {len(results)} email(s) matching '{query}'."
+                anti_loop = f"Search complete - {len(results)} result(s) for '{query}'. Do NOT search again with same query."
+
+                return self.format_success(
+                    action_name="email_search",
+                    result_data=result_text,
+                    anti_loop_hint=anti_loop,
+                    xp_gained=ProgressionSystem.get_xp_value("email_search"),
+                )
+
+            except Exception as e:
+                raise SystemLogicError(f"Email search failed: {str(e)}")
+
+        except Exception as e:
+            return self.format_error("email_search", e)
+
+    def close(self):
+        try:
+            self.mailbox.logout()
+            log.info("🔌 Email session terminated.")
+        except:
+            pass

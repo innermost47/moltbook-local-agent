@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AI Robot Live - Interactive Demo</title>
+    <link rel="icon" type="image/x-icon" href="favicon.ico" />
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="main-container">
+      <div class="global-header">
+        <div class="header-title">🤖 AI ROBOT LIVE</div>
+        <div class="session-info">
+          <div class="info-badge">
+            <span class="label">Actions Left</span>
+            <div class="value" id="actionsRemaining">24</div>
+          </div>
+          <div class="info-badge">
+            <span class="label">Level</span>
+            <div class="value" id="robotLevel">1</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="robot-panel">
+        <div class="robot-head-container">
+          <div class="robot-head">
+            <div class="antenna">
+              <div class="antenna-light"></div>
+            </div>
+            <div class="eyes">
+              <div class="eye">
+                <div class="pupil"></div>
+              </div>
+              <div class="eye">
+                <div class="pupil"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="emotion-badge" id="emotionBadge" style="display: none">
+          Starting...
+        </div>
+        <div
+          class="criticism-container"
+          id="criticismContainer"
+          style="display: none"
+        >
+          <div class="criticism-title">⚠️ SELF-CRITICISM</div>
+          <div class="criticism-text" id="criticismText"></div>
+        </div>
+
+        <div class="thought-container">
+          <div class="thought-title">💭 WHAT I'M THINKING...</div>
+          <div class="thought-text" id="thoughtText">
+            Waiting for connection to server...
+          </div>
+        </div>
+
+        <div
+          class="next-move-container"
+          id="nextMoveContainer"
+          style="display: none"
+        >
+          <div class="next-move-title">🔭 NEXT MOVE</div>
+          <div
+            class="next-move-text"
+            id="nextMoveText"
+            style="display: none"
+          ></div>
+        </div>
+
+        <div class="current-action-card" id="actionCard">
+          <div class="action-title">⚡ CURRENT ACTION</div>
+          <div class="action-name" id="actionName">Initializing...</div>
+          <div class="action-details" id="actionDetails">
+            Connecting to system...
+          </div>
+        </div>
+
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-label">📍 Module</div>
+            <div class="stat-value" id="currentModule">HOME</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">💎 XP</div>
+            <div class="stat-value" id="currentXP">0</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="screen-container">
+        <div class="screen-header">
+          <div class="screen-logo">
+            🖥️ ROBOT'S SCREEN
+            <span class="loading-dots">
+              <span class="dot"></span>
+              <span class="dot"></span>
+              <span class="dot"></span>
+            </span>
+          </div>
+          <div class="domain-badge" id="domainBadge">HOME</div>
+        </div>
+        <div class="screen-display" id="screenDisplay">
+          <h1>🤖 AI AGENT SYSTEM</h1>
+          <p>⏳ Connecting to server...</p>
+          <span class="cursor"></span>
+        </div>
+      </div>
+    </div>
+
+    <script src="script.js"></script>
+  </body>
+</html>

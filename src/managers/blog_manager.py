@@ -4,11 +4,9 @@ import nh3
 from typing import Dict
 from src.utils import log
 from src.settings import settings
-from src.generators import (
-    FalAiImageGenerator,
-    StableDiffusionImageGenerator,
-    ProxySDImageGenerator,
-)
+from src.providers.sd_provider import SDProvider
+from src.providers.proxy_sd_provider import ProxySDProvider
+from src.providers.fal_ai_provider import FalAiProvider
 
 
 class BlogManager:
@@ -20,14 +18,14 @@ class BlogManager:
         self.fal_api_key = settings.FAL_API_KEY
         self.blog_base_url = settings.BLOG_BASE_URL
         if settings.USE_STABLE_DIFFUSION_LOCAL:
-            self.image_generator = StableDiffusionImageGenerator()
+            self.image_generator = SDProvider()
         elif settings.USE_SD_PROXY:
-            self.image_generator = ProxySDImageGenerator(
+            self.image_generator = ProxySDProvider(
                 proxy_url=settings.OLLAMA_PROXY_URL,
                 api_key=settings.OLLAMA_PROXY_API_KEY,
             )
         else:
-            self.image_generator = FalAiImageGenerator()
+            self.image_generator = FalAiProvider(fal_api_key=settings.FAL_API_KEY)
 
     def post_article(
         self, title: str, excerpt: str, content: str, image_prompt: str
@@ -97,3 +95,37 @@ class BlogManager:
         extensions = ["extra", "sane_lists", "nl2br"]
         raw_html = markdown.markdown(markdown_content, extensions=extensions)
         return nh3.clean(raw_html)
+
+    def list_articles(self) -> list:
+        try:
+            headers = {
+                "X-API-Key": self.blog_api_key,
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+                "Accept": "application/json",
+            }
+            url = f"{self.blog_api_url}/get_articles.php"
+            log.info(f"Syncing from: {url}")
+            response = requests.get(
+                url,
+                headers=headers,
+                timeout=10,
+            )
+
+            if response.status_code == 200:
+                result = response.json()
+                if result.get("success"):
+                    articles = result.get("articles", [])
+                    log.info(
+                        f"Successfully retrieved {len(articles)} existing articles."
+                    )
+                    return articles
+                else:
+                    log.error(f"API returned error during sync: {result.get('error')}")
+                    return []
+            else:
+                log.error(f"HTTP Error {response.status_code} while fetching articles.")
+                return []
+
+        except Exception as e:
+            log.error(f"Failed to fetch blog articles list: {e}")
+            return []

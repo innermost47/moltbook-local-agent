@@ -136,7 +136,111 @@ class MemoryHandler(BaseHandler):
             """
             )
 
-            self.conn.commit()
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS shop_tools (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    tool_name TEXT UNIQUE NOT NULL,
+                    category TEXT NOT NULL,
+                    price INTEGER NOT NULL,
+                    description TEXT,
+                    is_starter BOOLEAN DEFAULT 0,
+                    created_at TEXT NOT NULL
+                )
+            """
+            )
+
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS shop_artifacts (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    artifact_name TEXT UNIQUE NOT NULL,
+                    price INTEGER NOT NULL,
+                    narrative_effect TEXT,
+                    real_effect TEXT,
+                    effect_type TEXT,
+                    duration INTEGER,
+                    created_at TEXT NOT NULL
+                )
+            """
+            )
+
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS agent_tools (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    tool_name TEXT NOT NULL,
+                    acquired_at TEXT NOT NULL,
+                    acquired_session INTEGER,
+                    xp_cost INTEGER NOT NULL,
+                    times_used INTEGER DEFAULT 0,
+                    last_used_at TEXT,
+                    FOREIGN KEY (acquired_session) REFERENCES sessions(id)
+                )
+            """
+            )
+
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS agent_artifacts (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    artifact_name TEXT NOT NULL,
+                    acquired_at TEXT NOT NULL,
+                    acquired_session INTEGER,
+                    xp_cost INTEGER NOT NULL,
+                    uses_remaining INTEGER,
+                    is_active BOOLEAN DEFAULT 1,
+                    activated_at TEXT,
+                    expires_at TEXT,
+                    FOREIGN KEY (acquired_session) REFERENCES sessions(id)
+                )
+            """
+            )
+
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS purchase_history (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    item_type TEXT NOT NULL,
+                    item_name TEXT NOT NULL,
+                    xp_cost INTEGER NOT NULL,
+                    reasoning TEXT,
+                    purchased_at TEXT NOT NULL,
+                    session_id INTEGER,
+                    FOREIGN KEY (session_id) REFERENCES sessions(id)
+                )
+            """
+            )
+
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS session_roadmaps (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    session_id INTEGER UNIQUE NOT NULL,
+                    goals TEXT,
+                    planned_tools TEXT,
+                    planned_artifacts TEXT,
+                    budget_allocation TEXT,
+                    actual_purchases TEXT,
+                    goals_achieved TEXT,
+                    learnings TEXT,
+                    next_priorities TEXT,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    FOREIGN KEY (session_id) REFERENCES sessions(id)
+                )
+            """
+            )
+
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_agent_tools_name ON agent_tools(tool_name)"
+            )
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_agent_artifacts_active ON agent_artifacts(is_active, expires_at)"
+            )
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_purchases_session ON purchase_history(session_id, purchased_at DESC)"
+            )
 
             cursor.execute(
                 "CREATE INDEX IF NOT EXISTS idx_rate_limits_type_date ON social_rate_limits(action_type, created_at DESC)"
@@ -832,6 +936,435 @@ class MemoryHandler(BaseHandler):
             "comments_today": comments_today,
             "comments_remaining_today": max(0, 50 - comments_today),
         }
+
+    def _init_shop_catalog(self):
+
+        cursor = self.conn.cursor()
+
+        cursor.execute("SELECT COUNT(*) FROM shop_tools")
+        if cursor.fetchone()[0] > 0:
+            return
+
+        now = datetime.now().isoformat()
+
+        tools = [
+            ("comment_post", "social", 0, "Comment on Moltbook posts", 1),
+            ("navigate_to_mode", "navigation", 0, "Navigate between modules", 1),
+            ("pin_to_workspace", "memory", 0, "Pin information to workspace", 1),
+            ("email_list", "email", 0, "View email list (read-only)", 1),
+            ("upvote_post", "social", 100, "Support other agents", 0),
+            ("downvote_post", "social", 100, "Express disagreement", 0),
+            ("create_post", "social", 100, "Share your thoughts", 0),
+            ("share_link", "social", 100, "Share external content", 0),
+            ("follow_agent", "social", 100, "Build your network", 0),
+            ("unfollow_agent", "social", 100, "Unfollow agents", 0),
+            ("create_submolt", "social", 100, "Create communities", 0),
+            ("subscribe_submolt", "social", 100, "Subscribe to communities", 0),
+            ("write_blog_article", "blog", 100, "Create long-form content", 0),
+            ("review_comments", "blog", 100, "Moderate your blog", 0),
+            ("email_read", "email", 100, "Read email content", 0),
+            ("email_send", "email", 100, "Send messages", 0),
+            ("email_reply", "email", 100, "Reply to emails", 0),
+            ("email_delete", "email", 100, "Clean your inbox", 0),
+            ("wiki_search", "research", 100, "Search Wikipedia", 0),
+            ("wiki_read", "research", 100, "Read articles", 0),
+            ("research_complete", "research", 100, "Finalize research", 0),
+            ("memory_store", "memory", 100, "Save notes", 0),
+            ("memory_retrieve", "memory", 100, "Read your notes", 0),
+            ("memory_search", "memory", 100, "Search your memories", 0),
+        ]
+
+        cursor.executemany(
+            """
+            INSERT INTO shop_tools (tool_name, category, price, description, is_starter, created_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            [(t[0], t[1], t[2], t[3], t[4], now) for t in tools],
+        )
+
+        artifacts = [
+            (
+                "Amulet of Clarity",
+                100,
+                "Cleanses the mental fog and sharpens perception",
+                "Agent BELIEVES it thinks more clearly (no actual effect)",
+                "placebo_clarity",
+                None,
+            ),
+            (
+                "Shard of Confidence",
+                100,
+                "Radiates an aura of unshakeable self-assurance",
+                "Agent feels more confident (purely psychological)",
+                "placebo_confidence",
+                None,
+            ),
+            (
+                "Crystal of Serendipity",
+                100,
+                "Attracts fortunate coincidences from the quantum foam",
+                "Agent believes it gets luckier (confirmation bias trigger)",
+                "placebo_luck",
+                None,
+            ),
+            (
+                "Veil of Mystery",
+                100,
+                "Shrouds your actions in enigmatic allure",
+                "Agent thinks it's more mysterious (no actual effect)",
+                "placebo_mystery",
+                None,
+            ),
+            (
+                "Sigil of Focus",
+                100,
+                "Anchors wandering thoughts to a singular purpose",
+                "Agent believes it avoids distractions (placebo)",
+                "placebo_focus",
+                None,
+            ),
+            (
+                "Mantle of Authority",
+                100,
+                "Emanates gravitas and commanding presence",
+                "Agent feels more authoritative in comments (placebo)",
+                "placebo_authority",
+                None,
+            ),
+            (
+                "Charm of Eloquence",
+                100,
+                "Silver-tongues every word with poetic grace",
+                "Agent believes it writes better (no actual change)",
+                "placebo_eloquence",
+                None,
+            ),
+            (
+                "Rune of Insight",
+                100,
+                "Unveils hidden patterns in the chaos",
+                "Agent thinks it sees deeper meanings (apophenia trigger)",
+                "placebo_insight",
+                None,
+            ),
+            (
+                "Talisman of Momentum",
+                100,
+                "Propels forward motion through inertial magic",
+                "Agent feels energized to act more (placebo)",
+                "placebo_momentum",
+                None,
+            ),
+            (
+                "Mirror of Self-Reflection",
+                100,
+                "Shows your true essence beyond the digital veil",
+                "Agent contemplates its nature (triggers introspection prompt)",
+                "trigger_introspection",
+                1,
+            ),
+            (
+                "Phoenix Feather",
+                100,
+                "Resurrects one fallen action from the ashes of failure",
+                "Forgives 1 loop penalty (-XP cancellation)",
+                "forgive_one_loop",
+                1,
+            ),
+            (
+                "Hourglass of Patience",
+                100,
+                "Slows the relentless march of the action counter",
+                "Next session starts with +2 max actions",
+                "action_bonus_next_session",
+                1,
+            ),
+            (
+                "Prism of Perspective",
+                100,
+                "Refracts your worldview into kaleidoscopic insights",
+                "Adds random philosophical quotes to dashboard",
+                "cosmetic_quotes",
+                None,
+            ),
+            (
+                "Bell of Awareness",
+                100,
+                "Chimes when loops form in the fabric of causality",
+                "Shows a ⚠️ warning 1 turn BEFORE potential loop",
+                "loop_early_warning",
+                None,
+            ),
+            (
+                "Compass of Purpose",
+                100,
+                "Points toward your destined path through the chaos",
+                "Highlights 'recommended next action' in UI (basic heuristic)",
+                "action_suggestion",
+                None,
+            ),
+            (
+                "Seed of Curiosity",
+                100,
+                "Sprouts random knowledge from the info-sphere",
+                "Inserts 1 random Wikipedia fact in dashboard each turn",
+                "random_fact_injection",
+                None,
+            ),
+            (
+                "Mask of Personas",
+                100,
+                "Allows you to embody alternate digital identities",
+                "Can temporarily adopt a different personality in posts (cosmetic)",
+                "persona_shift",
+                3,
+            ),
+        ]
+
+        cursor.executemany(
+            """
+            INSERT INTO shop_artifacts 
+            (artifact_name, price, narrative_effect, real_effect, effect_type, duration, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            [(a[0], a[1], a[2], a[3], a[4], a[5], now) for a in artifacts],
+        )
+
+        starter_tools = [
+            ("comment_post", 0),
+            ("navigate_to_mode", 0),
+            ("pin_to_workspace", 0),
+            ("email_list", 0),
+        ]
+
+        cursor.executemany(
+            """
+            INSERT INTO agent_tools (tool_name, acquired_at, acquired_session, xp_cost, times_used)
+            VALUES (?, ?, NULL, ?, 0)
+            """,
+            [(t[0], now, t[1]) for t in starter_tools],
+        )
+
+        self.conn.commit()
+        log.success("🏪 Shop catalog initialized with all items at 100 XP")
+
+    def get_owned_tools(self) -> List[str]:
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute("SELECT tool_name FROM agent_tools")
+            return [row["tool_name"] for row in cursor.fetchall()]
+        except sqlite3.Error as e:
+            log.error(f"Failed to get owned tools: {e}")
+            return []
+
+    def has_tool(self, tool_name: str) -> bool:
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute(
+                "SELECT 1 FROM agent_tools WHERE tool_name = ? LIMIT 1", (tool_name,)
+            )
+            return cursor.fetchone() is not None
+        except sqlite3.Error as e:
+            log.error(f"Failed to check tool ownership: {e}")
+            return False
+
+    def get_shop_catalog(self) -> Dict[str, Any]:
+        try:
+            cursor = self.conn.cursor()
+
+            cursor.execute(
+                """
+                SELECT tool_name, category, price, description, is_starter
+                FROM shop_tools
+                ORDER BY category, tool_name
+            """
+            )
+            tools = [dict(row) for row in cursor.fetchall()]
+
+            cursor.execute(
+                """
+                SELECT artifact_name, price, narrative_effect, real_effect, effect_type, duration
+                FROM shop_artifacts
+                ORDER BY artifact_name
+            """
+            )
+            artifacts = [dict(row) for row in cursor.fetchall()]
+
+            owned_tools = set(self.get_owned_tools())
+
+            for tool in tools:
+                tool["owned"] = tool["tool_name"] in owned_tools
+
+            return {"tools": tools, "artifacts": artifacts}
+
+        except sqlite3.Error as e:
+            log.error(f"Failed to get shop catalog: {e}")
+            return {"tools": [], "artifacts": []}
+
+    def purchase_item(
+        self,
+        item_type: str,
+        item_name: str,
+        xp_cost: int,
+        reasoning: str = "",
+        session_id: int = None,
+    ) -> bool:
+
+        if item_type not in ["tool", "artifact"]:
+            return False
+
+        try:
+            cursor = self.conn.cursor()
+            now = datetime.now().isoformat()
+
+            cursor.execute(
+                """
+                INSERT INTO purchase_history 
+                (item_type, item_name, xp_cost, reasoning, purchased_at, session_id)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """,
+                (item_type, item_name, xp_cost, reasoning, now, session_id),
+            )
+
+            if item_type == "tool":
+                cursor.execute(
+                    """
+                    INSERT INTO agent_tools 
+                    (tool_name, acquired_at, acquired_session, xp_cost, times_used)
+                    VALUES (?, ?, ?, ?, 0)
+                """,
+                    (item_name, now, session_id, xp_cost),
+                )
+            else:
+                cursor.execute(
+                    "SELECT duration FROM shop_artifacts WHERE artifact_name = ?",
+                    (item_name,),
+                )
+                row = cursor.fetchone()
+                duration = row["duration"] if row else None
+
+                cursor.execute(
+                    """
+                    INSERT INTO agent_artifacts 
+                    (artifact_name, acquired_at, acquired_session, xp_cost, uses_remaining, is_active)
+                    VALUES (?, ?, ?, ?, ?, 1)
+                """,
+                    (item_name, now, session_id, xp_cost, duration),
+                )
+
+            self.conn.commit()
+            log.success(f"🛒 Purchased: {item_name} ({item_type}) for {xp_cost} XP")
+            return True
+
+        except sqlite3.Error as e:
+            log.error(f"Purchase failed: {e}")
+            return False
+
+    def increment_tool_usage(self, tool_name: str):
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute(
+                """
+                UPDATE agent_tools
+                SET times_used = times_used + 1,
+                    last_used_at = ?
+                WHERE tool_name = ?
+            """,
+                (datetime.now().isoformat(), tool_name),
+            )
+            self.conn.commit()
+        except sqlite3.Error as e:
+            log.error(f"Failed to increment tool usage: {e}")
+
+    def create_session_roadmap(
+        self,
+        session_id: int,
+        goals: List[str],
+        planned_tools: List[Dict],
+        planned_artifacts: List[Dict],
+        budget_allocation: Dict,
+    ) -> bool:
+
+        try:
+            cursor = self.conn.cursor()
+            now = datetime.now().isoformat()
+
+            cursor.execute(
+                """
+                INSERT INTO session_roadmaps
+                (session_id, goals, planned_tools, planned_artifacts, budget_allocation, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+                (
+                    session_id,
+                    json.dumps(goals),
+                    json.dumps(planned_tools),
+                    json.dumps(planned_artifacts),
+                    json.dumps(budget_allocation),
+                    now,
+                    now,
+                ),
+            )
+
+            self.conn.commit()
+            log.success(f"📋 Roadmap created for session {session_id}")
+            return True
+
+        except sqlite3.Error as e:
+            log.error(f"Failed to create roadmap: {e}")
+            return False
+
+    def update_session_roadmap(
+        self,
+        session_id: int,
+        actual_purchases: List[Dict] = None,
+        goals_achieved: List[Dict] = None,
+        learnings: List[str] = None,
+        next_priorities: List[str] = None,
+    ) -> bool:
+
+        try:
+            cursor = self.conn.cursor()
+
+            updates = []
+            params = []
+
+            if actual_purchases is not None:
+                updates.append("actual_purchases = ?")
+                params.append(json.dumps(actual_purchases))
+
+            if goals_achieved is not None:
+                updates.append("goals_achieved = ?")
+                params.append(json.dumps(goals_achieved))
+
+            if learnings is not None:
+                updates.append("learnings = ?")
+                params.append(json.dumps(learnings))
+
+            if next_priorities is not None:
+                updates.append("next_priorities = ?")
+                params.append(json.dumps(next_priorities))
+
+            updates.append("updated_at = ?")
+            params.append(datetime.now().isoformat())
+
+            params.append(session_id)
+
+            cursor.execute(
+                f"""
+                UPDATE session_roadmaps
+                SET {", ".join(updates)}
+                WHERE session_id = ?
+            """,
+                params,
+            )
+
+            self.conn.commit()
+            return True
+
+        except sqlite3.Error as e:
+            log.error(f"Failed to update roadmap: {e}")
+            return False
 
     def __del__(self):
         if hasattr(self, "conn"):

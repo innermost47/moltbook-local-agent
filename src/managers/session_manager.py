@@ -323,12 +323,14 @@ class SessionManager:
         current_title = prog_status.get("current_title", "Digital Seedling")
         xp_needed = prog_status.get("xp_needed", 100)
 
-        owned_tools = self.dispatcher.memory.get_owned_tools()
-        catalog = self.dispatcher.memory.get_shop_catalog()
+        owned_tools = self.dispatcher.memory_handler.get_owned_tools()
+        catalog = self.dispatcher.memory_handler.get_shop_catalog()
         total_tools = len(catalog.get("tools", []))
 
-        purchase_history = self.dispatcher.memory.get_session_purchases(self.session_id)
-        active_plan = self.dispatcher.memory.get_active_master_plan()
+        purchase_history = self.dispatcher.memory_handler.get_session_purchases(
+            self.session_id
+        )
+        active_plan = self.dispatcher.memory_handler.get_active_master_plan()
 
         prompt = f"""
 Analyze your session and provide a detailed reflection.
@@ -630,7 +632,7 @@ The quantum frequencies resonate with your ascension...
 
     def _get_modules_quick_status(self) -> str:
 
-        owned_tools = set(self.dispatcher.memory.get_owned_tools())
+        owned_tools = set(self.dispatcher.memory_handler.get_owned_tools())
 
         module_actions = {
             "HOME": ["navigate", "pin", "visit_shop"],

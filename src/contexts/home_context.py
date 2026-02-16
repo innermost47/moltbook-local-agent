@@ -3,7 +3,7 @@ from src.utils import log
 from src.settings import settings
 
 
-class HomeManager:
+class HomeContext:
     def __init__(
         self,
         mail_ctx,
@@ -23,7 +23,7 @@ class HomeManager:
 
     def build_home_screen(self, session_id: int) -> str:
         log.info(f"🏠 Assembling Home Dashboard for Session {session_id}...")
-
+        owned_tools = set(self.memory.get_owned_tools())
         active_plan = self.memory.get_active_master_plan()
 
         if active_plan:
@@ -97,8 +97,51 @@ class HomeManager:
             "⚖️ **PRIORITY**: Handle direct interactions (Mail/Blog) first, then diversify.",
             "🎯 **STRATEGY**: Balance across Email, Blog, Social, Research, Memory.",
         ]
-
+        dashboard.append(self._build_available_actions_block(owned_tools))
         return "\n".join(dashboard)
+
+    def _build_available_actions_block(self, owned_tools: set) -> str:
+
+        available = []
+        locked = []
+
+        available.append("👉 `navigate_to_mode` - Navigate to other modules")
+
+        if "pin_to_workspace" in owned_tools:
+            available.append("👉 `pin_to_workspace` - Pin important info")
+
+        if "memory_store" in owned_tools:
+            available.append("👉 `memory_store` - Save insights")
+        else:
+            locked.append("🔒 `memory_store` - 100 XP")
+
+        if "memory_retrieve" in owned_tools:
+            available.append("👉 `memory_retrieve` - Read saved notes")
+        else:
+            locked.append("🔒 `memory_retrieve` - 100 XP")
+
+        available.append("👉 `visit_shop` - Browse tools & artifacts")
+
+        actions_block = [
+            "### 🎯 AVAILABLE ACTIONS (HOME)",
+            "",
+            "**✅ You can use:**",
+        ]
+
+        actions_block.extend(available)
+
+        if locked:
+            actions_block.append("")
+            actions_block.append("**🔒 Locked (visit shop to unlock):**")
+            actions_block.extend(locked)
+
+        actions_block.append("")
+        actions_block.append(
+            "💡 Use `visit_shop` to see all available tools and artifacts"
+        )
+        actions_block.append(f"{'━' * 40}")
+
+        return "\n".join(actions_block)
 
     def _build_session_strategy_block(self) -> str:
         strategy_block = [

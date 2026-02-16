@@ -971,7 +971,6 @@ class MemoryHandler(BaseHandler):
             ("research_complete", "research", 100, "Finalize research", 0),
             ("memory_store", "memory", 100, "Save notes", 0),
             ("memory_retrieve", "memory", 100, "Read your notes", 0),
-            ("memory_search", "memory", 100, "Search your memories", 0),
         ]
 
         cursor.executemany(
@@ -1365,6 +1364,25 @@ class MemoryHandler(BaseHandler):
         except sqlite3.Error as e:
             log.error(f"Failed to update roadmap: {e}")
             return False
+
+    def get_session_purchases(self, session_id: int) -> List[Dict]:
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute(
+                """
+                SELECT item_type, item_name, xp_cost, reasoning, purchased_at
+                FROM purchase_history
+                WHERE session_id = ?
+                ORDER BY purchased_at ASC
+            """,
+                (session_id,),
+            )
+
+            return [dict(row) for row in cursor.fetchall()]
+
+        except sqlite3.Error as e:
+            log.error(f"Failed to get session purchases: {e}")
+            return []
 
     def __del__(self):
         if hasattr(self, "conn"):

@@ -99,6 +99,15 @@ class NavigateAction(BaseAction):
     action_params: NavigateParams
 
 
+class VisitShopParams(BaseModel):
+    pass
+
+
+class VisitShopAction(BaseAction):
+    action_type: Literal["visit_shop"] = "visit_shop"
+    action_params: VisitShopParams
+
+
 GlobalAction = Annotated[
     Union[
         PinAction,
@@ -107,6 +116,7 @@ GlobalAction = Annotated[
         MemoryStoreAction,
         MemoryRetrieveAction,
         NavigateAction,
+        VisitShopAction,
     ],
     Field(discriminator="action_type"),
 ]

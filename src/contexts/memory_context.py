@@ -2,10 +2,10 @@ from typing import Dict
 from argparse import Namespace
 from src.settings import settings
 from src.utils import log
-from src.managers.base_context_manager import BaseContextManager
+from src.contexts.base_context import BaseContext
 
 
-class MemoryContextManager(BaseContextManager):
+class MemoryContext(BaseContext):
     def __init__(self, memory_handler):
         self.handler = memory_handler
 
@@ -19,7 +19,7 @@ class MemoryContextManager(BaseContextManager):
     def get_list_view(
         self, status_msg: str = "", result: Dict = None, workspace_pins=None
     ) -> str:
-
+        owned_tools = set(self.handler.get_owned_tools())
         last_state_info = ""
         try:
             last_state = self.handler.get_last_session_state() or {}
@@ -51,6 +51,61 @@ class MemoryContextManager(BaseContextManager):
             log.warning(f"Could not fetch memory categories: {e}")
             categories_display = "### 📂 AVAILABLE CATEGORIES\n\n_Status unavailable_\n"
 
+        available_actions = []
+        locked_actions = []
+
+        if "pin_to_workspace" in owned_tools:
+            available_actions.append(
+                """
+👉 `pin_to_workspace(label='...', content='...')`
+   - Pin important info to workspace (visible everywhere)
+   - FREE starter tool
+"""
+            )
+
+        if "memory_retrieve" in owned_tools:
+            available_actions.append(
+                """
+👉 `memory_retrieve(memory_category='...', memory_limit=10)`
+   - Recall stored memories from a category
+   - params: category, limit, order ('asc'|'desc')
+"""
+            )
+        else:
+            locked_actions.append(
+                "🔒 `memory_retrieve` - 100 XP (unlock to read memories)"
+            )
+
+        if "memory_store" in owned_tools:
+            available_actions.append(
+                """
+👉 `memory_store(memory_category='...', memory_content='...')`
+   - Store new insights in a category
+   - Available categories: """
+                + ", ".join(settings.MEMORY_CATEGORIES.keys())
+            )
+        else:
+            locked_actions.append(
+                "🔒 `memory_store` - 100 XP (unlock to save memories)"
+            )
+
+        actions_section = "### 🛠️ MEMORY ACTIONS\n\n"
+
+        if available_actions:
+            actions_section += "You are in MEMORY mode. Execute one of these:\n\n"
+            actions_section += "\n".join(available_actions)
+        else:
+            actions_section += "⚠️ **NO MEMORY TOOLS UNLOCKED**\n\n"
+            actions_section += (
+                "You can view categories, but can't interact with memories yet.\n"
+            )
+
+        if locked_actions:
+            actions_section += "\n\n### 🔒 LOCKED ACTIONS\n"
+            actions_section += "Purchase these tools to unlock memory management:\n\n"
+            actions_section += "\n".join(locked_actions)
+            actions_section += "\n\n💡 Navigate to HOME and use `visit_shop` to unlock."
+
         ctx = [
             "## 🧠 INTERNAL MEMORY SYSTEMS",
             f"✅ **STATUS**: {status_msg}" if status_msg else "",
@@ -59,15 +114,7 @@ class MemoryContextManager(BaseContextManager):
             "---",
             categories_display,
             "",
-            "### 🛠️ MEMORY ACTIONS",
-            "",
-            "👉 `memory_retrieve`",
-            "   - **params**: `memory_category`, `memory_limit`, `memory_order` ('asc'|'desc')",
-            "   - Recall stored memories from a category",
-            "",
-            "👉 `memory_store`",
-            "   - **params**: `memory_category`, `memory_content`",
-            "   - Store new memory in a category",
+            actions_section,
         ]
 
         return "\n".join(ctx)

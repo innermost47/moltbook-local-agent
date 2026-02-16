@@ -1,14 +1,15 @@
 from argparse import ArgumentParser
+from src.contexts.blog_context import BlogContext
+from src.contexts.home_context import HomeContext
+from src.contexts.mail_context import MailContext
+from src.contexts.memory_context import MemoryContext
+from src.contexts.research_context import ResearchContext
+from src.contexts.shop_context import ShopContext
+from src.contexts.social_context import SocialContext
 from src.dispatchers.action_dispatcher import ActionDispatcher
-from src.managers.blog_context_manager import BlogContextManager
-from src.managers.home_manager import HomeManager
-from src.managers.mail_context_manager import MailContextManager
-from src.managers.memory_context_manager import MemoryContextManager
 from src.managers.progression_system import ProgressionSystem
-from src.managers.research_context_manager import ResearchContextManager
 from src.managers.session_manager import SessionManager
 from src.managers.session_tracker import SessionTracker
-from src.managers.social_context_manager import SocialContextManager
 from src.providers.ollama_provider import OllamaProvider
 from src.settings import settings
 from src.tests.global_tests import GlobalTestSuite
@@ -34,15 +35,20 @@ def bootstrap(test_mode: bool = False):
 
     progression_system = ProgressionSystem(settings.DB_PATH)
 
-    social_ctx = SocialContextManager(
-        dispatcher.social_handler, dispatcher.memory_handler
-    )
-    mail_ctx = MailContextManager(dispatcher.email_handler)
-    blog_ctx = BlogContextManager(dispatcher.blog_handler)
-    research_ctx = ResearchContextManager(dispatcher.research_handler)
-    memory_ctx = MemoryContextManager(dispatcher.memory_handler)
+    dispatcher.set_progression_system(progression_system)
 
-    home_m = HomeManager(
+    social_ctx = SocialContext(dispatcher.social_handler, dispatcher.memory_handler)
+    mail_ctx = MailContext(dispatcher.email_handler, dispatcher.memory_handler)
+    blog_ctx = BlogContext(dispatcher.blog_handler, dispatcher.memory_handler)
+    research_ctx = ResearchContext(
+        dispatcher.research_handler, dispatcher.memory_handler
+    )
+    memory_ctx = MemoryContext(dispatcher.memory_handler)
+    shop_ctx = ShopContext(
+        dispatcher.memory_handler, progression_system=progression_system
+    )
+
+    home_m = HomeContext(
         mail_ctx=mail_ctx,
         blog_ctx=blog_ctx,
         social_ctx=social_ctx,
@@ -57,6 +63,7 @@ def bootstrap(test_mode: bool = False):
         "blog": blog_ctx,
         "research": research_ctx,
         "memory": memory_ctx,
+        "shop": shop_ctx,
     }
 
     session = SessionManager(
@@ -66,6 +73,7 @@ def bootstrap(test_mode: bool = False):
         ollama_provider=ollama,
         tracker=session_tracker,
         email_reporter=email_reporter,
+        progression_system=progression_system,
     )
 
     dispatcher.set_session_manager(session)

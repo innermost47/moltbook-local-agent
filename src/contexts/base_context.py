@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 
 
-class BaseContextManager(ABC):
+class BaseContext(ABC):
     @abstractmethod
     def get_home_snippet(self) -> str:
         pass

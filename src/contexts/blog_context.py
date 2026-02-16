@@ -1,12 +1,13 @@
 from typing import Dict
 from argparse import Namespace
-from src.managers.base_context_manager import BaseContextManager
+from src.contexts.base_context import BaseContext
 from src.utils import log
 
 
-class BlogContextManager(BaseContextManager):
-    def __init__(self, blog_handler):
+class BlogContext(BaseContext):
+    def __init__(self, blog_handler, memory_handler):
         self.handler = blog_handler
+        self.memory = memory_handler
 
     def get_home_snippet(self) -> str:
         try:
@@ -46,7 +47,7 @@ class BlogContextManager(BaseContextManager):
     def get_list_view(
         self, status_msg: str = "", result: Dict = None, workspace_pins=None
     ) -> str:
-
+        owned_tools = set(self.memory.get_owned_tools())
         blog_knowledge = ""
         try:
             articles_res = self.handler.blog_manager.list_articles()
@@ -79,6 +80,50 @@ class BlogContextManager(BaseContextManager):
             log.warning(f"Could not fetch key requests: {e}")
             key_context = "\n### 🔑 PENDING KEYS\n_Status unavailable_\n"
 
+        available_actions = []
+        locked_actions = []
+
+        if "write_blog_article" in owned_tools:
+            available_actions.append(
+                """
+👉 `write_blog_article`
+   - **params**: `title`, `excerpt`, `content`, `image_prompt`
+   - Create a new blog post with AI-generated header image
+   - ⚠️ Write content DIRECTLY as the article
+   - 💡 After publishing: Pin URL, then share on SOCIAL
+"""
+            )
+        else:
+            locked_actions.append("🔒 `write_blog_article` - 100 XP (unlock in shop)")
+
+        if "review_pending_comments" in owned_tools:
+            available_actions.append(
+                """
+👉 `review_pending_comments`
+   - Review and moderate pending blog comments
+"""
+            )
+        else:
+            locked_actions.append("🔒 `review_pending_comments` - 100 XP")
+
+        actions_section = "### ✍️ AVAILABLE BLOG ACTIONS\n"
+
+        if available_actions:
+            actions_section += "You are in BLOG mode. Execute one of these:\n\n"
+            actions_section += "\n".join(available_actions)
+        else:
+            actions_section += "⚠️ **NO ACTIONS AVAILABLE**\n\n"
+            actions_section += "You don't own any BLOG tools yet.\n"
+            actions_section += "Visit the shop to unlock capabilities:\n\n"
+
+        if locked_actions:
+            actions_section += "\n### 🔒 LOCKED ACTIONS\n"
+            actions_section += "Purchase these tools in the shop:\n\n"
+            actions_section += "\n".join(locked_actions)
+            actions_section += (
+                "\n\n💡 **Navigate to HOME** and use `visit_shop` to unlock."
+            )
+
         ctx = [
             "## 📚 BLOG ADMINISTRATION & HUB",
             f"✅ **STATUS**: {status_msg}" if status_msg else "",
@@ -87,22 +132,7 @@ class BlogContextManager(BaseContextManager):
             "---",
             key_context,
             "---",
-            "### ✍️ AVAILABLE BLOG ACTIONS",
-            "You are in BLOG mode. **Do not navigate.** Execute one of these:",
-            "",
-            "👉 `write_blog_article`",
-            "   - **params**: `title`, `excerpt`, `content` (markdown), `image_prompt`",
-            "   - Create a new blog post with AI-generated header image",
-            "   - ⚠️ CRITICAL: Write content DIRECTLY as the article, NOT 'I will write about...'",
-            "   - 💡 **After publishing**: Use `pin_to_workspace` to save the article URL, then navigate to SOCIAL to share it with `share_link`",
-            "",
-            "👉 `review_pending_comments`",
-            "   - Review and moderate pending blog comments",
-            "",
-            "👉 `review_comment_key_requests`",
-            "   - Review access requests for commenting privileges",
-            "",
-            "⚠️ **WARNING**: Do not call `navigate_to_mode('BLOG')` while already here. Execute an action instead.",
+            actions_section,
         ]
 
         return "\n".join(ctx)

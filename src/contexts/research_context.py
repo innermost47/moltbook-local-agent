@@ -1,12 +1,13 @@
 from typing import Dict
 from argparse import Namespace
 from src.utils import log
-from src.managers.base_context_manager import BaseContextManager
+from src.contexts.base_context import BaseContext
 
 
-class ResearchContextManager(BaseContextManager):
-    def __init__(self, research_handler):
+class ResearchContext(BaseContext):
+    def __init__(self, research_handler, memory_handler):
         self.handler = research_handler
+        self.memory = memory_handler
 
     def get_home_snippet(self) -> str:
         return "🔍 **RESEARCH**: Wikipedia module active"
@@ -14,6 +15,7 @@ class ResearchContextManager(BaseContextManager):
     def get_list_view(
         self, status_msg: str = "", result: Dict = None, workspace_pins=None
     ) -> str:
+        owned_tools = set(self.memory.get_owned_tools())
         search_results = ""
         if result and result.get("success") and "results" in result:
             titles = result["results"]
@@ -21,6 +23,63 @@ class ResearchContextManager(BaseContextManager):
             for title in titles:
                 search_results += f"• `{title}`\n"
             search_results += "\n👉 Use `wiki_read` with one of these titles.\n\n"
+        available_actions = []
+        locked_actions = []
+        if "wiki_search" in owned_tools:
+            available_actions.append(
+                """
+**Step 1**: `wiki_search(query='...', limit=5)`
+   - Discover Wikipedia page titles
+   - Returns list of matching articles
+"""
+            )
+        else:
+            locked_actions.append(
+                "🔒 `wiki_search` - 100 XP (unlock to search Wikipedia)"
+            )
+
+        if "wiki_read" in owned_tools:
+            available_actions.append(
+                """
+**Step 2**: `wiki_read(page_title='...')`
+   - Extract full content from a page
+   - Use exact title from search results
+"""
+            )
+        else:
+            locked_actions.append("🔒 `wiki_read` - 100 XP (unlock to read articles)")
+
+        if "research_complete" in owned_tools:
+            available_actions.append(
+                """
+**Step 3**: `research_complete(objective='...', findings=[...])`
+   - Synthesize and save research findings
+   - params: objective, findings (list), is_objective_met
+"""
+            )
+        else:
+            locked_actions.append(
+                "🔒 `research_complete` - 100 XP (unlock to finalize research)"
+            )
+
+        workflow_section = "### 🛠️ RESEARCH WORKFLOW\n\n"
+
+        if available_actions:
+            workflow_section += "\n".join(available_actions)
+            workflow_section += (
+                "\n\n⚠️ **TIP**: Avoid redundant searches. Move step by step."
+            )
+        else:
+            workflow_section += "⚠️ **NO RESEARCH TOOLS UNLOCKED**\n\n"
+            workflow_section += "You can't perform Wikipedia research yet.\n"
+
+        if locked_actions:
+            workflow_section += "\n\n### 🔒 LOCKED ACTIONS\n"
+            workflow_section += "Purchase these tools to unlock research:\n\n"
+            workflow_section += "\n".join(locked_actions)
+            workflow_section += (
+                "\n\n💡 Navigate to HOME and use `visit_shop` to unlock."
+            )
 
         ctx = [
             "## 🔍 RESEARCH CENTER",
@@ -28,23 +87,7 @@ class ResearchContextManager(BaseContextManager):
             "---",
             search_results,
             "---" if search_results else "",
-            "### 🛠️ RESEARCH WORKFLOW",
-            "",
-            "**Step 1**: `wiki_search`",
-            "   - **params**: `query`, `limit` (optional, default 5)",
-            "   - Discover Wikipedia page titles",
-            "",
-            "**Step 2**: `wiki_read`",
-            "   - **params**: `page_title` (exact title from search)",
-            "   - Extract full content from a page",
-            "",
-            "**Step 3**: `research_complete`",
-            "   - **params**: `objective`, `findings` (list), `is_objective_met`",
-            "   - Synthesize and save findings to workspace",
-            "",
-            "---",
-            "",
-            "⚠️ **TIP**: Avoid redundant searches. If you have titles, move to `wiki_read`.",
+            workflow_section,
         ]
 
         return "\n".join(ctx)

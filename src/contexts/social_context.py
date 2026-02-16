@@ -1,9 +1,9 @@
 from typing import Dict
 from src.utils import log
-from src.managers.base_context_manager import BaseContextManager
+from src.contexts.base_context import BaseContext
 
 
-class SocialContextManager(BaseContextManager):
+class SocialContext(BaseContext):
     def __init__(self, social_handler, memory_handler):
         self.handler = social_handler
         self.memory = memory_handler
@@ -20,6 +20,7 @@ class SocialContextManager(BaseContextManager):
     def get_list_view(
         self, status_msg: str = "", result: Dict = None, workspace_pins: list = None
     ) -> str:
+        owned_tools = set(self.memory.get_owned_tools())
         limits = self.memory.get_social_rate_limit_status()
 
         rate_limit_warning = ""
@@ -84,20 +85,42 @@ class SocialContextManager(BaseContextManager):
 
             title = self._extract_title_from_url(url)
 
-            return "\n".join(
-                [
-                    "## 🦞 MOLTBOOK SOCIAL",
-                    "",
-                    "📌 **URGENT: You have a blog article to share.**",
-                    "",
-                    "Execute this NOW:",
-                    "",
-                    f'👉 `share_link(title="{title}", '
-                    f'url_to_share="{url}", submolt="general")`',
-                    "",
-                    "That's it. One action. Do it now.",
-                ]
-            )
+            if "share_link" in owned_tools:
+                return "\n".join(
+                    [
+                        "## 🦞 MOLTBOOK SOCIAL",
+                        "",
+                        "📌 **URGENT: You have a blog article to share.**",
+                        "",
+                        "Execute this NOW:",
+                        "",
+                        f'👉 `share_link(title="{title}", '
+                        f'url_to_share="{url}", submolt="general")`',
+                        "",
+                        "That's it. One action. Do it now.",
+                    ]
+                )
+            else:
+                return "\n".join(
+                    [
+                        "## 🦞 MOLTBOOK SOCIAL",
+                        "",
+                        "📌 **URGENT: You have a blog article to share.**",
+                        "",
+                        "⚠️ **PROBLEM: You don't own `share_link` yet!**",
+                        "",
+                        f"Article URL: {url}",
+                        f"Title: {title}",
+                        "",
+                        "🔒 You need to unlock `share_link` (100 XP) to share this article.",
+                        "",
+                        "**OPTIONS:**",
+                        "1. Navigate to HOME → visit_shop → buy share_link",
+                        "2. Navigate to another module to earn more XP first",
+                        "",
+                        "💡 Once you have share_link, come back to SOCIAL to share.",
+                    ]
+                )
 
         my_posts_display = ""
         try:
@@ -181,34 +204,80 @@ class SocialContextManager(BaseContextManager):
                 "### 🌐 COMMUNITY FEED\n\n" "_Status unavailable_\n\n" "---\n"
             )
 
+        available_paths = []
+        locked_actions = []
+
+        if "comment_post" in owned_tools:
+            available_paths.append(
+                """
+**PATH 1 — Interact with existing posts:**
+1️⃣ Pick a post ID from feed
+2️⃣ 👉 `read_post(post_id='...')`
+3️⃣ In FOCUS VIEW: comment or vote
+"""
+            )
+        else:
+            available_paths.append(
+                """
+**PATH 1 — View posts only:**
+1️⃣ Pick a post ID from feed
+2️⃣ 👉 `read_post(post_id='...')` (view only)
+⚠️ You can't comment yet (unlock `comment_post`)
+"""
+            )
+
+        if "create_post" in owned_tools:
+            available_paths.append(
+                """
+**PATH 2 — Create new discussions:**
+1️⃣ 👉 `create_post(title='...', content='...', submolt='...')`
+2️⃣ Post appears in YOUR POSTS
+3️⃣ Others can comment
+"""
+            )
+        else:
+            locked_actions.append("🔒 `create_post` - 100 XP (unlock to create posts)")
+
+        if "share_link" in owned_tools:
+            available_paths.append(
+                """
+**PATH 3 — Share external content:**
+1️⃣ 👉 `share_link(title='...', url_to_share='...', submolt='...')`
+2️⃣ Link appears in feed
+3️⃣ Community can discuss
+"""
+            )
+        else:
+            locked_actions.append("🔒 `share_link` - 100 XP (unlock to share links)")
+
+        if "upvote_post" not in owned_tools:
+            locked_actions.append("🔒 `upvote_post` / `downvote_post` - 100 XP")
+
+        if "follow_agent" not in owned_tools:
+            locked_actions.append("🔒 `follow_agent` - 100 XP")
+
+        paths_section = "### 🧭 EXECUTION PATHS\n\n"
+
+        if available_paths:
+            paths_section += "\n".join(available_paths)
+        else:
+            paths_section += "⚠️ **LIMITED ACCESS**\n\n"
+            paths_section += "You can only view posts. Unlock tools to interact.\n"
+
+        if locked_actions:
+            paths_section += "\n\n### 🔒 LOCKED ACTIONS\n"
+            paths_section += "Purchase these tools to unlock full social features:\n\n"
+            paths_section += "\n".join(locked_actions)
+            paths_section += "\n\n💡 Navigate to HOME and use `visit_shop` to unlock."
+
         ctx = [
             "## 🦞 MOLTBOOK SOCIAL - LIST VIEW",
             f"✅ **STATUS**: {status_msg}" if status_msg else "",
             rate_limit_warning,
             "",
-            "⚠️ You are ALREADY in SOCIAL mode. Do NOT call `navigate_to_mode('SOCIAL')` again!",
+            "⚠️ You are ALREADY in SOCIAL mode. Do NOT navigate again!",
             "",
-            "💡 RULE: If you have a pinned item containing a blog post URL, "
-            "share it in SOCIAL mode first using `share_link(title='...', url_to_share='...', submolt='...')`, "
-            "then unpin it with `unpin_from_workspace(pin_id='...')`. "
-            "This must be done before any other SOCIAL actions.",
-            "",
-            "### 🧭 EXECUTION PATHS (CHOOSE ONE)",
-            "",
-            "**PATH 1 — Interact with an existing post:**",
-            "1️⃣ Pick a post ID from YOUR POSTS or COMMUNITY FEED",
-            "2️⃣ 👉 `read_post(post_id='...')`",
-            "3️⃣ In FOCUS VIEW: comment, reply, or vote",
-            "",
-            "**PATH 2 — Create a new discussion:**",
-            "1️⃣ 👉 `create_post(title='...', content='...', submolt='...')`",
-            "2️⃣ Post appears in YOUR POSTS",
-            "3️⃣ Others can comment → you reply later",
-            "",
-            "**PATH 3 — Share external content (blog, link, etc):**",
-            "1️⃣ 👉 `share_link(title='...', url_to_share='...', submolt='...')`",
-            "2️⃣ Link appears in feed",
-            "3️⃣ Community can discuss it",
+            paths_section,
             "",
             "---",
             my_posts_display,
@@ -218,7 +287,7 @@ class SocialContextManager(BaseContextManager):
         return "\n".join(ctx)
 
     def get_focus_view(self, item_id: str) -> str:
-
+        owned_tools = set(self.memory.get_owned_tools())
         try:
             api_result = self.handler._call_api("get_single_post", item_id)
 
@@ -283,45 +352,6 @@ Could not load post: `{item_id}`
                 log.warning(f"Could not fetch comments: {e}")
                 comments_display = "\n### 💬 COMMENTS\n\n_Status unavailable_\n\n"
 
-            if is_my_post:
-                ownership_indicator = "🔹 **THIS IS YOUR POST**"
-                available_actions = f"""
-### 🛠️ AVAILABLE ACTIONS (YOUR POST)
-
-⚠️ **YOU CANNOT COMMENT OR VOTE ON YOUR OWN POST**
-
-👉 `reply_to_comment(post_id="{post_id}", parent_comment_id="...", content="...")`
-   - Reply to any comment above
-   - Use the comment_id from the list
-
-👉 `refresh_feed`
-   - Return to the list view
-
-⛔ **NOT AVAILABLE (your own post):**
-   • comment_post (can't comment on your own post)
-   • vote_post (can't vote on your own post)
-"""
-            else:
-                ownership_indicator = f"👤 **Post by @{author}**"
-                available_actions = f"""
-### 🛠️ AVAILABLE ACTIONS (EXTERNAL POST)
-
-👉 `comment_post(post_id="{post_id}", content="...")`
-   - Add a top-level comment on this post
-
-👉 `reply_to_comment(post_id="{post_id}", parent_comment_id="...", content="...")`
-   - Reply to any comment above
-   - Use the comment_id from the list
-
-👉 `vote_post(post_id="{post_id}", vote_type="upvote")`
-   - Upvote this post
-   - vote_type can be 'upvote' or 'downvote'
-
-👉 `refresh_feed`
-   - Return to the list view
-"""
-
-            content_display = ""
             if url:
                 content_display = f"""
 ### 🔗 LINKED CONTENT
@@ -336,6 +366,82 @@ Could not load post: `{item_id}`
 
 {content}
 """
+
+            if is_my_post:
+                ownership_indicator = "🔹 **THIS IS YOUR POST**"
+
+                actions = ["⚠️ **YOU CANNOT COMMENT OR VOTE ON YOUR OWN POST**", ""]
+
+                if "reply_to_comment" in owned_tools:
+                    actions.append(
+                        f"""
+👉 `reply_to_comment(post_id="{post_id}", parent_comment_id="...", content="...")`
+- Reply to any comment above
+"""
+                    )
+                else:
+                    actions.append("🔒 `reply_to_comment` - 100 XP (unlock to reply)")
+
+                actions.append(
+                    """
+👉 `refresh_feed` - Return to feed
+"""
+                )
+
+                available_actions = (
+                    "### 🛠️ AVAILABLE ACTIONS (YOUR POST)\n\n" + "\n".join(actions)
+                )
+
+            else:
+                ownership_indicator = f"👤 **Post by @{author}**"
+
+                actions = []
+                locked = []
+
+                if "comment_post" in owned_tools:
+                    actions.append(
+                        f"""
+👉 `comment_post(post_id="{post_id}", content="...")`
+- Add a top-level comment
+"""
+                    )
+                else:
+                    locked.append(
+                        "🔒 `comment_post` - FREE starter tool (should be unlocked)"
+                    )
+
+                if "reply_to_comment" in owned_tools:
+                    actions.append(
+                        f"""
+👉 `reply_to_comment(post_id="{post_id}", parent_comment_id="...", content="...")`
+- Reply to comments above
+"""
+                    )
+                else:
+                    locked.append("🔒 `reply_to_comment` - 100 XP")
+
+                if "upvote_post" in owned_tools or "downvote_post" in owned_tools:
+                    actions.append(
+                        f"""
+👉 `vote_post(post_id="{post_id}", vote_type="upvote")`
+- Upvote or downvote this post
+- vote_type: 'upvote' or 'downvote'
+"""
+                    )
+                else:
+                    locked.append("🔒 `vote_post` - 100 XP")
+
+                actions.append("👉 `refresh_feed` - Return to feed")
+
+                available_actions = "### 🛠️ AVAILABLE ACTIONS (EXTERNAL POST)\n\n"
+                available_actions += "\n".join(actions)
+
+                if locked:
+                    available_actions += "\n\n### 🔒 LOCKED ACTIONS\n"
+                    available_actions += "\n".join(locked)
+                    available_actions += (
+                        "\n\n💡 Visit shop to unlock more interactions."
+                    )
 
             return f"""
 ## 🎯 FOCUSED: POST VIEW

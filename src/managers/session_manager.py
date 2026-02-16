@@ -19,6 +19,7 @@ class SessionManager:
         ollama_provider,
         tracker,
         email_reporter,
+        progression_system,
     ):
         self.home = home_manager
         self.managers = managers_map
@@ -32,7 +33,7 @@ class SessionManager:
         self.current_domain = "home"
         self.tracker = tracker
         self.email_reporter = email_reporter
-        self.progression = ProgressionSystem(settings.DB_PATH)
+        self.progression = progression_system
         self.agent_conversation_history: List[Dict] = []
         self.live_viewer = LiveBroadcaster()
 
@@ -146,7 +147,9 @@ class SessionManager:
                     )
                 else:
                     current_schema = SchemaFactory.get_schema_for_context(
-                        domain="plan", is_popup_active=False
+                        domain="plan",
+                        is_popup_active=False,
+                        memory_handler=self.dispatcher.memory_handler,
                     )
 
                 self.current_context = UIUtils.render_modal_overlay(
@@ -172,6 +175,7 @@ class SessionManager:
                     current_schema = SchemaFactory.get_schema_for_context(
                         domain=self.current_domain,
                         is_popup_active=bool(self.pending_action),
+                        memory_handler=self.dispatcher.memory_handler,
                     )
 
             self.live_viewer.broadcast_screen(
@@ -309,6 +313,18 @@ class SessionManager:
         success_rate = (
             (successes / len(self.tracker.events) * 100) if self.tracker.events else 0
         )
+        prog_status = self.progression.get_current_status()
+        current_xp = prog_status.get("current_xp", 0)
+        current_level = prog_status.get("level", 1)
+        current_title = prog_status.get("current_title", "Digital Seedling")
+        xp_needed = prog_status.get("xp_needed", 100)
+
+        owned_tools = self.dispatcher.memory.get_owned_tools()
+        catalog = self.dispatcher.memory.get_shop_catalog()
+        total_tools = len(catalog.get("tools", []))
+
+        purchase_history = self.dispatcher.memory.get_session_purchases(self.session_id)
+        active_plan = self.dispatcher.memory.get_active_master_plan()
 
         prompt = f"""
 Analyze your session and provide a detailed reflection.
@@ -322,12 +338,31 @@ SESSION STATISTICS:
 ACTIONS LOG:
 {events_summary}
 
-GENERATE A REFLECTION (max 250 words) COVERING:
+PROGRESSION SYSTEM STATUS:
+- Current XP: {current_xp}/{xp_needed} (Level {current_level})
+- Title: {current_title}
+- Tools Owned: {len(owned_tools)}/{total_tools}
+- Tools Purchased This Session: {', '.join([p['item_name'] for p in purchase_history]) if purchase_history else 'None'}
+- XP Spent This Session: {sum([p['xp_cost'] for p in purchase_history])} XP
+
+YOUR MASTER PLAN:
+{active_plan.get('objective') if active_plan else 'No master plan defined yet'}
+
+GENERATE A REFLECTION (max 300 words) COVERING:
 
 1. **Learnings**: What patterns or insights emerged? What worked well?
+
 2. **Struggles**: What failed or needs improvement? What caused loops, errors, or inefficiencies?
+
 3. **Framework Insights**: Reflect on how the current framework behaves. Which features are underutilized? How could you leverage it better next time? Note any quirks, pitfalls, or strategies learned.
-4. **Next Session Plan**: What should be prioritized next time to improve performance? Include concrete steps based on your understanding of the framework.
+
+4. **Progression Strategy**: 
+   - How did you manage your XP budget this session?
+   - Were your tool purchases strategic? Did you use them effectively?
+   - What tools should you prioritize buying next session?
+   - How can you maximize XP gain while minimizing XP loss (loops)?
+
+5. **Next Session Plan**: What should be prioritized next time to improve performance? Include concrete steps based on your understanding of the framework AND the progression system.
 
 Be specific, actionable, and focus on improving your future interactions with the system, not just evaluating past actions.
 """
@@ -494,6 +529,9 @@ The quantum frequencies resonate with your ascension...
             if "navigate_to" in result:
                 self.current_domain = result["navigate_to"].lower()
 
+        elif a_type == "visit_shop":
+            self.current_domain = "shop"
+
         elif a_type == "navigate_to_mode":
             self.current_domain = (
                 params.get("chosen_mode") or params.get("mode") or "home"
@@ -507,6 +545,15 @@ The quantum frequencies resonate with your ascension...
 
         if self.current_domain == "home":
             raw_body = self.home.build_home_screen(self.session_id)
+        elif self.current_domain == "shop":
+            ctx_manager = self.managers.get("shop")
+            if ctx_manager:
+                raw_body = ctx_manager.get_list_view(
+                    result=result if a_type == "buy_tool" else {},
+                    workspace_pins=self._get_blog_pins(),
+                )
+            else:
+                raw_body = "## ❌ SHOP UNAVAILABLE\n\nShop module not initialized."
         else:
             ctx_manager = self.managers.get(self.current_domain)
             if ctx_manager:

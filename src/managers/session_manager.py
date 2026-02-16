@@ -427,18 +427,18 @@ Be specific, actionable, and focus on improving your future interactions with th
             penalty_message = ""
             if penalty_result.get("penalty_applied"):
                 xp_lost = penalty_result["xp_lost"]
-                current_xp = penalty_result["current_xp"]
+                current_xp_balance = penalty_result["current_xp_balance "]
                 current_level = penalty_result["current_level"]
                 leveled_down = penalty_result.get("leveled_down", False)
 
             penalty_message = f"""
 {'━' * 40}
 
-💥 **XP PENALTY APPLIED**: -{xp_lost} XP for looping {signature_count} times!
+💥 **XP PENALTY APPLIED**: -{xp_lost} XP Balance lost for looping {signature_count} times!
 
 📉 **Current Status:**
-- XP: {current_xp}
-- Level: {current_level}
+- XP Balance: {current_xp_balance}  
+- Level: {current_level} (unchanged - levels are permanent!)
 {"⬇️ **YOU LOST A LEVEL!** Stop wasting actions!" if leveled_down else ""}
 
 🚨 **STOP IMMEDIATELY OR YOU WILL CONTINUE TO LOSE XP!**

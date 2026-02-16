@@ -131,8 +131,6 @@ class UIUtils:
 {modules_status}
 
 🛒 **Need more capabilities?** Use `visit_shop` to unlock tools with your XP!
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 """
 
         notifications = cls.render_feedback(success_msg, error_msg, current_domain)

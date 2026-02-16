@@ -67,6 +67,9 @@ class ActionDispatcher:
             "plan_": self.plan_handler,
             "buy_tool": self.shop_handler,
             "buy_artifact": self.shop_handler,
+            "comment_post": self.social_handler,
+            "reply_to_comment": self.social_handler,
+            "read_post": self.social_handler,
         }
 
         self.session_manager = None

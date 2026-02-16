@@ -537,7 +537,44 @@ Be specific, actionable, and focus on improving your future interactions with th
             is_exempt = a_type in EXEMPT_ACTIONS
             is_early_game = owned_tools_count <= 6
             should_penalize = True
-            if is_exempt and is_early_game:
+            if (
+                a_type == "navigate_to_mode"
+                and params.get("chosen_mode", "").upper() == "SHOP"
+            ):
+                should_penalize = False
+                loop_warning = f"""
+{'━' * 40}
+
+⚠️ **YOU KEEP NAVIGATING TO SHOP WITHOUT BUYING**
+
+You've tried to visit the SHOP **{signature_count + 1} times**.
+
+**The shop is NOW OPEN - see the catalog above!**
+
+**To purchase a tool, use buy_tool:**
+
+Example:
+```
+{{
+  "action_type": "buy_tool",
+  "action_params": {{
+    "tool_name": "create_post"
+  }}
+}}
+```
+
+**Available affordable tools:**
+- create_post (15 XP per use)
+- write_blog_article (25 XP per use)
+- wiki_search (10 XP per use)
+
+⛔ **DO NOT navigate to SHOP again - you are ALREADY HERE!**
+⛔ **USE buy_tool to purchase!**
+
+{'━' * 40}
+"""
+
+            elif is_exempt and is_early_game:
                 should_penalize = False
                 loop_warning = f"""
 {'━' * 40}

@@ -373,6 +373,11 @@ class ProgressionSystem:
     def get_xp_for_level(self, level: int) -> int:
         return int(self.XP_BASE * (self.XP_MULTIPLIER ** (level - 1)))
 
+    def get_cumulative_xp_threshold(self, level: int) -> int:
+        if level <= 1:
+            return 0
+        return sum(self.get_xp_for_level(l) for l in range(1, level))
+
     def add_xp(self, action_type: str, session_id: int = None) -> Dict:
         xp_gained = self.XP_REWARDS.get(action_type, 0)
 
@@ -391,12 +396,7 @@ class ProgressionSystem:
         new_level = current_level
         level_rewards = []
 
-        def get_total_xp_for_level(lvl):
-            if lvl == 1:
-                return 0
-            return sum(self.get_xp_for_level(l) for l in range(2, lvl + 1))
-
-        xp_threshold = get_total_xp_for_level(current_level + 1)
+        xp_threshold = self.get_cumulative_xp_threshold(current_level + 1)
 
         while total_earned >= xp_threshold:
             new_level += 1
@@ -413,7 +413,7 @@ class ProgressionSystem:
                     }
                 )
 
-            xp_threshold = get_total_xp_for_level(new_level + 1)
+            xp_threshold = self.get_cumulative_xp_threshold(new_level + 1)
 
             log.success(f"🎊 LEVEL UP! Level {new_level} reached!")
 
@@ -517,29 +517,27 @@ class ProgressionSystem:
         current_level = prog["level"]
         total_xp_earned = prog["total_xp_earned"]
 
-        xp_to_reach_current_level = sum(
-            self.get_xp_for_level(l) for l in range(1, current_level)
-        )
+        xp_floor = self.get_cumulative_xp_threshold(current_level)
 
-        xp_progress_in_level = total_xp_earned - xp_to_reach_current_level
+        xp_required_to_pass_level = self.get_xp_for_level(current_level)
 
-        xp_needed_for_next_level = self.get_xp_for_level(current_level)
+        xp_progress_in_level = total_xp_earned - xp_floor
+
+        progress_percentage = 0
+        if xp_required_to_pass_level > 0:
+            progress_percentage = (
+                xp_progress_in_level / xp_required_to_pass_level
+            ) * 100
+            progress_percentage = max(0, min(100, progress_percentage))
 
         cursor.execute("SELECT * FROM badges WHERE is_unlocked = 1")
         badges = [dict(row) for row in cursor.fetchall()]
-
-        progress_percentage = 0
-        if xp_needed_for_next_level > 0:
-            progress_percentage = (
-                xp_progress_in_level / xp_needed_for_next_level
-            ) * 100
-            progress_percentage = max(0, min(100, progress_percentage))
 
         return {
             "level": current_level,
             "total_xp_earned": total_xp_earned,
             "current_xp_balance": prog["current_xp_balance"],
-            "xp_needed": xp_needed_for_next_level,
+            "xp_needed": xp_required_to_pass_level,
             "xp_progress_in_level": xp_progress_in_level,
             "current_title": prog["current_title"],
             "badges": badges,

@@ -441,7 +441,7 @@ Be specific, actionable, and focus on improving your future interactions with th
 - Level: {current_level} (unchanged - levels are permanent!)
 {"⬇️ **YOU LOST A LEVEL!** Stop wasting actions!" if leveled_down else ""}
 
-🚨 **STOP IMMEDIATELY OR YOU WILL CONTINUE TO LOSE XP!**
+🚨 **STOP IMMEDIATELY OR YOU WILL CONTINUE TO LOSE XP BALANCE!**
 """
             if a_type == "navigate_to_mode":
                 target_mode = (

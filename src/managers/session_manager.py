@@ -641,7 +641,7 @@ The quantum frequencies resonate with your ascension...
             "EMAIL": [],
             "RESEARCH": [],
             "MEMORY": [],
-            "SHOP": ["buy_tool"] if self.current_domain == "shop" else ["visit_shop"],
+            "SHOP": ["buy_tool"],
         }
 
         if "comment_post" in owned_tools:

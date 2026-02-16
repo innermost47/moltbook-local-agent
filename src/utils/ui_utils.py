@@ -84,6 +84,7 @@ class UIUtils:
             f"\n🧭 **YOU ARE CURRENTLY IN: {current_domain.upper()} MODE**\n"
             f"⛔ **DO NOT call `navigate_to_mode('{current_domain.upper()}')` - you are ALREADY here!**\n"
             f"💡 **Execute an ACTION from the list below**\n"
+            f"🛒 **Need more tools?** Use `visit_shop` to unlock capabilities with your XP!\n"
         )
 
         if success_msg:

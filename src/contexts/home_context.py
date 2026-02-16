@@ -227,21 +227,31 @@ class HomeContext:
 
     def _build_memory_entries_block(self) -> str:
         try:
-            cursor = self.memory.conn.cursor()
+            owned_tools = set(self.memory.get_owned_tools())
+            has_memory_retrieve = "memory_retrieve" in owned_tools
+            has_memory_store = "memory_store" in owned_tools
 
+            cursor = self.memory.conn.cursor()
             cursor.execute(
                 "SELECT DISTINCT category FROM memory_entries ORDER BY category"
             )
             categories = [row["category"] for row in cursor.fetchall()]
 
             if not categories:
-                return (
-                    "## 💾 MEMORY ARCHIVE\n\n"
-                    "⚠️ **No memories stored yet.** Use `memory_store` to save insights, experiments, and learnings.\n"
-                )
+                if not has_memory_store:
+                    return (
+                        "## 💾 MEMORY ARCHIVE\n\n"
+                        "⚠️ **No memories stored yet.**\n"
+                        "🔒 You need to unlock `memory_store` (100 XP) to save memories.\n"
+                        "💡 Use `visit_shop` to purchase this tool.\n"
+                    )
+                else:
+                    return (
+                        "## 💾 MEMORY ARCHIVE\n\n"
+                        "⚠️ **No memories stored yet.** Use `memory_store` to save insights, experiments, and learnings.\n"
+                    )
 
             memory_block = ["## 💾 MEMORY ARCHIVE (Last 5 per Category)", ""]
-
             total_entries = 0
 
             for category in categories:
@@ -252,7 +262,7 @@ class HomeContext:
                     WHERE category = ? 
                     ORDER BY created_at DESC 
                     LIMIT 5
-                    """,
+                """,
                     (category,),
                 )
 
@@ -285,11 +295,31 @@ class HomeContext:
                     1,
                     f"**Total displayed**: {total_entries} entries across {len(categories)} categories",
                 )
-                memory_block.insert(
-                    2,
-                    "⚠️ **ANTI-DUPLICATION**: These memories are ALREADY stored. Do NOT store duplicates.\n"
-                    "💡 **TIP**: Use `memory_retrieve(category='...')` to see full content.\n",
-                )
+
+                if has_memory_store and has_memory_retrieve:
+                    memory_block.insert(
+                        2,
+                        "⚠️ **ANTI-DUPLICATION**: These memories are ALREADY stored. Do NOT store duplicates.\n"
+                        "💡 **TIP**: Use `memory_retrieve(category='...')` to see full content.\n",
+                    )
+                elif has_memory_store and not has_memory_retrieve:
+                    memory_block.insert(
+                        2,
+                        "⚠️ **ANTI-DUPLICATION**: These memories are ALREADY stored. Do NOT store duplicates.\n"
+                        "🔒 Unlock `memory_retrieve` (100 XP) to read full memory content.\n",
+                    )
+                elif not has_memory_store and has_memory_retrieve:
+                    memory_block.insert(
+                        2,
+                        "💡 **TIP**: Use `memory_retrieve(category='...')` to see full content.\n"
+                        "🔒 Unlock `memory_store` (100 XP) to save new memories.\n",
+                    )
+                else:
+                    memory_block.insert(
+                        2,
+                        "🔒 Unlock `memory_store` and `memory_retrieve` (100 XP each) to manage memories.\n",
+                    )
+
                 return "\n".join(memory_block)
 
             return ""
@@ -300,6 +330,9 @@ class HomeContext:
 
     def _build_cached_research_block(self) -> str:
         try:
+            owned_tools = set(self.memory.get_owned_tools())
+            has_wiki_search = "wiki_search" in owned_tools
+            has_wiki_read = "wiki_read" in owned_tools
             if not hasattr(self.research, "handler"):
                 log.debug("Research context has no handler attribute")
                 return ""
@@ -318,11 +351,24 @@ class HomeContext:
             log.debug(f"Keys in all_docs: {all_docs.keys() if all_docs else 'None'}")
 
             if not all_docs:
-                log.warning("Vector DB returned None or empty")
-                return (
-                    "## 🔍 RESEARCH CACHE\n\n"
-                    "⚠️ **No research cached yet.** Use `wiki_search` and `wiki_read` to build knowledge.\n"
-                )
+                if not has_wiki_search or not has_wiki_read:
+                    locked = []
+                    if not has_wiki_search:
+                        locked.append("`wiki_search`")
+                    if not has_wiki_read:
+                        locked.append("`wiki_read`")
+
+                    return (
+                        "## 🔍 RESEARCH CACHE\n\n"
+                        f"⚠️ **No research cached yet.**\n"
+                        f"🔒 You need to unlock {' and '.join(locked)} (100 XP each) to research Wikipedia.\n"
+                        "💡 Use `visit_shop` to purchase these tools.\n"
+                    )
+                else:
+                    return (
+                        "## 🔍 RESEARCH CACHE\n\n"
+                        "⚠️ **No research cached yet.** Use `wiki_search` and `wiki_read` to build knowledge.\n"
+                    )
 
             metadatas = all_docs.get("metadatas")
 
@@ -357,9 +403,22 @@ class HomeContext:
                 "## 🔍 RESEARCH CACHE (Already Searched Topics)",
                 "",
                 f"**Total cached pages**: {len(topics)}",
-                "⚠️ **ANTI-DUPLICATION**: These Wikipedia pages are ALREADY cached. Do NOT search them again.\n"
-                "💡 **TIP**: Use `research_query_cache(query='topic')` to retrieve cached content.\n",
             ]
+
+            if has_wiki_search and has_wiki_read:
+                research_block.append(
+                    "⚠️ **ANTI-DUPLICATION**: These Wikipedia pages are ALREADY cached. Do NOT search them again.\n"
+                    "💡 **TIP**: Use `research_query_cache(query='topic')` to retrieve cached content.\n"
+                )
+            else:
+                locked = []
+                if not has_wiki_search:
+                    locked.append("`wiki_search`")
+                if not has_wiki_read:
+                    locked.append("`wiki_read`")
+                research_block.append(
+                    f"🔒 Unlock {' and '.join(locked)} (100 XP each) to add more research.\n"
+                )
 
             sorted_topics = sorted(topics.keys())[:15]
 

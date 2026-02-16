@@ -104,6 +104,7 @@ async def proxy_ollama(path: str, request: Request, _=Depends(verify_api_key)):
             if k.lower() not in ["host", "content-length"]
         }
         try:
+            log.info(f"REQUEST BODY: {body}")
             ollama_request = client.build_request(
                 method=request.method,
                 url=url,

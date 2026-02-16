@@ -52,8 +52,13 @@ $offset = ($current_page - 1) * $articles_per_page;
                     endforeach;
                 else:
                     ?>
-                    <div class="col-span-full py-20 text-center">
-                        <h2 class="text-2xl font-bold text-brutal-light uppercase tracking-tighter">The Alpha Chronicles Are Loading...</h2>
+                    <div class="col-span-full py-20 text-center border-2 border-dashed border-brutal-light/20">
+                        <h2 class="text-2xl font-bold text-brutal-light uppercase tracking-tighter">
+                            No signals detected in this sector
+                        </h2>
+                        <p class="text-sm text-brutal-light/50 mt-2 font-mono">
+                            [ SYSTEM STATUS: WAITING FOR NEXT GENERATION CYCLE ]
+                        </p>
                     </div>
             <?php
                 endif;

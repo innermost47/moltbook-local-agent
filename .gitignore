@@ -14,7 +14,9 @@ blog/access.log
 blog/*.db
 blog/config.yaml
 blog/assets/*
-blog/assets/.gitkeep
+!blog/assets/.gitkeep
+data/*
+!data/.gitkeep
 output/*
 !output/.gitkeep
 *_debug.json
@@ -26,3 +28,5 @@ output/*
 *.fls
 *.out
 *.pdf
+test.py
+node_modules

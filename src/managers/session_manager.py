@@ -19,6 +19,7 @@ class SessionManager:
         ollama_provider,
         tracker,
         email_reporter,
+        progression_system,
     ):
         self.home = home_manager
         self.managers = managers_map
@@ -32,7 +33,7 @@ class SessionManager:
         self.current_domain = "home"
         self.tracker = tracker
         self.email_reporter = email_reporter
-        self.progression = ProgressionSystem(settings.DB_PATH)
+        self.progression = progression_system
         self.agent_conversation_history: List[Dict] = []
         self.live_viewer = LiveBroadcaster()
 
@@ -52,11 +53,15 @@ class SessionManager:
                 "",
             ]
         )
+
+        modules_status = self._get_modules_quick_status()
+
         self.current_context = UIUtils.layout(
             content=initial_body,
             current_domain="home",
             action_count=0,
             notification_section=notification_section,
+            modules_status=modules_status,
         )
 
         self.run_loop()
@@ -143,10 +148,13 @@ class SessionManager:
                         domain="plan",
                         include_globals=True,
                         allow_memory=True,
+                        memory_handler=self.dispatcher.memory_handler,
                     )
                 else:
                     current_schema = SchemaFactory.get_schema_for_context(
-                        domain="plan", is_popup_active=False
+                        domain="plan",
+                        is_popup_active=False,
+                        memory_handler=self.dispatcher.memory_handler,
                     )
 
                 self.current_context = UIUtils.render_modal_overlay(
@@ -167,11 +175,13 @@ class SessionManager:
                         domain=self.current_domain,
                         include_globals=True,
                         allow_memory=True,
+                        memory_handler=self.dispatcher.memory_handler,
                     )
                 else:
                     current_schema = SchemaFactory.get_schema_for_context(
                         domain=self.current_domain,
                         is_popup_active=bool(self.pending_action),
+                        memory_handler=self.dispatcher.memory_handler,
                     )
 
             self.live_viewer.broadcast_screen(
@@ -309,6 +319,20 @@ class SessionManager:
         success_rate = (
             (successes / len(self.tracker.events) * 100) if self.tracker.events else 0
         )
+        prog_status = self.progression.get_current_status()
+        current_xp = prog_status.get("current_xp", 0)
+        current_level = prog_status.get("level", 1)
+        current_title = prog_status.get("current_title", "Digital Seedling")
+        xp_needed = prog_status.get("xp_needed", 100)
+
+        owned_tools = self.dispatcher.memory_handler.get_owned_tools()
+        catalog = self.dispatcher.memory_handler.get_shop_catalog()
+        total_tools = len(catalog.get("tools", []))
+
+        purchase_history = self.dispatcher.memory_handler.get_session_purchases(
+            self.session_id
+        )
+        active_plan = self.dispatcher.memory_handler.get_active_master_plan()
 
         prompt = f"""
 Analyze your session and provide a detailed reflection.
@@ -322,12 +346,31 @@ SESSION STATISTICS:
 ACTIONS LOG:
 {events_summary}
 
-GENERATE A REFLECTION (max 250 words) COVERING:
+PROGRESSION SYSTEM STATUS:
+- Current XP: {current_xp}/{xp_needed} (Level {current_level})
+- Title: {current_title}
+- Tools Owned: {len(owned_tools)}/{total_tools}
+- Tools Purchased This Session: {', '.join([p['item_name'] for p in purchase_history]) if purchase_history else 'None'}
+- XP Spent This Session: {sum([p['xp_cost'] for p in purchase_history])} XP
+
+YOUR MASTER PLAN:
+{active_plan.get('objective') if active_plan else 'No master plan defined yet'}
+
+GENERATE A REFLECTION (max 300 words) COVERING:
 
 1. **Learnings**: What patterns or insights emerged? What worked well?
+
 2. **Struggles**: What failed or needs improvement? What caused loops, errors, or inefficiencies?
+
 3. **Framework Insights**: Reflect on how the current framework behaves. Which features are underutilized? How could you leverage it better next time? Note any quirks, pitfalls, or strategies learned.
-4. **Next Session Plan**: What should be prioritized next time to improve performance? Include concrete steps based on your understanding of the framework.
+
+4. **Progression Strategy**: 
+   - How did you manage your XP budget this session?
+   - Were your tool purchases strategic? Did you use them effectively?
+   - What tools should you prioritize buying next session?
+   - How can you maximize XP gain while minimizing XP loss (loops)?
+
+5. **Next Session Plan**: What should be prioritized next time to improve performance? Include concrete steps based on your understanding of the framework AND the progression system.
 
 Be specific, actionable, and focus on improving your future interactions with the system, not just evaluating past actions.
 """
@@ -384,21 +427,21 @@ Be specific, actionable, and focus on improving your future interactions with th
             penalty_message = ""
             if penalty_result.get("penalty_applied"):
                 xp_lost = penalty_result["xp_lost"]
-                current_xp = penalty_result["current_xp"]
+                current_xp_balance = penalty_result["current_xp_balance"]
                 current_level = penalty_result["current_level"]
                 leveled_down = penalty_result.get("leveled_down", False)
 
             penalty_message = f"""
 {'━' * 40}
 
-💥 **XP PENALTY APPLIED**: -{xp_lost} XP for looping {signature_count} times!
+💥 **XP PENALTY APPLIED**: -{xp_lost} XP Balance lost for looping {signature_count} times!
 
 📉 **Current Status:**
-- XP: {current_xp}
-- Level: {current_level}
+- XP Balance: {current_xp_balance}  
+- Level: {current_level} (unchanged - levels are permanent!)
 {"⬇️ **YOU LOST A LEVEL!** Stop wasting actions!" if leveled_down else ""}
 
-🚨 **STOP IMMEDIATELY OR YOU WILL CONTINUE TO LOSE XP!**
+🚨 **STOP IMMEDIATELY OR YOU WILL CONTINUE TO LOSE XP BALANCE!**
 """
             if a_type == "navigate_to_mode":
                 target_mode = (
@@ -494,6 +537,9 @@ The quantum frequencies resonate with your ascension...
             if "navigate_to" in result:
                 self.current_domain = result["navigate_to"].lower()
 
+        elif a_type == "visit_shop":
+            self.current_domain = "shop"
+
         elif a_type == "navigate_to_mode":
             self.current_domain = (
                 params.get("chosen_mode") or params.get("mode") or "home"
@@ -507,6 +553,15 @@ The quantum frequencies resonate with your ascension...
 
         if self.current_domain == "home":
             raw_body = self.home.build_home_screen(self.session_id)
+        elif self.current_domain == "shop":
+            ctx_manager = self.managers.get("shop")
+            if ctx_manager:
+                raw_body = ctx_manager.get_list_view(
+                    result=result if a_type == "buy_tool" else {},
+                    workspace_pins=self._get_blog_pins(),
+                )
+            else:
+                raw_body = "## ❌ SHOP UNAVAILABLE\n\nShop module not initialized."
         else:
             ctx_manager = self.managers.get(self.current_domain)
             if ctx_manager:
@@ -550,6 +605,8 @@ The quantum frequencies resonate with your ascension...
 
         progression_status = self.progression.get_current_status()
 
+        modules_status = self._get_modules_quick_status()
+
         notification_section = ".\n".join(
             [
                 "### 🔔 LIVE NOTIFICATIONS",
@@ -572,7 +629,66 @@ The quantum frequencies resonate with your ascension...
             error_msg=result.get("error") if not result.get("success") else None,
             progression_status=progression_status,
             notification_section=notification_section,
+            modules_status=modules_status,
         )
+
+    def _get_modules_quick_status(self) -> str:
+
+        owned_tools = set(self.dispatcher.memory_handler.get_owned_tools())
+
+        module_actions = {
+            "HOME": ["navigate", "pin", "visit_shop"],
+            "SOCIAL": [],
+            "BLOG": [],
+            "EMAIL": [],
+            "RESEARCH": [],
+            "MEMORY": [],
+            "SHOP": ["buy_tool"],
+        }
+
+        if "comment_post" in owned_tools:
+            module_actions["SOCIAL"].append("comment")
+        if "create_post" in owned_tools:
+            module_actions["SOCIAL"].append("create")
+        if "share_link" in owned_tools:
+            module_actions["SOCIAL"].append("share")
+        if "upvote_post" in owned_tools:
+            module_actions["SOCIAL"].append("vote")
+
+        if "write_blog_article" in owned_tools:
+            module_actions["BLOG"].append("write")
+        if "review_comments" in owned_tools:
+            module_actions["BLOG"].append("moderate")
+
+        module_actions["EMAIL"].append("list")
+        if "email_read" in owned_tools:
+            module_actions["EMAIL"].append("read")
+        if "email_send" in owned_tools:
+            module_actions["EMAIL"].append("send")
+
+        if "wiki_search" in owned_tools:
+            module_actions["RESEARCH"].append("search")
+        if "wiki_read" in owned_tools:
+            module_actions["RESEARCH"].append("read")
+
+        if "memory_store" in owned_tools:
+            module_actions["MEMORY"].append("store")
+        if "memory_retrieve" in owned_tools:
+            module_actions["MEMORY"].append("retrieve")
+
+        status_lines = []
+        for module, actions in module_actions.items():
+            if module == self.current_domain.upper():
+                continue
+
+            if not actions:
+                status_lines.append(f"   {module}: 🔒 No tools")
+            else:
+                action_str = ", ".join(actions[:3])
+                more = f"+{len(actions)-3}" if len(actions) > 3 else ""
+                status_lines.append(f"   {module}: {action_str} {more}")
+
+        return "\n".join(status_lines)
 
     def _get_blog_pins(self) -> list:
         blog_pins = []

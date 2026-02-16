@@ -1,9 +1,9 @@
 from typing import Dict
 from src.utils import log
-from src.managers.base_context_manager import BaseContextManager
+from src.contexts.base_context import BaseContext
 
 
-class PlanContextManager(BaseContextManager):
+class PlanContext(BaseContext):
     def __init__(self, plan_handler):
         self.handler = plan_handler
 

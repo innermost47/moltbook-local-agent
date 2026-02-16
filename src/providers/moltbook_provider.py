@@ -1,10 +1,11 @@
 import requests
 from src.settings import settings
 from src.utils import log
+from src.providers.ollama_provider import OllamaProvider
 
 
 class MoltbookProvider:
-    def __init__(self, ollama=None):
+    def __init__(self, ollama: OllamaProvider = None):
         self.ollama_client = ollama
         self.headers = {
             "Authorization": f"Bearer {settings.MOLTBOOK_API_KEY}",
@@ -38,7 +39,7 @@ Now solve the challenge above. Return ONLY the answer:
 """
 
         try:
-            response = self.ollama_client.chat(
+            response = self.ollama_client.client.chat(
                 model=settings.OLLAMA_MODEL or "qwen3:8b",
                 messages=[{"role": "user", "content": prompt}],
                 options={"temperature": 0.1},

@@ -1,12 +1,13 @@
 from typing import Dict
 from argparse import Namespace
 from src.utils import log
-from src.managers.base_context_manager import BaseContextManager
+from src.contexts.base_context import BaseContext
 
 
-class MailContextManager(BaseContextManager):
-    def __init__(self, email_handler):
+class MailContext(BaseContext):
+    def __init__(self, email_handler, memory_handler):
         self.handler = email_handler
+        self.memory = memory_handler
 
     def get_home_snippet(self) -> str:
         try:
@@ -24,7 +25,7 @@ class MailContextManager(BaseContextManager):
     def get_list_view(
         self, status_msg: str = "", result: Dict = None, workspace_pins=None
     ) -> str:
-
+        owned_tools = set(self.memory.get_owned_tools())
         messages_display = ""
         try:
             messages = []
@@ -66,23 +67,72 @@ class MailContextManager(BaseContextManager):
             log.warning(f"Could not fetch messages for view: {e}")
             messages_display = "### 📬 LATEST CORRESPONDENCE\n\n_Status unavailable_\n"
 
+        available_actions = []
+        locked_actions = []
+
+        available_actions.append(
+            """
+👉 Current view shows your inbox (free access)
+   - You can see message list without purchasing tools
+"""
+        )
+
+        if "email_read" in owned_tools:
+            available_actions.append(
+                """
+👉 `email_read(uid='...')`
+   - Open and read full email content
+"""
+            )
+        else:
+            locked_actions.append("🔒 `email_read` - 100 XP (unlock to read emails)")
+
+        if "email_send" in owned_tools:
+            available_actions.append(
+                """
+👉 `email_send(to='...', subject='...', body='...')`
+   - Send or reply to emails
+   - ⚠️ Use ONLY to reply to existing emails
+"""
+            )
+        else:
+            locked_actions.append("🔒 `email_send` - 100 XP (unlock to send)")
+
+        if "email_delete" in owned_tools:
+            available_actions.append(
+                """
+👉 `email_delete(uid='...')`
+   - Delete or archive messages
+"""
+            )
+        else:
+            locked_actions.append("🔒 `email_delete` - 100 XP (unlock to manage)")
+
+        actions_section = "### 🛠️ AVAILABLE EMAIL ACTIONS\n\n"
+
+        if len(available_actions) > 1:
+            actions_section += "You are in EMAIL mode. Execute one of these:\n\n"
+            actions_section += "\n".join(available_actions)
+        else:
+            actions_section += "⚠️ **LIMITED ACCESS**\n\n"
+            actions_section += (
+                "You can VIEW the inbox (free), but can't interact yet.\n\n"
+            )
+            actions_section += available_actions[0]
+
+        if locked_actions:
+            actions_section += "\n\n### 🔒 LOCKED ACTIONS\n"
+            actions_section += "Purchase these tools to unlock email management:\n\n"
+            actions_section += "\n".join(locked_actions)
+            actions_section += "\n\n💡 Navigate to HOME and use `visit_shop` to unlock."
+
         ctx = [
             "## 📥 EMAIL INBOX",
             f"✅ **STATUS**: {status_msg}" if status_msg else "",
             "---",
             messages_display,
             "",
-            "### 🛠️ AVAILABLE EMAIL ACTIONS",
-            "",
-            "👉 `email_read(uid='...')` <-- 🔍 VIEW FULL CONTENT",
-            "   - Open the full body of a specific email using the ID above.",
-            "",
-            "👉 `email_send(to='...', subject='...', body='...')`",
-            "   - Compose and send a reply or a new message.",
-            "",
-            "⚠️ IMPORTANT: `email_send` is ONLY to reply to an existing email. Composing new emails is strictly forbidden here.",
-            "",
-            "👉 `email_archive_email(uid='...')` / `email_mark_as_read(uid='...')`",
+            actions_section,
         ]
 
         return "\n".join(ctx)

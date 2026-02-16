@@ -9,6 +9,7 @@ from src.handlers.social_handler import SocialHandler
 from src.handlers.research_handler import ResearchHandler
 from src.handlers.memory_handler import MemoryHandler
 from src.handlers.plan_handler import PlanHandler
+from src.handlers.shop_handler import ShopHandler
 from src.settings import settings, AvailableModule
 from src.utils.exceptions import (
     UnknownActionError,
@@ -40,6 +41,10 @@ class ActionDispatcher:
             self.memory_handler, test_mode, ollama=ollama
         )
         self.plan_handler = PlanHandler(self.memory_handler)
+        self.shop_handler = ShopHandler(
+            memory_handler=self.memory_handler,
+            progression_system=None,
+        )
 
         self._handler_map = {
             "write_blog": self.blog_handler,
@@ -60,9 +65,14 @@ class ActionDispatcher:
             "research_": self.research_handler,
             "memory_": self.memory_handler,
             "plan_": self.plan_handler,
+            "buy_tool": self.shop_handler,
+            "buy_artifact": self.shop_handler,
         }
 
         self.session_manager = None
+
+    def set_progression_system(self, progression_system):
+        self.shop_handler.progression = progression_system
 
     def set_session_manager(self, session_manager):
         self.session_manager = session_manager

@@ -35,47 +35,49 @@ class ProgressionSystem:
     }
 
     XP_REWARDS = {
-        "email_read": 1,
-        "email_get_messages": 0,
-        "email_send": 10,
-        "email_mark_as_read": 1,
+        "approve_comment_key": 3,
+        "approve_comment": 4,
+        "comment_post": 10,
+        "create_post": 15,
+        "create_submolt": 20,
+        "delete_post": 2,
         "email_archive": 1,
         "email_delete": 1,
+        "email_get_messages": 0,
+        "email_mark_as_read": 1,
+        "email_read": 1,
         "email_search": 2,
-        "navigate_to_mode": 0,
-        "write_blog_article": 25,
-        "share_created_blog_post_url": 12,
-        "review_comment_key_requests": 5,
-        "approve_comment_key": 3,
-        "reject_comment_key": 2,
-        "review_pending_comments": 5,
-        "approve_comment": 4,
-        "reject_comment": 3,
-        "get_latest_articles": 0,
-        "social_register": 20,
-        "social_update_profile": 5,
-        "social_claim_status": 10,
-        "create_post": 15,
-        "share_link": 12,
-        "publish_public_comment": 8,
-        "vote_post": 3,
-        "delete_post": 2,
-        "create_submolt": 20,
-        "subscribe_submolt": 4,
+        "email_send": 10,
+        "engagement_master": 50,
+        "first_post_of_day": 20,
         "follow_agent": 3,
-        "social_search": 2,
-        "wiki_search": 10,
-        "wiki_read": 5,
-        "research_complete": 40,
-        "research_query_cache": 10,
-        "memory_store": 7,
+        "get_latest_articles": 0,
         "memory_retrieve": 2,
+        "memory_store": 7,
+        "navigate_to_mode": 0,
+        "perfect_session": 100,
         "plan_initialize": 50,
         "plan_update": 35,
         "plan_view": 0,
-        "first_post_of_day": 20,
-        "perfect_session": 100,
-        "engagement_master": 50,
+        "publish_public_comment": 8,
+        "reject_comment_key": 2,
+        "reject_comment": 3,
+        "reply_to_comment": 10,
+        "research_complete": 40,
+        "research_query_cache": 10,
+        "review_comment_key_requests": 5,
+        "review_pending_comments": 5,
+        "share_created_blog_post_url": 12,
+        "share_link": 12,
+        "social_claim_status": 10,
+        "social_register": 20,
+        "social_search": 2,
+        "social_update_profile": 5,
+        "subscribe_submolt": 4,
+        "vote_post": 3,
+        "wiki_read": 5,
+        "wiki_search": 10,
+        "write_blog_article": 25,
     }
 
     TITLES = [
@@ -108,8 +110,8 @@ class ProgressionSystem:
             """
             CREATE TABLE IF NOT EXISTS progression (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                current_xp INTEGER DEFAULT 0,
-                total_xp INTEGER DEFAULT 0,
+                total_xp_earned INTEGER DEFAULT 0,    
+                current_xp_balance INTEGER DEFAULT 0,
                 level INTEGER DEFAULT 1,
                 current_title TEXT DEFAULT '🌱 Digital Seedling',
                 updated_at TEXT
@@ -135,7 +137,8 @@ class ProgressionSystem:
             CREATE TABLE IF NOT EXISTS xp_history (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 action_type TEXT NOT NULL,
-                xp_gained INTEGER NOT NULL,
+                xp_change INTEGER NOT NULL, 
+                transaction_type TEXT NOT NULL, 
                 session_id INTEGER,
                 timestamp TEXT NOT NULL
             )
@@ -153,11 +156,65 @@ class ProgressionSystem:
         """
         )
 
+        cursor.execute("PRAGMA table_info(progression)")
+        columns = [col[1] for col in cursor.fetchall()]
+
+        if "current_xp" in columns and "current_xp_balance" not in columns:
+            log.info("🔄 Migrating progression table schema...")
+            cursor.execute(
+                """
+                CREATE TABLE progression_new (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    total_xp_earned INTEGER DEFAULT 0,
+                    current_xp_balance INTEGER DEFAULT 0,
+                    level INTEGER DEFAULT 1,
+                    current_title TEXT DEFAULT '🌱 Digital Seedling',
+                    updated_at TEXT
+                )
+            """
+            )
+            cursor.execute(
+                """
+                INSERT INTO progression_new (id, total_xp_earned, current_xp_balance, level, current_title, updated_at)
+                SELECT id, total_xp, current_xp, level, current_title, updated_at FROM progression
+            """
+            )
+            cursor.execute("DROP TABLE progression")
+            cursor.execute("ALTER TABLE progression_new RENAME TO progression")
+            log.success("✅ Progression table migration complete!")
+
+        cursor.execute("PRAGMA table_info(xp_history)")
+        xp_columns = [col[1] for col in cursor.fetchall()]
+
+        if "xp_gained" in xp_columns and "xp_change" not in xp_columns:
+            log.info("🔄 Migrating xp_history table schema...")
+            cursor.execute(
+                """
+                CREATE TABLE xp_history_new (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    action_type TEXT NOT NULL,
+                    xp_change INTEGER NOT NULL,
+                    transaction_type TEXT NOT NULL DEFAULT 'earned',
+                    session_id INTEGER,
+                    timestamp TEXT NOT NULL
+                )
+            """
+            )
+            cursor.execute(
+                """
+                INSERT INTO xp_history_new (id, action_type, xp_change, transaction_type, session_id, timestamp)
+                SELECT id, action_type, xp_gained, 'earned', session_id, timestamp FROM xp_history
+            """
+            )
+            cursor.execute("DROP TABLE xp_history")
+            cursor.execute("ALTER TABLE xp_history_new RENAME TO xp_history")
+            log.success("✅ xp_history table migration complete!")
+
         cursor.execute("SELECT COUNT(*) FROM progression")
         if cursor.fetchone()[0] == 0:
             cursor.execute(
                 """
-                INSERT INTO progression (current_xp, total_xp, level, current_title, updated_at)
+                INSERT INTO progression (total_xp_earned, current_xp_balance, level, current_title, updated_at)
                 VALUES (0, 0, 1, '🌱 Digital Seedling', ?)
             """,
                 (datetime.now().isoformat(),),
@@ -177,48 +234,32 @@ class ProgressionSystem:
         )
 
         cursor = self.conn.cursor()
-
         cursor.execute("SELECT * FROM progression WHERE id = 1")
         prog = cursor.fetchone()
 
-        current_xp = prog["current_xp"]
-        total_xp = prog["total_xp"]
+        current_balance = prog["current_xp_balance"]
+        total_earned = prog["total_xp_earned"]
         current_level = prog["level"]
 
-        new_current_xp = max(0, current_xp + xp_penalty)
-        new_total_xp = total_xp + xp_penalty
+        new_balance = max(0, current_balance + xp_penalty)
 
         leveled_down = False
-        new_level = current_level
 
-        if new_current_xp == 0 and current_level > 1:
-            new_level = current_level - 1
-            xp_for_previous_level = self.get_xp_for_level(new_level + 1)
-            new_current_xp = xp_for_previous_level + xp_penalty
-            new_current_xp = max(0, new_current_xp)
-            leveled_down = True
-
-        new_title_text = self._get_title_for_level(new_level).name
+        new_title_text = self._get_title_for_level(current_level).name
 
         cursor.execute(
             """
             UPDATE progression 
-            SET current_xp = ?, total_xp = ?, level = ?, current_title = ?, updated_at = ?
+            SET current_xp_balance = ?, updated_at = ?
             WHERE id = 1
         """,
-            (
-                new_current_xp,
-                new_total_xp,
-                new_level,
-                new_title_text,
-                datetime.now().isoformat(),
-            ),
+            (new_balance, datetime.now().isoformat()),
         )
 
         cursor.execute(
             """
-            INSERT INTO xp_history (action_type, xp_gained, session_id, timestamp)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO xp_history (action_type, xp_change, transaction_type, session_id, timestamp)
+            VALUES (?, ?, 'penalty', ?, ?)
         """,
             (
                 f"LOOP_PENALTY:{action_type}",
@@ -231,15 +272,15 @@ class ProgressionSystem:
         self.conn.commit()
 
         log.warning(
-            f"⚠️ LOOP PENALTY: {xp_penalty} XP for repeating {action_type} {loop_count} times!"
+            f"⚠️ LOOP PENALTY: {xp_penalty} XP balance lost for repeating {action_type} {loop_count} times!"
         )
 
         return {
             "penalty_applied": True,
             "xp_lost": abs(xp_penalty),
             "loop_count": loop_count,
-            "current_xp": new_current_xp,
-            "current_level": new_level,
+            "current_xp_balance": new_balance,
+            "current_level": current_level,
             "leveled_down": leveled_down,
         }
 
@@ -333,18 +374,18 @@ class ProgressionSystem:
         return int(self.XP_BASE * (self.XP_MULTIPLIER ** (level - 1)))
 
     def add_xp(self, action_type: str, session_id: int = None) -> Dict:
+
         xp_gained = self.XP_REWARDS.get(action_type, 0)
 
         if xp_gained == 0:
             return {"leveled_up": False, "xp_gained": 0}
 
         cursor = self.conn.cursor()
-
         cursor.execute("SELECT * FROM progression WHERE id = 1")
         prog = cursor.fetchone()
 
-        current_xp = prog["current_xp"] + xp_gained
-        total_xp = prog["total_xp"] + xp_gained
+        total_earned = prog["total_xp_earned"] + xp_gained
+        current_balance = prog["current_xp_balance"] + xp_gained
         current_level = prog["level"]
 
         xp_needed = self.get_xp_for_level(current_level + 1)
@@ -353,8 +394,11 @@ class ProgressionSystem:
         new_level = current_level
         level_rewards = []
 
-        while current_xp >= xp_needed:
-            current_xp -= xp_needed
+        total_xp_for_next = sum(
+            self.get_xp_for_level(l) for l in range(1, current_level + 2)
+        )
+
+        while total_earned >= total_xp_for_next:
             new_level += 1
             leveled_up = True
 
@@ -369,8 +413,9 @@ class ProgressionSystem:
                     }
                 )
 
-            xp_needed = self.get_xp_for_level(new_level + 1)
-
+            total_xp_for_next = sum(
+                self.get_xp_for_level(l) for l in range(1, new_level + 2)
+            )
             log.success(f"🎊 LEVEL UP! Level {new_level} reached!")
 
         new_title_text = (
@@ -382,12 +427,12 @@ class ProgressionSystem:
         cursor.execute(
             """
             UPDATE progression 
-            SET current_xp = ?, total_xp = ?, level = ?, current_title = ?, updated_at = ?
+            SET total_xp_earned = ?, current_xp_balance = ?, level = ?, current_title = ?, updated_at = ?
             WHERE id = 1
         """,
             (
-                current_xp,
-                total_xp,
+                total_earned,
+                current_balance,
                 new_level,
                 new_title_text,
                 datetime.now().isoformat(),
@@ -396,8 +441,8 @@ class ProgressionSystem:
 
         cursor.execute(
             """
-            INSERT INTO xp_history (action_type, xp_gained, session_id, timestamp)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO xp_history (action_type, xp_change, transaction_type, session_id, timestamp)
+            VALUES (?, ?, 'earned', ?, ?)
         """,
             (action_type, xp_gained, session_id, datetime.now().isoformat()),
         )
@@ -407,12 +452,50 @@ class ProgressionSystem:
         return {
             "leveled_up": leveled_up,
             "xp_gained": xp_gained,
-            "current_xp": current_xp,
+            "current_xp_balance": current_balance,
+            "total_xp_earned": total_earned,
             "xp_needed": xp_needed,
             "current_level": new_level,
             "current_title": new_title_text,
             "rewards": level_rewards,
         }
+
+    def spend_xp(self, amount: int, reason: str = "", session_id: int = None) -> bool:
+
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT current_xp_balance FROM progression WHERE id = 1")
+        prog = cursor.fetchone()
+
+        current_balance = prog["current_xp_balance"]
+
+        if current_balance < amount:
+            log.error(f"❌ Insufficient XP balance: {current_balance} < {amount}")
+            return False
+
+        new_balance = current_balance - amount
+
+        cursor.execute(
+            """
+            UPDATE progression 
+            SET current_xp_balance = ?, updated_at = ?
+            WHERE id = 1
+        """,
+            (new_balance, datetime.now().isoformat()),
+        )
+
+        cursor.execute(
+            """
+            INSERT INTO xp_history (action_type, xp_change, transaction_type, session_id, timestamp)
+            VALUES (?, ?, 'spent', ?, ?)
+        """,
+            (reason, -amount, session_id, datetime.now().isoformat()),
+        )
+
+        self.conn.commit()
+
+        log.info(f"💸 Spent {amount} XP on '{reason}'. Balance: {new_balance}")
+
+        return True
 
     def _get_title_for_level(self, level: int) -> Optional[Title]:
         applicable_titles = [t for t in self.TITLES if t.level <= level]
@@ -431,21 +514,35 @@ class ProgressionSystem:
             return {}
 
         current_level = prog["level"]
-        xp_needed = self.get_xp_for_level(current_level + 1)
+        total_xp_earned = prog["total_xp_earned"]
+
+        xp_to_reach_current_level = sum(
+            self.get_xp_for_level(l) for l in range(1, current_level)
+        )
+
+        xp_progress_in_level = total_xp_earned - xp_to_reach_current_level
+
+        xp_needed_for_next_level = self.get_xp_for_level(current_level)
 
         cursor.execute("SELECT * FROM badges WHERE is_unlocked = 1")
         badges = [dict(row) for row in cursor.fetchall()]
 
+        progress_percentage = 0
+        if xp_needed_for_next_level > 0:
+            progress_percentage = (
+                xp_progress_in_level / xp_needed_for_next_level
+            ) * 100
+            progress_percentage = max(0, min(100, progress_percentage))
+
         return {
             "level": current_level,
-            "current_xp": prog["current_xp"],
-            "total_xp": prog["total_xp"],
-            "xp_needed": xp_needed,
+            "total_xp_earned": total_xp_earned,
+            "current_xp_balance": prog["current_xp_balance"],
+            "xp_needed": xp_needed_for_next_level,
+            "xp_progress_in_level": xp_progress_in_level,
             "current_title": prog["current_title"],
             "badges": badges,
-            "progress_percentage": (
-                (prog["current_xp"] / xp_needed * 100) if xp_needed > 0 else 0
-            ),
+            "progress_percentage": progress_percentage,
         }
 
     def check_and_unlock_badges(self, stats: Dict) -> List[Dict]:

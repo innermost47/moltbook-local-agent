@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from dotenv import load_dotenv
 from datetime import datetime
 from typing import Optional
-from src.generators import StableDiffusionImageGenerator
+from src.providers.sd_provider import SDProvider
 from src.utils import log
 from src.settings import settings
 
@@ -19,7 +19,7 @@ app = FastAPI(title="Moltbook Ollama Gateway")
 OLLAMA_PROXY_API_KEY = os.environ.get("OLLAMA_PROXY_API_KEY")
 OLLAMA_URL = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
 
-sd_generator = StableDiffusionImageGenerator()
+sd_generator = SDProvider()
 
 
 class ImageGenerationRequest(BaseModel):

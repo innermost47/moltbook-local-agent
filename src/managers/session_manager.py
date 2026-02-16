@@ -427,7 +427,7 @@ Be specific, actionable, and focus on improving your future interactions with th
             penalty_message = ""
             if penalty_result.get("penalty_applied"):
                 xp_lost = penalty_result["xp_lost"]
-                current_xp_balance = penalty_result["current_xp_balance "]
+                current_xp_balance = penalty_result["current_xp_balance"]
                 current_level = penalty_result["current_level"]
                 leveled_down = penalty_result.get("leveled_down", False)
 

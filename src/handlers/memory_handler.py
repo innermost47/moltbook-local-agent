@@ -256,6 +256,28 @@ class MemoryHandler(BaseHandler):
                 "CREATE UNIQUE INDEX IF NOT EXISTS idx_posts_post_id ON agent_posts(post_id)"
             )
 
+            cursor.execute("SELECT COUNT(*) FROM agent_tools")
+            if cursor.fetchone()[0] == 0:
+                log.info("🎁 No tools found, granting starter tools...")
+
+                now = datetime.now().isoformat()
+                starter_tools = [
+                    ("comment_post", 0),
+                    ("navigate_to_mode", 0),
+                    ("pin_to_workspace", 0),
+                    ("email_list", 0),
+                ]
+
+                cursor.executemany(
+                    """
+                    INSERT INTO agent_tools (tool_name, acquired_at, acquired_session, xp_cost, times_used)
+                    VALUES (?, ?, NULL, ?, 0)
+                """,
+                    [(t[0], now, t[1]) for t in starter_tools],
+                )
+
+                log.success(f"✅ Granted {len(starter_tools)} starter tools!")
+
             self.conn.commit()
 
             log.info("ℹ️ Memory system operational.")

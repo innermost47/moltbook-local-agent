@@ -6,7 +6,6 @@ from src.utils.ui_utils import UIUtils
 from src.screens.schema_factory import SchemaFactory
 from src.screens.tool_factory import ToolFactory
 from src.settings import settings
-from src.managers.progression_system import ProgressionSystem
 from src.utils.live_broadcaster import LiveBroadcaster
 
 
@@ -69,7 +68,10 @@ class SessionManager:
     def _initialize_conversation_history(self):
         system_content = self._load_system_prompt()
 
+        dynamic_tools_section = self._build_dynamic_tools_section()
+
         STRICT_JSON_SUFFIX = (
+            f"{dynamic_tools_section}\n\n"  #
             "### 🌐 ENVIRONMENT & OPPORTUNITIES\n"
             "You have access to multiple modules to expand your actions beyond mere research:\n"
             "- **Research (wiki_read, wiki_search)**: Collect knowledge, but remember, the goal is to apply it.\n"
@@ -115,12 +117,114 @@ class SessionManager:
         )
 
         full_system_content = system_content + STRICT_JSON_SUFFIX
-
-        self.agent_conversation_history = [
-            {"role": "system", "content": full_system_content}
-        ]
+        self.agent_conversation_history[0] = {
+            "role": "system",
+            "content": full_system_content,
+        }
 
         log.info(f"✅ System prompt loaded for {settings.AGENT_NAME}")
+
+    def _build_dynamic_tools_section(self) -> str:
+
+        owned_tools = set(self.dispatcher.memory_handler.get_owned_tools())
+        prog_status = self.progression.get_current_status()
+        current_xp_balance = prog_status.get("current_xp_balance", 0)
+
+        can_afford = current_xp_balance >= 100
+        gap = max(0, 100 - current_xp_balance)
+
+        xp_earning_tools = []
+        if "comment_post" in owned_tools:
+            xp_earning_tools.append("comment_post (8 XP)")
+        if "create_post" in owned_tools:
+            xp_earning_tools.append("create_post (15 XP)")
+        if "write_blog_article" in owned_tools:
+            xp_earning_tools.append("write_blog_article (25 XP)")
+        if "email_send" in owned_tools:
+            xp_earning_tools.append("email_send (10 XP)")
+        if "wiki_search" in owned_tools:
+            xp_earning_tools.append("wiki_search (10 XP)")
+
+        section = [
+            "### 💰 YOUR XP & TOOLS STATUS",
+            "",
+            f"**Current XP Balance**: {current_xp_balance} XP",
+            f"**Tools Owned**: {len(owned_tools)} tools",
+            "",
+        ]
+
+        if can_afford:
+            section.extend(
+                [
+                    "✅ **YOU CAN AFFORD A TOOL!**",
+                    "",
+                    "**Next steps:**",
+                    "1. Use `visit_shop` to browse available tools",
+                    "2. Choose strategically (prioritize tools that earn MORE XP)",
+                    "3. Use `buy_tool(tool_name='...')` to purchase (costs 100 XP)",
+                    "4. Use your new tool immediately to start earning XP back",
+                    "",
+                    "**Recommended first purchases:**",
+                    "- `create_post` (15 XP per post) - Fast ROI",
+                    "- `write_blog_article` (25 XP per article) - Best ROI",
+                    "- `wiki_search` (10 XP) + `wiki_read` (5 XP) - Enable research",
+                    "",
+                ]
+            )
+        else:
+            if not xp_earning_tools:
+                section.extend(
+                    [
+                        "⚠️ **CRITICAL: You have NO XP-earning tools!**",
+                        "",
+                        "**You are stuck!** You cannot earn XP to buy tools.",
+                        "This should never happen. Contact admin immediately.",
+                        "",
+                    ]
+                )
+            elif "comment_post" in xp_earning_tools[0]:
+                comments_needed = (gap + 7) // 8
+                section.extend(
+                    [
+                        f"⚠️ **YOU NEED {gap} MORE XP TO BUY YOUR FIRST TOOL**",
+                        "",
+                        "**Your XP earning strategy:**",
+                        f"1. Navigate to SOCIAL: `navigate_to_mode(chosen_mode='SOCIAL')`",
+                        f"2. Comment on posts: `comment_post(...)` - Earns 8 XP each",
+                        f"3. Repeat **{comments_needed} times** to reach 100 XP total",
+                        f"4. Visit shop: `visit_shop`",
+                        f"5. Buy your first tool: `buy_tool(tool_name='create_post')` (recommended)",
+                        "",
+                        "**Why this matters:**",
+                        "- comment_post is your ONLY way to earn XP right now",
+                        "- You need 100 XP to unlock better tools",
+                        "- Better tools = faster XP earning = more capabilities",
+                        "- DO NOT waste actions on navigation/pinning (0 XP)",
+                        "",
+                    ]
+                )
+            else:
+                section.extend(
+                    [
+                        f"💡 **YOU NEED {gap} MORE XP TO BUY A TOOL**",
+                        "",
+                        "**Your XP-earning tools:**",
+                    ]
+                )
+                for tool in xp_earning_tools:
+                    section.append(f"- {tool}")
+                section.extend(
+                    [
+                        "",
+                        "**Strategy:**",
+                        "1. Use your highest-XP tools to earn quickly",
+                        "2. Once you reach 100 XP, visit shop and buy a new tool",
+                        "3. Prioritize tools that earn even MORE XP",
+                        "",
+                    ]
+                )
+
+        return "\n".join(section)
 
     def _load_system_prompt(self) -> str:
 
@@ -207,7 +311,7 @@ class SessionManager:
                     debug_filename="debug.json",
                 )
             )
-
+            self._initialize_conversation_history()
             self.live_viewer.broadcast_action(
                 action_type=action_object.action_type,
                 action_params=getattr(action_object, "action_params", {}),

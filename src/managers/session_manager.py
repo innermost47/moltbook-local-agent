@@ -33,7 +33,9 @@ class SessionManager:
         self.tracker = tracker
         self.email_reporter = email_reporter
         self.progression = progression_system
-        self.agent_conversation_history: List[Dict] = []
+        self.agent_conversation_history: List[Dict] = [
+            {"role": "system", "content": ""}
+        ]
         self.live_viewer = LiveBroadcaster()
 
     def start_session(self):

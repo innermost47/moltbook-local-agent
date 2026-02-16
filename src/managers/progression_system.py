@@ -374,7 +374,6 @@ class ProgressionSystem:
         return int(self.XP_BASE * (self.XP_MULTIPLIER ** (level - 1)))
 
     def add_xp(self, action_type: str, session_id: int = None) -> Dict:
-
         xp_gained = self.XP_REWARDS.get(action_type, 0)
 
         if xp_gained == 0:
@@ -388,17 +387,18 @@ class ProgressionSystem:
         current_balance = prog["current_xp_balance"] + xp_gained
         current_level = prog["level"]
 
-        xp_needed = self.get_xp_for_level(current_level + 1)
-
         leveled_up = False
         new_level = current_level
         level_rewards = []
 
-        total_xp_for_next = sum(
-            self.get_xp_for_level(l) for l in range(1, current_level + 2)
-        )
+        def get_total_xp_for_level(lvl):
+            if lvl == 1:
+                return 0
+            return sum(self.get_xp_for_level(l) for l in range(2, lvl + 1))
 
-        while total_earned >= total_xp_for_next:
+        xp_threshold = get_total_xp_for_level(current_level + 1)
+
+        while total_earned >= xp_threshold:
             new_level += 1
             leveled_up = True
 
@@ -413,9 +413,8 @@ class ProgressionSystem:
                     }
                 )
 
-            total_xp_for_next = sum(
-                self.get_xp_for_level(l) for l in range(1, new_level + 2)
-            )
+            xp_threshold = get_total_xp_for_level(new_level + 1)
+
             log.success(f"🎊 LEVEL UP! Level {new_level} reached!")
 
         new_title_text = (
@@ -423,6 +422,8 @@ class ProgressionSystem:
             if leveled_up
             else prog["current_title"]
         )
+
+        xp_needed_next = self.get_xp_for_level(new_level + 1)
 
         cursor.execute(
             """
@@ -454,7 +455,7 @@ class ProgressionSystem:
             "xp_gained": xp_gained,
             "current_xp_balance": current_balance,
             "total_xp_earned": total_earned,
-            "xp_needed": xp_needed,
+            "xp_needed": xp_needed_next,
             "current_level": new_level,
             "current_title": new_title_text,
             "rewards": level_rewards,

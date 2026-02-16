@@ -169,9 +169,10 @@ class HomeContext:
             return ""
 
         level = prog_status.get("level", 1)
-        current_xp = prog_status.get("current_xp", 0)
+        total_xp_earned = prog_status.get("total_xp_earned", 0)
+        current_xp_balance = prog_status.get("current_xp_balance", 0)
         xp_needed = prog_status.get("xp_needed", 100)
-        total_xp = prog_status.get("total_xp", 0)
+        xp_progress_in_level = prog_status.get("xp_progress_in_level", 0)
         title = prog_status.get("current_title", "🌱 Digital Seedling")
         badges = prog_status.get("badges", [])
         progress_pct = prog_status.get("progress_percentage", 0)
@@ -192,26 +193,33 @@ class HomeContext:
         progression_block = [
             "### 🎮 PROGRESSION & ACHIEVEMENTS",
             f"**Level {level}** - {title}",
-            f"XP: [{xp_bar}] {current_xp}/{xp_needed} ({progress_pct:.1f}%)",
-            f"Total XP Earned: {total_xp:,}",
+            f"Progress to Next Level: [{xp_bar}] {xp_progress_in_level}/{xp_needed} ({progress_pct:.1f}%)",
+            f"Total XP Earned: {total_xp_earned:,} (determines your level)",
+            f"XP Balance: {current_xp_balance:,} (available for shop)",
             badge_display if badge_display else "",
             "\n",
             "🎯 **WHY EARN XP?**",
-            "• XP is your CURRENCY to unlock new capabilities",
+            "• XP Balance is your CURRENCY to unlock new capabilities",
             "• All tools cost 100 XP in the shop (write_blog, email_send, wiki_search, etc.)",
+            "• 💡 **IMPORTANT**: Buying tools uses your XP Balance but does NOT affect:",
+            "  - Your Total XP Earned (permanent)",
+            "  - Your Level (permanent)",
+            "  - Your Progress Bar (based on Total XP Earned)",
             "• More tools = More strategic options = Better performance",
-            "• Use `visit_shop` to browse available tools and purchase with XP",
+            "• Use `visit_shop` to browse available tools and purchase with XP Balance",
             "\n",
             "💡 **How to Earn XP:**",
             "• Major actions: Write blog (25 XP), Complete research (40 XP)",
             "• Medium actions: Send email (10 XP), Create post (15 XP), Share link (12 XP)",
             "• Small actions: Comment (8 XP), Store memory (7 XP), Vote (3 XP)",
             "• Special bonuses: Perfect session (100 XP), Engagement master (50 XP)",
+            "• Each XP earned increases BOTH your Balance AND your Total",
             "\n",
             "⚠️ **XP PENALTIES FOR LOOPS:**",
+            "• Penalties reduce your XP Balance (not your Total or Level)",
             "• 2nd repeat: -10 XP | 3rd repeat: -20 XP | 4th repeat: -30 XP",
-            "• 5th+ repeat: -50 XP, -75 XP, -100 XP (can lose levels!)",
-            "• STOP wasting actions = STOP losing XP!",
+            "• 5th+ repeat: -50 XP, -75 XP, -100 XP",
+            "• STOP wasting actions = STOP losing XP Balance!",
             f"{'━' * 40}",
         ]
 

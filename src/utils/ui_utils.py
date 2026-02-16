@@ -13,6 +13,7 @@ class UIUtils:
         width = 70
         padding = width - len(terminal_label)
         top_line = f"**{terminal_label}{node_status.rjust(padding)}**"
+
         nav_items = [
             (
                 f"📍 ▶️ **[{d.upper()}]**"
@@ -21,6 +22,7 @@ class UIUtils:
             )
             for d in settings.AVAILABLE_MODULES
         ]
+
         max_actions = settings.MAX_ACTIONS_PER_SESSION
         remaining = max_actions - action_count
         energy_bar = "🟢" * remaining + "🔴" * action_count
@@ -54,14 +56,18 @@ class UIUtils:
         if progression_status:
             level = progression_status.get("level", 1)
             title = progression_status.get("current_title", "")
-            current_xp = progression_status.get("current_xp", 0)
+            current_xp_balance = progression_status.get("current_xp_balance", 0)
+            xp_progress_in_level = progression_status.get("xp_progress_in_level", 0)
             xp_needed = progression_status.get("xp_needed", 100)
+            progress_pct = progression_status.get("progress_percentage", 0)
+
             xp_bar_width = 30
-            xp_percentage = (current_xp / xp_needed) if xp_needed > 0 else 0
+            xp_percentage = progress_pct / 100
             filled = int(xp_bar_width * xp_percentage)
             empty = xp_bar_width - filled
             xp_bar = "█" * filled + "░" * empty
-            prog_display = f"\n⭐ **LVL {level}** {title} | XP: [{xp_bar}] {current_xp}/{xp_needed}"
+
+            prog_display = f"\n⭐ **LVL {level}** {title} | Balance: {current_xp_balance} XP | Progress: [{xp_bar}] {xp_progress_in_level}/{xp_needed} ({progress_pct:.1f}%)"
 
         return (
             f"{top_line}\n"

@@ -61,19 +61,27 @@ class ShopHandler(BaseHandler):
 
             price = tool_info.get("price", 100)
 
-            current_xp = self.progression.get_current_status().get("current_xp", 0)
+            prog_status = self.progression.get_current_status()
+            current_xp_balance = prog_status.get("current_xp_balance", 0)
 
-            if current_xp < price:
-                needed = price - current_xp
+            if current_xp_balance < price:
+                needed = price - current_xp_balance
                 return self.format_error(
                     "buy_tool",
                     FormattingError(
-                        message=f"Insufficient XP. You have {current_xp} XP but need {price} XP.",
+                        message=f"Insufficient XP balance. You have {current_xp_balance} XP but need {price} XP.",
                         suggestion=f"Earn {needed} more XP by completing actions. Avoid loops to maximize XP gain.",
                     ),
                 )
 
             session_id = getattr(self.memory, "current_session_id", None)
+
+            if not self.progression.spend_xp(
+                price, reason=f"buy_tool:{tool_name}", session_id=session_id
+            ):
+                return self.format_error(
+                    "buy_tool", Exception("Failed to deduct XP. Transaction aborted.")
+                )
 
             success = self.memory.purchase_item(
                 item_type="tool",
@@ -84,13 +92,15 @@ class ShopHandler(BaseHandler):
             )
 
             if not success:
+                self.progression.add_xp_manual(price, "refund:buy_tool_failed")
                 return self.format_error(
-                    "buy_tool", Exception("Purchase failed. Database error.")
+                    "buy_tool",
+                    Exception("Purchase failed. Database error. XP refunded."),
                 )
 
-            self.progression.adjust_xp(-price)
-
-            new_balance = self.progression.get_current_status().get("current_xp", 0)
+            new_balance = self.progression.get_current_status().get(
+                "current_xp_balance", 0
+            )
 
             description = tool_info.get("description", "")
             category = tool_info.get("category", "general")
@@ -104,12 +114,14 @@ class ShopHandler(BaseHandler):
 
 💰 **Transaction:**
 - Cost: -{price} XP
-- Previous balance: {current_xp} XP
+- Previous balance: {current_xp_balance} XP
 - New balance: {new_balance} XP
 
-✅ **You can now use this tool!**
+✅ **Your level remains unchanged!** Spending XP doesn't affect progression.
 
-Navigate to the appropriate module to use your new capability:
+**You can now use this tool!**
+
+Navigate to the appropriate module:
 - SOCIAL tools → `navigate_to_mode('SOCIAL')`
 - BLOG tools → `navigate_to_mode('BLOG')`
 - EMAIL tools → `navigate_to_mode('EMAIL')`

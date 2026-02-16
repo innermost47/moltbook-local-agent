@@ -71,14 +71,65 @@ class ToolFactory:
         include_globals: bool = True,
         allow_navigation: bool = True,
         allow_memory: bool = True,
+        memory_handler=None,
     ) -> List[dict]:
 
         tools = []
         target = domain.lower()
 
+        if memory_handler:
+            owned_tools = set(memory_handler.get_owned_tools())
+            log.info(f"🔑 Filtering tools based on ownership: {owned_tools}")
+        else:
+            owned_tools = None
+
         domain_actions = ToolFactory._get_domain_actions(target)
 
         for action_class in domain_actions:
+            if owned_tools is not None:
+                action_type_field = action_class.model_fields.get("action_type")
+                if action_type_field:
+                    action_name = action_type_field.default
+
+                    tool_to_action = {
+                        "comment_post": "comment_post",
+                        "create_post": "create_post",
+                        "share_link": "share_link",
+                        "vote_post": "vote_post",
+                        "write_blog_article": "write_blog_article",
+                        "review_comments": "review_pending_comments",
+                        "email_read": "email_read",
+                        "email_send": "email_send",
+                        "email_delete": "email_delete",
+                        "wiki_search": "wiki_search",
+                        "wiki_read": "wiki_read",
+                        "research_complete": "research_complete",
+                        "memory_store": "memory_store",
+                        "memory_retrieve": "memory_retrieve",
+                    }
+
+                    always_available = {
+                        "navigate_to_mode",
+                        "refresh_home",
+                        "pin_to_workspace",
+                        "unpin_from_workspace",
+                        "session_finish",
+                        "email_get_messages",
+                        "read_post",
+                        "refresh_feed",
+                    }
+
+                    if action_name not in always_available:
+                        tool_name = None
+                        for t, a in tool_to_action.items():
+                            if a == action_name:
+                                tool_name = t
+                                break
+
+                        if tool_name and tool_name not in owned_tools:
+                            log.debug(f"🔒 Skipping {action_name} (tool not owned)")
+                            continue
+
             tool = ToolFactory.action_to_tool(action_class)
             if tool:
                 tools.append(tool)
@@ -88,6 +139,7 @@ class ToolFactory:
                 current_domain=target,
                 allow_navigation=allow_navigation,
                 allow_memory=allow_memory,
+                memory_handler=memory_handler,
             )
             tools.extend(global_tools)
 
@@ -150,6 +202,7 @@ class ToolFactory:
         current_domain: str,
         allow_navigation: bool = True,
         allow_memory: bool = True,
+        memory_handler=None,
     ) -> List[dict]:
         tools = []
 
@@ -158,7 +211,20 @@ class ToolFactory:
             if nav_tool:
                 tools.append(nav_tool)
 
-        if allow_memory:
+        if allow_memory and memory_handler:
+            owned_tools = set(memory_handler.get_owned_tools())
+
+            if "memory_store" in owned_tools:
+                mem_store = ToolFactory.action_to_tool(MemoryStoreAction)
+                if mem_store:
+                    tools.append(mem_store)
+
+            if "memory_retrieve" in owned_tools:
+                mem_retrieve = ToolFactory.action_to_tool(MemoryRetrieveAction)
+                if mem_retrieve:
+                    tools.append(mem_retrieve)
+
+        elif allow_memory and not memory_handler:
             mem_store = ToolFactory.action_to_tool(MemoryStoreAction)
             mem_retrieve = ToolFactory.action_to_tool(MemoryRetrieveAction)
             if mem_store:

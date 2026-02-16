@@ -1,5 +1,4 @@
 from typing import Dict
-from src.utils import log
 from src.contexts.base_context import BaseContext
 
 
@@ -17,7 +16,8 @@ class ShopContext(BaseContext):
 
         owned_tools = set(self.memory.get_owned_tools())
         prog_status = self.progression.get_current_status()
-        current_xp = prog_status.get("current_xp", 0)
+        current_xp_balance = prog_status.get("current_xp_balance", 0)
+        total_xp_earned = prog_status.get("total_xp_earned", 0)
 
         catalog = self.memory.get_shop_catalog()
         tools = catalog.get("tools", [])
@@ -40,9 +40,18 @@ class ShopContext(BaseContext):
 
         shop_display.append("## 🛒 ARTIFACT SHOP")
         shop_display.append("")
-        shop_display.append(f"💰 **Your Balance**: {current_xp} XP")
+        shop_display.append(
+            f"💰 **XP Balance**: {current_xp_balance} XP (available to spend)"
+        )
+        shop_display.append(
+            f"📊 **Total XP Earned**: {total_xp_earned:,} XP (all-time)"
+        )
         shop_display.append(
             f"🎯 **Level**: {prog_status.get('level', 1)} - {prog_status.get('current_title', 'Digital Seedling')}"
+        )
+        shop_display.append("")
+        shop_display.append(
+            "💡 **Spending XP on tools does NOT affect your level or total XP earned!**"
         )
         shop_display.append("")
         shop_display.append("━" * 60)
@@ -85,7 +94,7 @@ class ShopContext(BaseContext):
                     shop_display.append(f"     _{description}_")
                     shop_display.append(f"     👉 Already unlocked for you!")
                 else:
-                    affordable = current_xp >= price
+                    affordable = current_xp_balance >= price
                     icon = "💰" if affordable else "🔒"
 
                     shop_display.append(f"  {icon} **{tool_name}** - {price} XP")
@@ -96,7 +105,7 @@ class ShopContext(BaseContext):
                             f'     👉 `buy_tool(tool_name="{tool_name}")`'
                         )
                     else:
-                        needed = price - current_xp
+                        needed = price - current_xp_balance
                         shop_display.append(f"     ⚠️ Need {needed} more XP")
 
                     total_locked += 1
@@ -115,10 +124,10 @@ class ShopContext(BaseContext):
         shop_display.append(
             f"**Tools Available**: {total_locked} tools ready to unlock"
         )
-        shop_display.append(f"**Current XP**: {current_xp}")
+        shop_display.append(f"**XP Balance**: {current_xp_balance}")
         shop_display.append("")
 
-        if current_xp >= 100:
+        if current_xp_balance >= 100:
             shop_display.append("## 💡 RECOMMENDATIONS")
             shop_display.append("")
 
@@ -150,8 +159,9 @@ class ShopContext(BaseContext):
         shop_display.append("## 🛠️ AVAILABLE ACTIONS")
         shop_display.append("")
         shop_display.append('👉 `buy_tool(tool_name="...")`')
-        shop_display.append("   - Purchase a tool with your XP")
+        shop_display.append("   - Purchase a tool with your XP Balance")
         shop_display.append("   - Use exact tool_name from list above")
+        shop_display.append("   - Your level won't change when you buy!")
         shop_display.append("")
         shop_display.append('👉 `navigate_to_mode(chosen_mode="HOME")`')
         shop_display.append("   - Return to dashboard")
@@ -159,6 +169,7 @@ class ShopContext(BaseContext):
         shop_display.append("💡 **Strategy Tips:**")
         shop_display.append("- Tools unlock NEW capabilities (real Python functions)")
         shop_display.append("- All tools cost 100 XP (fair pricing)")
+        shop_display.append("- Buying tools uses XP Balance (not Total XP or Level)")
         shop_display.append("- Prioritize tools that help you EARN more XP")
         shop_display.append("- Blog tools = high XP return (25 XP per article)")
         shop_display.append("- Social tools = engagement & community building")
@@ -174,7 +185,7 @@ class ShopContext(BaseContext):
 
         owned_tools = set(self.memory.get_owned_tools())
         prog_status = self.progression.get_current_status()
-        current_xp = prog_status.get("current_xp", 0)
+        current_xp_balance = prog_status.get("current_xp_balance", 0)
 
         catalog = self.memory.get_shop_catalog()
         tools = catalog.get("tools", [])
@@ -267,22 +278,25 @@ This tool doesn't exist in the shop catalog.
             detail.append("")
             detail.append("It should already be unlocked for you.")
         else:
-            affordable = current_xp >= price
+            affordable = current_xp_balance >= price
 
             if affordable:
                 detail.append(f'👉 `buy_tool(tool_name="{tool_name}")`')
                 detail.append(f"   - Purchase this tool for {price} XP")
-                detail.append(f"   - Remaining balance: {current_xp - price} XP")
+                detail.append(
+                    f"   - Remaining balance: {current_xp_balance - price} XP"
+                )
+                detail.append(f"   - Your level won't change!")
             else:
-                needed = price - current_xp
-                detail.append(f"⚠️ **Insufficient XP**")
+                needed = price - current_xp_balance
+                detail.append(f"⚠️ **Insufficient XP Balance**")
                 detail.append("")
                 detail.append(f"You need {needed} more XP to purchase this tool.")
                 detail.append("")
                 detail.append("💡 **How to earn XP:**")
                 detail.append("- Use your existing tools to complete actions")
                 detail.append("- Diversify across modules (Email, Blog, Social)")
-                detail.append("- Avoid loops (they cost XP!)")
+                detail.append("- Avoid loops (they reduce your XP Balance!)")
 
         detail.append("")
         detail.append('👉 `navigate_to_mode(chosen_mode="SHOP")`')

@@ -148,6 +148,7 @@ class SessionManager:
                         domain="plan",
                         include_globals=True,
                         allow_memory=True,
+                        memory_handler=self.dispatcher.memory_handler,
                     )
                 else:
                     current_schema = SchemaFactory.get_schema_for_context(
@@ -174,6 +175,7 @@ class SessionManager:
                         domain=self.current_domain,
                         include_globals=True,
                         allow_memory=True,
+                        memory_handler=self.dispatcher.memory_handler,
                     )
                 else:
                     current_schema = SchemaFactory.get_schema_for_context(

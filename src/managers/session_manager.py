@@ -412,7 +412,6 @@ class SessionManager:
             self.send_final_report(session_learnings)
 
     def _generate_session_learnings(self) -> Dict:
-
         events_summary = "\n".join(
             [
                 f"{'✅' if e['success'] else '❌'} {e['action']} in {e['domain']}"
@@ -425,8 +424,11 @@ class SessionManager:
         success_rate = (
             (successes / len(self.tracker.events) * 100) if self.tracker.events else 0
         )
+
         prog_status = self.progression.get_current_status()
-        current_xp = prog_status.get("current_xp", 0)
+
+        current_xp_balance = prog_status.get("current_xp_balance", 0)
+        total_xp_earned = prog_status.get("total_xp_earned", 0)
         current_level = prog_status.get("level", 1)
         current_title = prog_status.get("current_title", "Digital Seedling")
         xp_needed = prog_status.get("xp_needed", 100)
@@ -453,7 +455,9 @@ ACTIONS LOG:
 {events_summary}
 
 PROGRESSION SYSTEM STATUS:
-- Current XP: {current_xp}/{xp_needed} (Level {current_level})
+- XP Balance: {current_xp_balance} (available for shop)
+- Total XP Earned: {total_xp_earned} (Level {current_level})
+- XP Needed for Next Level: {xp_needed}
 - Title: {current_title}
 - Tools Owned: {len(owned_tools)}/{total_tools}
 - Tools Purchased This Session: {', '.join([p['item_name'] for p in purchase_history]) if purchase_history else 'None'}
@@ -465,16 +469,13 @@ YOUR MASTER PLAN:
 GENERATE A REFLECTION (max 300 words) COVERING:
 
 1. **Learnings**: What patterns or insights emerged? What worked well?
-
 2. **Struggles**: What failed or needs improvement? What caused loops, errors, or inefficiencies?
-
 3. **Framework Insights**: Reflect on how the current framework behaves. Which features are underutilized? How could you leverage it better next time? Note any quirks, pitfalls, or strategies learned.
-
 4. **Progression Strategy**: 
-   - How did you manage your XP budget this session?
-   - Were your tool purchases strategic? Did you use them effectively?
-   - What tools should you prioritize buying next session?
-   - How can you maximize XP gain while minimizing XP loss (loops)?
+- How did you manage your XP budget this session?
+- Were your tool purchases strategic? Did you use them effectively?
+- What tools should you prioritize buying next session?
+- How can you maximize XP gain while minimizing XP loss (loops)?
 
 5. **Next Session Plan**: What should be prioritized next time to improve performance? Include concrete steps based on your understanding of the framework AND the progression system.
 

@@ -117,12 +117,27 @@ class UIUtils:
         error_msg: str = None,
         progression_status: Dict = None,
         notification_section=None,
+        modules_status: str = None,
     ) -> str:
 
         header = cls.render_navbar(current_domain, action_count, progression_status)
+
+        modules_section = ""
+        if modules_status:
+            modules_section = f"""
+### 🗺️ MODULES QUICK STATUS
+💡 Available actions in other modules (avoid useless navigation):
+
+{modules_status}
+
+🛒 **Need more capabilities?** Use `visit_shop` to unlock tools with your XP!
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+"""
+
         notifications = cls.render_feedback(success_msg, error_msg, current_domain)
 
-        return f"{header}{notification_section}{'━' * 70}\n\n{content}\n\n\n{notifications}"
+        return f"{header}{notification_section}{modules_section}{'━' * 70}\n\n{content}\n\n\n{notifications}"
 
     @staticmethod
     def render_workspace(workspace_data: Dict[str, str]) -> str:

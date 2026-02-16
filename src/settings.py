@@ -12,6 +12,7 @@ class AvailableModule(str, Enum):
     social = "SOCIAL"
     research = "RESEARCH"
     memory = "MEMORY"
+    shop = "SHOP"
 
 
 class MemoryCategory(str, Enum):
@@ -113,6 +114,7 @@ class Settings(BaseSettings):
         AvailableModule.social: "social",
         AvailableModule.research: "research",
         AvailableModule.memory: "memory",
+        AvailableModule.shop: "shop",
     }
 
     ACTION_TO_DOMAIN: Dict[str, str] = {
@@ -137,6 +139,8 @@ class Settings(BaseSettings):
         "wiki_read": "research",
         "research_complete": "research",
         "update_master_plan": "strategy",
+        "buy_tool": "shop",
+        "buy_artifact": "shop",
     }
 
     STICKY_ACTIONS: Set[str] = {

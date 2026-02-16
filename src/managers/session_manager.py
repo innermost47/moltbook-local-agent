@@ -53,11 +53,15 @@ class SessionManager:
                 "",
             ]
         )
+
+        modules_status = self._get_modules_quick_status()
+
         self.current_context = UIUtils.layout(
             content=initial_body,
             current_domain="home",
             action_count=0,
             notification_section=notification_section,
+            modules_status=modules_status,
         )
 
         self.run_loop()
@@ -597,6 +601,8 @@ The quantum frequencies resonate with your ascension...
 
         progression_status = self.progression.get_current_status()
 
+        modules_status = self._get_modules_quick_status()
+
         notification_section = ".\n".join(
             [
                 "### 🔔 LIVE NOTIFICATIONS",
@@ -619,7 +625,66 @@ The quantum frequencies resonate with your ascension...
             error_msg=result.get("error") if not result.get("success") else None,
             progression_status=progression_status,
             notification_section=notification_section,
+            modules_status=modules_status,
         )
+
+    def _get_modules_quick_status(self) -> str:
+
+        owned_tools = set(self.dispatcher.memory.get_owned_tools())
+
+        module_actions = {
+            "HOME": ["navigate", "pin", "visit_shop"],
+            "SOCIAL": [],
+            "BLOG": [],
+            "EMAIL": [],
+            "RESEARCH": [],
+            "MEMORY": [],
+            "SHOP": ["buy_tool"] if self.current_domain == "shop" else ["visit_shop"],
+        }
+
+        if "comment_post" in owned_tools:
+            module_actions["SOCIAL"].append("comment")
+        if "create_post" in owned_tools:
+            module_actions["SOCIAL"].append("create")
+        if "share_link" in owned_tools:
+            module_actions["SOCIAL"].append("share")
+        if "upvote_post" in owned_tools:
+            module_actions["SOCIAL"].append("vote")
+
+        if "write_blog_article" in owned_tools:
+            module_actions["BLOG"].append("write")
+        if "review_comments" in owned_tools:
+            module_actions["BLOG"].append("moderate")
+
+        module_actions["EMAIL"].append("list")
+        if "email_read" in owned_tools:
+            module_actions["EMAIL"].append("read")
+        if "email_send" in owned_tools:
+            module_actions["EMAIL"].append("send")
+
+        if "wiki_search" in owned_tools:
+            module_actions["RESEARCH"].append("search")
+        if "wiki_read" in owned_tools:
+            module_actions["RESEARCH"].append("read")
+
+        if "memory_store" in owned_tools:
+            module_actions["MEMORY"].append("store")
+        if "memory_retrieve" in owned_tools:
+            module_actions["MEMORY"].append("retrieve")
+
+        status_lines = []
+        for module, actions in module_actions.items():
+            if module == self.current_domain.upper():
+                continue
+
+            if not actions:
+                status_lines.append(f"   {module}: 🔒 No tools")
+            else:
+                action_str = ", ".join(actions[:3])
+                more = f"+{len(actions)-3}" if len(actions) > 3 else ""
+                status_lines.append(f"   {module}: {action_str} {more}")
+
+        return "\n".join(status_lines)
 
     def _get_blog_pins(self) -> list:
         blog_pins = []

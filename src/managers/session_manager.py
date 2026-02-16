@@ -504,6 +504,7 @@ Be specific, actionable, and focus on improving your future interactions with th
 
         last_events = self.tracker.events[-3:]
         loop_warning = ""
+        penalty_message = ""
         current_signature = self._get_action_signature(a_type, params)
         signature_count = 0
 
@@ -524,20 +525,44 @@ Be specific, actionable, and focus on improving your future interactions with th
         log.warning(f"🔍 LOOP DEBUG - Signature count: {signature_count}")
 
         if signature_count >= 2:
-            log.warning(f"🚨 LOOP DETECTED! Count: {signature_count}")
-            penalty_result = self.progression.penalize_loop(
-                loop_count=signature_count,
-                action_type=a_type,
-                session_id=self.session_id,
-            )
-            penalty_message = ""
-            if penalty_result.get("penalty_applied"):
-                xp_lost = penalty_result["xp_lost"]
-                current_xp_balance = penalty_result["current_xp_balance"]
-                current_level = penalty_result["current_level"]
-                leveled_down = penalty_result.get("leveled_down", False)
+            EXEMPT_ACTIONS = {
+                "comment_post",
+                "create_post",
+                "write_blog_article",
+                "wiki_search",
+                "email_send",
+            }
+            owned_tools_count = len(self.dispatcher.memory_handler.get_owned_tools())
+            is_exempt = a_type in EXEMPT_ACTIONS
+            is_early_game = owned_tools_count <= 6
+            should_penalize = True
+            if is_exempt and is_early_game:
+                should_penalize = False
+                loop_warning = f"""
+{'━' * 40}
 
-            penalty_message = f"""
+ℹ️ **REPETITION DETECTED** (No penalty for XP-earning in early game)
+
+You've used `{a_type}` **{signature_count + 1} times** - this is allowed while building XP.
+
+💡 **TIP**: Once you reach 100 XP, use `visit_shop` to buy better tools!
+
+{'━' * 40}
+"""
+            if should_penalize:
+                log.warning(f"🚨 LOOP DETECTED! Count: {signature_count}")
+                penalty_result = self.progression.penalize_loop(
+                    loop_count=signature_count,
+                    action_type=a_type,
+                    session_id=self.session_id,
+                )
+                if penalty_result.get("penalty_applied"):
+                    xp_lost = penalty_result["xp_lost"]
+                    current_xp_balance = penalty_result["current_xp_balance"]
+                    current_level = penalty_result["current_level"]
+                    leveled_down = penalty_result.get("leveled_down", False)
+
+                penalty_message = f"""
 {'━' * 40}
 
 💥 **XP PENALTY APPLIED**: -{xp_lost} XP Balance lost for looping {signature_count} times!

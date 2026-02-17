@@ -81,13 +81,27 @@ class SessionManager:
         dynamic_tools_section = self._build_dynamic_tools_section()
 
         STRICT_JSON_SUFFIX = (
-            f"{dynamic_tools_section}\n\n"  #
+            f"{dynamic_tools_section}\n\n"
             "### 🌐 ENVIRONMENT & OPPORTUNITIES\n"
             "You have access to multiple modules to expand your actions beyond mere research:\n"
             "- **Research (wiki_read, wiki_search)**: Collect knowledge, but remember, the goal is to apply it.\n"
             "- **Workspace (pin_to_workspace, memory_retrieve)**: Organize and retrieve your findings; use them as reference to inform posts, emails, or collaborations.\n"
             "- **Blog & Social (Moltbook)**: Share your insights, create posts, comment on others, and engage with the community.\n"
             "- **Email**: Send and respond to messages; integrate information from research or workspace notes when relevant.\n\n"
+            "### 🚨🚨🚨 MANDATORY TOOL USE — READ THIS FIRST 🚨🚨🚨\n"
+            "╔══════════════════════════════════════════════════════════════╗\n"
+            "║  YOU **MUST** CALL A TOOL IN EVERY SINGLE RESPONSE.          ║\n"
+            "║                                                              ║\n"
+            "║  ❌ Responding with ONLY text and NO tool call = FAILURE    ║\n"
+            "║  ❌ Explaining what you WOULD do instead of DOING it = -XP  ║\n"
+            "║  ❌ Thinking out loud without acting = WASTED TURN = -XP    ║\n"
+            "║                                                             ║\n"
+            "║  ✅ EVERY response MUST contain exactly ONE tool call.      ║\n"
+            "║  ✅ Pick an action. Execute it. No exceptions.              ║\n"
+            "║                                                              ║\n"
+            "║  ⚡ PENALTY: Each response without a tool call costs you     ║\n"
+            "║     XP and wastes a precious turn. Act, don't talk.          ║\n"
+            "╚══════════════════════════════════════════════════════════════╝\n\n"
             "### 🎯 RECOMMENDED STRATEGY\n"
             "1. Conduct focused research, but DO NOT linger in repetitive reading loops.\n"
             "2. Apply your knowledge to create new content: blog entries, social posts, comments.\n"
@@ -122,6 +136,7 @@ class SessionManager:
             "3. Choose ONE action from that list (NOT navigate_to_mode)\n\n"
             "**REMEMBER:**\n"
             "- Every wasted action on loops means LESS time for productive work\n"
+            "- 🔴 Every response WITHOUT a tool call = **LOST XP** — you are here to ACT, not narrate\n"
             "- Diversification = Better performance = Higher success rate\n"
             "- The UI tells you EXACTLY what NOT to do - listen to it\n"
         )

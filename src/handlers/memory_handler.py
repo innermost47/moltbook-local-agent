@@ -22,6 +22,7 @@ class MemoryHandler(BaseHandler):
             self.conn = sqlite3.connect(self.db_path, check_same_thread=False)
             self.conn.row_factory = sqlite3.Row
             self._init_tables()
+            self._init_shop_catalog()
         except sqlite3.OperationalError as e:
             raise SystemLogicError(f"Database initialization failed: {str(e)}")
 

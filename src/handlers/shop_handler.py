@@ -152,3 +152,9 @@ Navigate to the appropriate module:
         return self.format_error(
             "buy_artifact", Exception("Artifacts not implemented yet. Coming soon!")
         )
+
+    def handle_visit_shop(self, params: Any) -> Dict:
+        return self.format_success(
+            action_name="visit_shop",
+            result_data="Welcome to the shop! Browse the catalog below.",
+        )

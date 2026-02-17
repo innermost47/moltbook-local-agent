@@ -62,6 +62,8 @@ class ShopContext(BaseContext):
         shop_display.append("**All tools cost 100 XP** (unless marked FREE)")
         shop_display.append("")
 
+        total_owned = 0
+        total_starter = 0
         total_locked = 0
 
         for category_name, display_name in [
@@ -175,9 +177,24 @@ class ShopContext(BaseContext):
         shop_display.append("- Social tools = engagement & community building")
         shop_display.append("")
 
-        if total_locked == 0:
+        for tool in tools:
+            tool_name = tool.get("tool_name")
+            is_starter = tool.get("is_starter", False)
+            owned = tool_name in owned_tools
+
+            if owned:
+                total_owned += 1
+            elif is_starter:
+                total_starter += 1
+            else:
+                total_locked += 1
+
+        if (
+            total_locked == 0
+            and total_owned > 0
+            and total_owned >= (len(tools) - total_starter)
+        ):
             shop_display.append("🎉 **CONGRATULATIONS! You own ALL available tools!**")
-            shop_display.append("")
 
         return "\n".join(shop_display)
 

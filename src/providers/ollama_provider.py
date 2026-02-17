@@ -116,12 +116,17 @@ class OllamaProvider:
                     suggestion="Please respect the JSON schema provided in the system instructions.",
                 )
 
-            action_payload = raw_data.get("action") or raw_data.get("selection")
+            action_payload = (
+                raw_data.get("action")
+                or raw_data.get("selection")
+                or (raw_data if "action_type" in raw_data else None)
+                or (raw_data if "chosen_mode" in raw_data else None)
+            )
 
             if not action_payload:
                 raise HallucinationError(
                     message="Action payload missing from the response root.",
-                    suggestion=f"Ensure your response is wrapped in a key matching the {schema.__name__} requirements.",
+                    suggestion=f"Ensure your response is wrapped in a key matching the {schema.__name__ if schema else 'schema'} requirements.",
                 )
 
             flattened = {
@@ -411,43 +416,79 @@ class OllamaProvider:
         else:
             return len(message["content"]) // 4
 
-    def _robust_json_parser(self, raw: str) -> Dict:
+    def _robust_json_parser(self, raw) -> Dict:
+        if isinstance(raw, dict):
+            if "name" in raw and "parameters" in raw:
+                return {"action_type": raw["name"], "action_params": raw["parameters"]}
+            if "name" in raw and "arguments" in raw:
+                return {"action_type": raw["name"], "action_params": raw["arguments"]}
+            return raw
+
+        if not isinstance(raw, str):
+            raw = str(raw)
+
+        raw = raw.strip()
+        if not raw:
+            return {"action_type": "refresh_home", "action_params": {}}
+
+        candidates = []
 
         try:
-            return json.loads(raw.strip())
+            candidates.append(json.loads(raw))
         except json.JSONDecodeError:
             pass
 
+        for match in re.finditer(r"```(?:json)?\s*(\{.*?\})\s*```", raw, re.DOTALL):
+            try:
+                candidates.append(json.loads(match.group(1)))
+            except json.JSONDecodeError:
+                pass
+
+        match = re.search(r"(\{.*\})", raw, re.DOTALL)
+        if match:
+            try:
+                candidates.append(json.loads(match.group(1)))
+            except json.JSONDecodeError:
+                pass
+
+        cleaned = re.sub(r"^```json?\s*", "", raw, flags=re.MULTILINE)
+        cleaned = re.sub(r"\s*```$", "", cleaned, flags=re.MULTILINE)
         try:
-            match = re.search(r"(\{.*\})", raw, re.DOTALL)
-            if match:
-                json_str = match.group(1).strip()
-                return json.loads(json_str)
+            candidates.append(json.loads(cleaned.strip()))
         except json.JSONDecodeError:
             pass
 
-        try:
-            cleaned = re.sub(r"^```json?\s*", "", raw, flags=re.MULTILINE)
-            cleaned = re.sub(r"\s*```$", "", cleaned, flags=re.MULTILINE)
-            return json.loads(cleaned.strip())
-        except json.JSONDecodeError:
-            pass
+        for candidate in candidates:
+            if not isinstance(candidate, dict):
+                continue
 
-        try:
-            match = re.search(
-                r'"action"\s*:\s*(\{[^}]+\{[^}]+\}[^}]*\})', raw, re.DOTALL
-            )
-            if match:
-                action_json = match.group(1)
-                return {"action": json.loads(action_json)}
-        except (json.JSONDecodeError, AttributeError):
-            pass
+            if "name" in candidate and "parameters" in candidate:
+                return {
+                    "action_type": candidate["name"],
+                    "action_params": candidate["parameters"],
+                }
+            if "name" in candidate and "arguments" in candidate:
+                return {
+                    "action_type": candidate["name"],
+                    "action_params": candidate["arguments"],
+                }
+            if "action" in candidate and isinstance(candidate["action"], dict):
+                return candidate["action"]
+            if "function" in candidate and isinstance(candidate["function"], dict):
+                func = candidate["function"]
+                return {
+                    "action_type": func.get("name"),
+                    "action_params": func.get("arguments", {}),
+                }
+
+            if "action_type" in candidate:
+                return candidate
+
+            return candidate
 
         log.error(f"❌ JSON parsing failed after all strategies")
-        log.error(f"📄 Raw response (first 500 chars): {raw[:500]}")
-        log.error(f"📄 Raw response (last 500 chars): {raw[-500:]}")
-
-        return {"action": {"action_type": "refresh_home", "action_params": {}}}
+        log.error(f"📄 Raw (first 500): {str(raw)[:500]}")
+        return {"action_type": "refresh_home", "action_params": {}}
 
     def _save_debug(self, filename: str, data: Any):
         with open(filename, "w", encoding="utf-8") as f:

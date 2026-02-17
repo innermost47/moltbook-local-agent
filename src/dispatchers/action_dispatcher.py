@@ -75,6 +75,7 @@ class ActionDispatcher:
             "comment_post": self.social_handler,
             "reply_to_comment": self.social_handler,
             "read_post": self.social_handler,
+            "visit_shop": self.shop_handler,
         }
 
         self.session_manager = None

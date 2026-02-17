@@ -99,6 +99,20 @@ class SimplifiedMoltbookScreen(BaseModel):
     action: SimplifiedMoltbookAction
 
 
+SocialListAction = Annotated[
+    Union[
+        ReadPostAction,
+        RefreshFeedAction,
+        GlobalAction,
+    ],
+    Field(discriminator="action_type"),
+]
+
+
+class SocialListScreen(BaseModel):
+    action: SocialListAction
+
+
 class RegisterParams(BaseModel):
     name: str = Field(..., min_length=3)
     description: str = Field(..., min_length=20)
@@ -229,6 +243,7 @@ class FullMoltbookScreen(BaseModel):
 
 MoltbookAction = SimplifiedMoltbookAction
 MoltbookScreen = SimplifiedMoltbookScreen
+
 
 MoltbookTestAction = FullMoltbookAction
 MoltbookTestScreen = FullMoltbookScreen

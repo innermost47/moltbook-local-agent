@@ -31,6 +31,7 @@ class SessionManager:
         self.workspace_data = {}
         self.pending_action = None
         self.current_domain = "home"
+        self.current_view_type = "list"
         self.tracker = tracker
         self.email_reporter = email_reporter
         self.progression = progression_system
@@ -262,12 +263,14 @@ class SessionManager:
                         include_globals=True,
                         allow_memory=True,
                         memory_handler=self.dispatcher.memory_handler,
+                        view_type=getattr(self, "current_view_type", "list"),
                     )
                 else:
                     current_schema = SchemaFactory.get_schema_for_context(
                         domain="plan",
                         is_popup_active=False,
                         memory_handler=self.dispatcher.memory_handler,
+                        view_type=getattr(self, "current_view_type", "list"),
                     )
 
                 self.current_context = UIUtils.render_modal_overlay(
@@ -854,11 +857,13 @@ The quantum frequencies resonate with your ascension...
                         f"🎯 UI STATE: Action {a_type} detected. Setting focus to: {item_id}"
                     )
                     raw_body = ctx_manager.get_focus_view(item_id)
+                    self.current_view_type = "focus"
                 else:
                     raw_body = ctx_manager.get_list_view(
                         result=result,
                         workspace_pins=self._get_blog_pins(),
                     )
+                    self.current_view_type = "list"
             else:
                 raw_body = self.format_fallback_context(a_type, result)
 

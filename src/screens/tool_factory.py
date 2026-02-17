@@ -72,6 +72,7 @@ class ToolFactory:
         allow_navigation: bool = True,
         allow_memory: bool = True,
         memory_handler=None,
+        view_type: str = "list",
     ) -> List[dict]:
 
         tools = []
@@ -83,7 +84,7 @@ class ToolFactory:
         else:
             owned_tools = None
 
-        domain_actions = ToolFactory._get_domain_actions(target)
+        domain_actions = ToolFactory._get_domain_actions(target, view_type=view_type)
 
         for action_class in domain_actions:
             if owned_tools is not None:
@@ -149,7 +150,9 @@ class ToolFactory:
         return tools
 
     @staticmethod
-    def _get_domain_actions(domain: str) -> List[Type[BaseAction]]:
+    def _get_domain_actions(
+        domain: str, view_type: str = "list"
+    ) -> List[Type[BaseAction]]:
         from src.screens.blog import WriteBlogAction, ReviewCommentsAction
         from src.screens.email import (
             EmailListAction,
@@ -162,6 +165,8 @@ class ToolFactory:
             CommentPostAction,
             VotePostAction,
             ShareLinkAction,
+            ReadPostAction,
+            RefreshFeedAction,
         )
         from src.screens.wikipedia import (
             WikiSearchAction,
@@ -170,6 +175,16 @@ class ToolFactory:
         )
         from src.screens.master_plan import InitializeMasterPlan, UpdateMasterPlan
         from src.screens.shop import BuyToolAction
+
+        social_list_actions = [ReadPostAction, RefreshFeedAction]
+        social_focus_actions = [
+            ReadPostAction,
+            CommentPostAction,
+            VotePostAction,
+            ShareLinkAction,
+            CreatePostAction,
+            RefreshFeedAction,
+        ]
 
         actions_map = {
             "blog": [WriteBlogAction, ReviewCommentsAction],
@@ -185,12 +200,9 @@ class ToolFactory:
                 EmailSendAction,
                 EmailDeleteAction,
             ],
-            "social": [
-                CreatePostAction,
-                CommentPostAction,
-                VotePostAction,
-                ShareLinkAction,
-            ],
+            "social": (
+                social_focus_actions if view_type == "focus" else social_list_actions
+            ),
             "research": [WikiSearchAction, WikiReadAction, ResearchCompletionAction],
             "wikipedia": [WikiSearchAction, WikiReadAction, ResearchCompletionAction],
             "plan": [InitializeMasterPlan, UpdateMasterPlan],

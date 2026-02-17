@@ -1,7 +1,7 @@
 from typing import Type, Union, get_args, Literal, Annotated
 from pydantic import BaseModel, Field, create_model
 from src.screens.home import HomeScreen
-from src.screens.social import MoltbookScreen
+from src.screens.social import SocialListScreen, MoltbookScreen
 from src.screens.blog import BlogScreen
 from src.screens.email import EmailScreen
 from src.screens.master_plan import StrategyScreen, StrictPlanScreen
@@ -16,7 +16,10 @@ from src.screens.base import BaseAction
 class SchemaFactory:
     @staticmethod
     def get_schema_for_context(
-        domain: str, is_popup_active: bool, memory_handler=None
+        domain: str,
+        is_popup_active: bool,
+        memory_handler=None,
+        view_type: str = "list",
     ) -> Type[BaseModel]:
 
         if is_popup_active:
@@ -36,7 +39,7 @@ class SchemaFactory:
             "blog": BlogScreen,
             "email": EmailScreen,
             "mail": EmailScreen,
-            "social": MoltbookScreen,
+            "social": MoltbookScreen if view_type == "focus" else SocialListScreen,
             "research": ResearchScreen,
             "wikipedia": ResearchScreen,
             "plan": StrategyScreen,

@@ -199,7 +199,14 @@ class ToolFactory:
             "shop": [BuyToolAction],
         }
 
-        return actions_map.get(domain, [])
+        result = actions_map.get(domain)
+
+        if result is None:
+            log.error(f"❌ Unknown domain '{domain}' - returning empty actions!")
+            log.error(f"❌ Add '{domain}' to ACTION_TO_DOMAIN in settings.py!")
+            return []
+
+        return result
 
     @staticmethod
     def _get_global_tools(

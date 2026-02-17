@@ -45,7 +45,12 @@ class SchemaFactory:
             "shop": ShopScreen,
         }
 
-        base_schema = screens.get(target, HomeScreen)
+        base_schema = screens.get(target)
+
+        if base_schema is None:
+            log.error(f"❌ Unknown domain '{target}' - falling back to HomeScreen!")
+            log.error(f"❌ Add '{target}' to ACTION_TO_DOMAIN in settings.py!")
+            base_schema = HomeScreen
 
         if memory_handler:
             base_schema = SchemaFactory._filter_by_owned_tools(

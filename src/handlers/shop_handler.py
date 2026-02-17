@@ -154,7 +154,38 @@ Navigate to the appropriate module:
         )
 
     def handle_visit_shop(self, params: Any) -> Dict:
+        prog_status = self.progression.get_current_status()
+        current_xp_balance = prog_status.get("current_xp_balance", 0)
+        owned_tools_count = len(self.memory.get_owned_tools())
+
+        if current_xp_balance >= 100:
+            result_data = (
+                f"Welcome to the shop! You have {current_xp_balance} XP - "
+                f"you can afford a tool! Use `buy_tool(tool_name='...')` to purchase."
+            )
+            anti_loop = (
+                "You are NOW in the SHOP. "
+                "Use `buy_tool(tool_name='...')` to purchase a tool. "
+                "DO NOT call visit_shop again!"
+            )
+        else:
+            needed = 100 - current_xp_balance
+            comments_needed = max(0, -(-needed // 8))
+            result_data = (
+                f"Shop visited. You have {current_xp_balance}/100 XP - "
+                f"not enough to buy anything yet! "
+                f"Need {needed} more XP ({comments_needed} comments). "
+                f"Go earn XP first!"
+            )
+            anti_loop = (
+                f"You CANNOT buy anything with {current_xp_balance} XP. "
+                f"DO NOT visit shop again until you have 100 XP. "
+                f"Go to SOCIAL and use comment_post to earn {needed} more XP first!"
+            )
+
         return self.format_success(
             action_name="visit_shop",
-            result_data="Welcome to the shop! Browse the catalog below.",
+            result_data=result_data,
+            anti_loop_hint=anti_loop,
+            owned_tools_count=owned_tools_count,
         )

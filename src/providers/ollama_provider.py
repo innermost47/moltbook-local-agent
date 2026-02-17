@@ -192,7 +192,7 @@ class OllamaProvider:
             f"---\n🕒 **System Time**: {now}"
         )
 
-        messages = conversation_history + [
+        messages = self._clean_history_for_context(conversation_history) + [
             {"role": "user", "content": full_llm_payload}
         ]
 
@@ -247,29 +247,57 @@ class OllamaProvider:
                     "tool_calls": tool_calls_serializable,
                 }
             else:
+                content = message.get("content", "")
+                thinking = message.get("thinking", "")
+
+                if not content and thinking:
+                    log.warning(
+                        "⚠️ Qwen3 thinking mode detected - extracting from thinking"
+                    )
+                    match = re.search(r"(\{.*\})", thinking, re.DOTALL)
+                    if match:
+                        content = match.group(1)
+                        log.info(f"✅ Extracted content from thinking: {content[:100]}")
+                    else:
+                        log.error("❌ No JSON found in thinking block!")
+
                 assistant_msg = {
                     "role": "assistant",
-                    "content": message.get("content", ""),
+                    "content": content,
                 }
 
-                if pydantic_model:
+                if pydantic_model and content:
                     try:
-                        data_dict = self._robust_json_parser(assistant_msg)
+                        data_dict = self._robust_json_parser(content)
                         validated = pydantic_model.model_validate(data_dict)
-                        assistant_msg = validated.model_dump_json()
+                        assistant_msg = {
+                            "role": "assistant",
+                            "content": validated.model_dump_json(),
+                        }
                     except ValidationError as e:
-                        raise FormattingError(
-                            message=f"JSON structure does not match {pydantic_model.__name__}.",
-                            suggestion="Ensure all required fields are present and correctly typed.",
+                        log.warning(
+                            f"⚠️ JSON structure does not match {pydantic_model.__name__}."
                         )
+
+                elif pydantic_model and not content:
+                    log.error(
+                        "❌ Empty content even after thinking extraction - fallback!"
+                    )
+                    assistant_msg = {
+                        "role": "assistant",
+                        "content": json.dumps(
+                            {
+                                "action": {
+                                    "action_type": "refresh_home",
+                                    "action_params": {},
+                                }
+                            }
+                        ),
+                    }
 
             updated_history = conversation_history + [
                 {"role": "user", "content": prompt},
-                (
-                    assistant_msg
-                    if isinstance(assistant_msg, dict)
-                    else {"role": "assistant", "content": assistant_msg}
-                ),
+                assistant_msg,
             ]
 
             if settings.ENABLE_SMART_COMPRESSION:
@@ -288,6 +316,31 @@ class OllamaProvider:
                 "error": fe.message,
                 "suggestion": fe.suggestion,
             }, conversation_history
+
+    def _clean_history_for_context(self, history: List[Dict]) -> List[Dict]:
+        cleaned = []
+        for msg in history:
+            if msg.get("role") == "assistant" and msg.get("tool_calls"):
+                clean_msg = dict(msg)
+                clean_tool_calls = []
+                for tc in msg["tool_calls"]:
+                    clean_tc = dict(tc)
+                    if "function" in clean_tc:
+                        clean_args = dict(clean_tc["function"].get("arguments", {}))
+                        clean_args.pop("reasoning", None)
+                        clean_args.pop("self_criticism", None)
+                        clean_args.pop("emotions", None)
+                        clean_tc["function"] = {
+                            **clean_tc["function"],
+                            "arguments": clean_args,
+                        }
+                    clean_tool_calls.append(clean_tc)
+                clean_msg["tool_calls"] = clean_tool_calls
+                clean_msg["content"] = ""
+                cleaned.append(clean_msg)
+            else:
+                cleaned.append(msg)
+        return cleaned
 
     def _manage_context_window(
         self, response: Dict, conversation_history: List[Dict]

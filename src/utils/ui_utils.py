@@ -97,7 +97,7 @@ class UIUtils:
         is_early_game = owned_tools_count <= 6
         is_repeatable = last_action in REPEATABLE_ACTIONS
         can_afford_tool = current_xp_balance >= 100
-        comments_needed = max(0, -(-(100 - current_xp_balance) // 8))
+        comments_needed = max(0, -(-(100 - current_xp_balance) // 10))
 
         feedback = ""
 

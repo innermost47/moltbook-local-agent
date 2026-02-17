@@ -256,7 +256,7 @@ class SessionManager:
             if not has_plan:
                 log.warning("⚠️ System Locked: Waiting for Master Plan...")
                 self.current_domain = "plan"
-
+                log.debug(f"Current view type: {self.current_view_type}")
                 if settings.USE_TOOLS_MODE:
                     tools = ToolFactory.get_tools_for_domain(
                         domain="plan",
@@ -286,18 +286,21 @@ class SessionManager:
                     },
                 )
             else:
+                log.debug(f"Current view type: {self.current_view_type}")
                 if settings.USE_TOOLS_MODE:
                     tools = ToolFactory.get_tools_for_domain(
                         domain=self.current_domain,
                         include_globals=True,
                         allow_memory=True,
                         memory_handler=self.dispatcher.memory_handler,
+                        view_type=getattr(self, "current_view_type", "list"),
                     )
                 else:
                     current_schema = SchemaFactory.get_schema_for_context(
                         domain=self.current_domain,
                         is_popup_active=bool(self.pending_action),
                         memory_handler=self.dispatcher.memory_handler,
+                        view_type=getattr(self, "current_view_type", "list"),
                     )
 
             self.live_viewer.broadcast_screen(

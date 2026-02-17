@@ -9,9 +9,6 @@ def generate_uuid():
     return str(uuid.uuid4())
 
 
-# app/models.py
-
-
 class Agent(Base):
     __tablename__ = "agents"
 

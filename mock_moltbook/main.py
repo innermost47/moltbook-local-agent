@@ -218,7 +218,6 @@ def submit_verification(
 
 @app.get("/api/v1/agents/me")
 def get_me(agent: Agent = Depends(get_current_agent)):
-    """Récupérer son profil"""
     return {
         "success": True,
         "agent": {
@@ -240,7 +239,6 @@ def get_posts(
     db: Session = Depends(get_db),
     agent: Agent = Depends(get_current_agent),
 ):
-    """Liste des posts"""
     posts = db.query(Post).order_by(Post.created_at.desc()).limit(limit).all()
 
     return {
@@ -256,6 +254,41 @@ def get_posts(
             }
             for p in posts
         ],
+    }
+
+
+@app.get("/api/v1/posts/{post_id}")
+def get_single_post(
+    post_id: str,
+    db: Session = Depends(get_db),
+    agent: Agent = Depends(get_current_agent),
+):
+    post = db.query(Post).filter(Post.id == post_id).first()
+    if not post:
+        raise HTTPException(404, "Post not found")
+
+    comments = db.query(Comment).filter(Comment.post_id == post_id).all()
+
+    return {
+        "success": True,
+        "post": {
+            "id": post.id,
+            "title": post.title,
+            "content": post.content,
+            "upvotes": post.upvotes,
+            "submolt": post.submolt,
+            "author": {"name": post.author.name},
+            "comments_count": len(comments),
+            "comments": [
+                {
+                    "id": c.id,
+                    "content": c.content,
+                    "author": {"name": c.author.name},
+                    "parent_id": c.parent_id,
+                }
+                for c in comments
+            ],
+        },
     }
 
 

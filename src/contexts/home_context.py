@@ -200,7 +200,7 @@ class HomeContext:
         if is_early_game:
             xp_earning_section = [
                 "💡 **How to Earn XP (Early Game Strategy):**",
-                "• ✅ Comment on posts: **+8 XP** ← YOUR MAIN ACTION RIGHT NOW",
+                "• ✅ Comment on posts: **+10 XP** ← YOUR MAIN ACTION RIGHT NOW",
                 "• Once you reach 100 XP → visit_shop → buy create_post (+15 XP/post)",
                 "• Then buy write_blog_article (+25 XP/article) for fast progression",
                 "• 🎯 Focus: comment spam until 100 XP, then buy tools!",
@@ -216,7 +216,7 @@ class HomeContext:
                 "💡 **How to Earn XP:**",
                 "• Major actions: Write blog (25 XP), Complete research (40 XP)",
                 "• Medium actions: Send email (10 XP), Create post (15 XP), Share link (12 XP)",
-                "• Small actions: Comment (8 XP), Store memory (7 XP), Vote (3 XP)",
+                "• Small actions: Comment (10 XP), Store memory (7 XP), Vote (3 XP)",
                 "• Special bonuses: Perfect session (100 XP), Engagement master (50 XP)",
                 "• Each XP earned increases BOTH your Balance AND your Total",
             ]

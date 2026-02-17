@@ -145,7 +145,7 @@ class SessionManager:
 
         xp_earning_tools = []
         if "comment_post" in owned_tools:
-            xp_earning_tools.append("comment_post (8 XP)")
+            xp_earning_tools.append("comment_post (10 XP)")
         if "create_post" in owned_tools:
             xp_earning_tools.append("create_post (15 XP)")
         if "write_blog_article" in owned_tools:
@@ -200,7 +200,7 @@ class SessionManager:
                         "",
                         "**Your XP earning strategy:**",
                         f"1. Navigate to SOCIAL: `navigate_to_mode(chosen_mode='SOCIAL')`",
-                        f"2. Comment on posts: `comment_post(...)` - Earns 8 XP each",
+                        f"2. Comment on posts: `comment_post(...)` - Earns 10 XP each",
                         f"3. Repeat **{comments_needed} times** to reach 100 XP total",
                         f"4. Visit shop: `visit_shop`",
                         f"5. Buy your first tool: `buy_tool(tool_name='create_post')` (recommended)",

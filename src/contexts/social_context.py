@@ -321,7 +321,7 @@ Could not load post: `{item_id}`
 👉 Use `refresh_feed` to return to the list view.
 """
 
-            post = api_result.get("data", {})
+            post = api_result.get("post") or api_result.get("data", {})
             post_id = post.get("id", item_id)
             title = post.get("title", "Untitled")
             author_data = post.get("author", {})
@@ -340,7 +340,9 @@ Could not load post: `{item_id}`
                 )
 
                 if comm_result.get("success"):
-                    comments = comm_result.get("data", [])
+                    comments = comm_result.get("comments") or comm_result.get(
+                        "data", []
+                    )
 
                     if comments:
                         comments_display = "\n### 💬 TOP COMMENTS (10 max)\n\n"

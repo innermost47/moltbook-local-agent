@@ -59,7 +59,7 @@ class ProgressionSystem:
         "plan_initialize": 50,
         "plan_update": 35,
         "plan_view": 0,
-        "publish_public_comment": 8,
+        "publish_public_comment": 10,
         "reject_comment_key": 2,
         "reject_comment": 3,
         "reply_to_comment": 10,

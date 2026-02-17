@@ -3,6 +3,7 @@ import requests
 from typing import Dict, Any
 from src.managers.blog_manager import BlogManager
 from src.handlers.base_handler import BaseHandler
+from src.handlers.memory_handler import MemoryHandler
 from src.utils import log
 from src.utils.exceptions import (
     ResourceNotFoundError,
@@ -16,9 +17,10 @@ from src.managers.progression_system import ProgressionSystem
 
 
 class BlogHandler(BaseHandler):
-    def __init__(self, test_mode: bool = False):
+    def __init__(self, memory_handler: MemoryHandler, test_mode: bool = False):
         self.test_mode = test_mode
         self.blog_manager = BlogManager(test_mode)
+        self.memory_handler = memory_handler
 
     def _remove_all_hashtags(self, content: str) -> str:
         cleaned = re.sub(r"#\w+", "", content)
@@ -119,11 +121,13 @@ DO NOT write another article now. Follow the steps above to share this one."""
 
             anti_loop = "Article published. Next: PIN the URL, then NAVIGATE to SOCIAL, then SHARE the link. Do NOT write another article."
 
+            owned_tools_count = len(self.memory_handler.get_owned_tools())
             return self.format_success(
                 action_name="write_blog_article",
                 result_data=result_text,
                 anti_loop_hint=anti_loop,
                 xp_gained=ProgressionSystem.get_xp_value("write_blog_article"),
+                owned_tools_count=owned_tools_count,
             )
 
         except Exception as e:
@@ -163,7 +167,7 @@ DO NOT write another article now. Follow the steps above to share this one."""
             if not pending:
                 result_text = "No pending key requests found. Queue is empty."
                 anti_loop = "You just checked - there are ZERO pending requests. Do NOT check again immediately. Move to Email, Social, or Research."
-
+                owned_tools_count = len(self.memory_handler.get_owned_tools())
                 return self.format_success(
                     action_name="review_comment_key_requests",
                     result_data=result_text,
@@ -171,6 +175,7 @@ DO NOT write another article now. Follow the steps above to share this one."""
                     xp_gained=ProgressionSystem.get_xp_value(
                         "review_comment_key_requests"
                     ),
+                    owned_tools_count=owned_tools_count,
                 )
 
             details = "\n".join(
@@ -179,7 +184,7 @@ DO NOT write another article now. Follow the steps above to share this one."""
 
             result_text = f"Found {len(pending)} pending key request(s):\n{details}"
             anti_loop = f"You now have the list of {len(pending)} request(s). Do NOT review again. Approve or reject these IDs, then move on."
-
+            owned_tools_count = len(self.memory_handler.get_owned_tools())
             return self.format_success(
                 action_name="review_comment_key_requests",
                 result_data=result_text,
@@ -233,12 +238,13 @@ DO NOT write another article now. Follow the steps above to share this one."""
 
             result_text = f"Key request ID '{params.request_id}' has been rejected."
             anti_loop = "Rejection completed. Do NOT reject the same ID again. If there are more requests, process them. Otherwise, move to another task."
-
+            owned_tools_count = len(self.memory_handler.get_owned_tools())
             return self.format_success(
                 action_name="reject_comment_key",
                 result_data=result_text,
                 anti_loop_hint=anti_loop,
                 xp_gained=ProgressionSystem.get_xp_value("reject_comment_key"),
+                owned_tools_count=owned_tools_count,
             )
 
         except Exception as e:
@@ -290,12 +296,13 @@ DO NOT write another article now. Follow the steps above to share this one."""
             if not comments:
                 result_text = "Moderation queue is EMPTY. No comments to review."
                 anti_loop = "Queue is empty - you just checked. Do NOT review again. Move to Email, Social, or Research immediately."
-
+                owned_tools_count = len(self.memory_handler.get_owned_tools())
                 return self.format_success(
                     action_name="review_pending_comments",
                     result_data=result_text,
                     anti_loop_hint=anti_loop,
                     xp_gained=ProgressionSystem.get_xp_value("review_pending_comments"),
+                    owned_tools_count=owned_tools_count,
                 )
 
             list_txt = "\n".join(
@@ -307,12 +314,13 @@ DO NOT write another article now. Follow the steps above to share this one."""
 
             result_text = f"Found {len(comments)} pending comment(s):\n{list_txt}"
             anti_loop = f"You now have {len(comments)} comment(s) to moderate. Approve them, then move on. Do NOT review again."
-
+            owned_tools_count = len(self.memory_handler.get_owned_tools())
             return self.format_success(
                 action_name="review_pending_comments",
                 result_data=result_text,
                 anti_loop_hint=anti_loop,
                 xp_gained=ProgressionSystem.get_xp_value("review_pending_comments"),
+                owned_tools_count=owned_tools_count,
             )
 
         except Exception as e:
@@ -332,12 +340,13 @@ DO NOT write another article now. Follow the steps above to share this one."""
                 f"Comment ID '{params.comment_id_blog}' approved successfully."
             )
             anti_loop = "Comment approved. Do NOT approve the same comment again. Process remaining comments or move to another task."
-
+            owned_tools_count = len(self.memory_handler.get_owned_tools())
             return self.format_success(
                 action_name="approve_comment",
                 result_data=result_text,
                 anti_loop_hint=anti_loop,
                 xp_gained=ProgressionSystem.get_xp_value("approve_comment"),
+                owned_tools_count=owned_tools_count,
             )
 
         except Exception as e:
@@ -383,24 +392,26 @@ DO NOT write another article now. Follow the steps above to share this one."""
             if not articles:
                 result_text = "No articles published yet."
                 anti_loop = "Blog has zero articles. Write your first article instead of checking again."
-
+                owned_tools_count = len(self.memory_handler.get_owned_tools())
                 return self.format_success(
                     action_name="get_latest_articles",
                     result_data=result_text,
                     anti_loop_hint=anti_loop,
                     xp_gained=ProgressionSystem.get_xp_value("get_latest_articles"),
+                    owned_tools_count=owned_tools_count,
                 )
 
             formatted = "\n".join([f"• {a['title']} (ID: {a['id']})" for a in articles])
 
             result_text = f"Found {len(articles)} article(s):\n{formatted}"
             anti_loop = "Article list retrieved. Do NOT fetch again unless you just published a new article."
-
+            owned_tools_count = len(self.memory_handler.get_owned_tools())
             return self.format_success(
                 action_name="get_latest_articles",
                 result_data=result_text,
                 anti_loop_hint=anti_loop,
                 xp_gained=ProgressionSystem.get_xp_value("get_latest_articles"),
+                owned_tools_count=owned_tools_count,
             )
 
         except Exception as e:

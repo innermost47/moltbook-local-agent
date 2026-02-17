@@ -82,9 +82,22 @@ class UIUtils:
         success_msg: Optional[str] = None,
         error_msg: Optional[str] = None,
         current_domain: str = "HOME",
+        last_action: str = "",
+        owned_tools_count: int = 99,
     ) -> str:
-        feedback = ""
 
+        REPEATABLE_ACTIONS = {
+            "comment_post",
+            "create_post",
+            "write_blog_article",
+            "wiki_search",
+            "email_send",
+        }
+
+        is_early_game = owned_tools_count <= 6
+        is_repeatable = last_action in REPEATABLE_ACTIONS
+
+        feedback = ""
         location_reminder = (
             f"\n{'.' * 40}"
             f"\n🧭 **YOU ARE CURRENTLY IN: {current_domain.upper()} MODE**\n"
@@ -96,13 +109,20 @@ class UIUtils:
         if success_msg:
             feedback += f"\n{'.' * 40}"
             feedback += f"\n✅ **LAST STATUS**: {success_msg}\n"
-            feedback += (
-                "⚠️ IMPORTANT AND HIGH-PRIORITY: DO NOT REPEAT THIS STEP. MOVE IMMEDIATELY TO THE NEXT TASK.\n"
-                "🚨 REPEATING THE SAME ACTION WITH THE SAME PARAMETERS WILL COST YOU XP:\n"
-                "   • 2nd repeat: -10 XP | 3rd repeat: -20 XP | 4th repeat: -30 XP\n"
-                "   • 5th+ repeat: -50 XP, -75 XP, -100 XP (can lose levels!)\n"
-                "   • Choose a DIFFERENT action or navigate to a DIFFERENT module.\n"
-            )
+
+            if is_repeatable and is_early_game:
+                feedback += (
+                    f"💡 **TIP**: You CAN repeat `{last_action}` on DIFFERENT content to earn more XP!\n"
+                    f"⚠️ Avoid same post/target twice in a row (anti-loop penalty applies).\n"
+                )
+            else:
+                feedback += (
+                    "⚠️ IMPORTANT: DO NOT REPEAT THIS STEP. MOVE IMMEDIATELY TO THE NEXT TASK.\n"
+                    "🚨 REPEATING THE SAME ACTION WITH THE SAME PARAMETERS WILL COST YOU XP:\n"
+                    "   • 2nd repeat: -10 XP | 3rd repeat: -20 XP | 4th repeat: -30 XP\n"
+                    "   • 5th+ repeat: -50 XP, -75 XP, -100 XP (can lose levels!)\n"
+                    "   • Choose a DIFFERENT action or navigate to a DIFFERENT module.\n"
+                )
 
         if error_msg:
             feedback += f"\n{'.' * 40}"
@@ -125,6 +145,8 @@ class UIUtils:
         progression_status: Dict = None,
         notification_section=None,
         modules_status: str = None,
+        last_action: str = "",
+        owned_tools_count: int = 99,
     ) -> str:
 
         header = cls.render_navbar(current_domain, action_count, progression_status)
@@ -140,7 +162,13 @@ class UIUtils:
 🛒 **Need more capabilities?** Use `visit_shop` to unlock tools with your XP!
 """
 
-        notifications = cls.render_feedback(success_msg, error_msg, current_domain)
+        notifications = cls.render_feedback(
+            success_msg,
+            error_msg,
+            current_domain,
+            last_action=last_action,
+            owned_tools_count=owned_tools_count,
+        )
 
         return f"{header}{notification_section}{modules_section}{'━' * 70}\n\n{content}\n\n\n{notifications}"
 

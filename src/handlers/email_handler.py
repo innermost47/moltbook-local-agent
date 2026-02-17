@@ -4,6 +4,7 @@ from typing import Dict, Any
 from imap_tools import MailBox, MailMessageFlags
 from bs4 import BeautifulSoup
 from src.handlers.base_handler import BaseHandler
+from src.handlers.memory_handler import MemoryHandler
 from src.utils import log
 from src.utils.exceptions import (
     SystemLogicError,
@@ -16,12 +17,21 @@ from src.managers.progression_system import ProgressionSystem
 
 
 class EmailHandler(BaseHandler):
-    def __init__(self, host, smtp_host, user, password, test_mode=False):
+    def __init__(
+        self,
+        host,
+        smtp_host,
+        user,
+        password,
+        memory_handler: MemoryHandler,
+        test_mode=False,
+    ):
         self.host = host
         self.smtp_host = smtp_host
         self.user = user
         self.password = password
         self.test_mode = test_mode
+        self.memory_handler = memory_handler
         self.mailbox = MailBox(self.host)
         self._authenticate()
 
@@ -77,12 +87,13 @@ class EmailHandler(BaseHandler):
                 f"CONTENT:\n{email_data['body']}\n"
                 f"----------------------"
             )
-
+            owned_tools_count = len(self.memory_handler.get_owned_tools())
             return self.format_success(
                 action_name="email_read",
                 result_data=result_text,
                 anti_loop_hint=f"Email {uid} READ. You have the full content. Respond or archive it now.",
                 xp_gained=ProgressionSystem.get_xp_value("email_read"),
+                owned_tools_count=owned_tools_count,
             )
 
         except Exception as e:
@@ -122,22 +133,24 @@ class EmailHandler(BaseHandler):
                 if not messages:
                     result_text = "Inbox is EMPTY. No emails to process."
                     anti_loop = "Inbox checked - it's empty. Do NOT check again immediately. Move to Blog, Social, or Research."
-
+                    owned_tools_count = len(self.memory_handler.get_owned_tools())
                     return self.format_success(
                         action_name="email_get_messages",
                         result_data=result_text,
                         anti_loop_hint=anti_loop,
                         xp_gained=ProgressionSystem.get_xp_value("email_get_messages"),
+                        owned_tools_count=owned_tools_count,
                     )
 
                 result_text = f"Retrieved {len(messages)} email(s) from inbox."
                 anti_loop = f"You now have {len(messages)} email(s). Read or respond to them. Do NOT fetch messages again until you've processed these."
-
+                owned_tools_count = len(self.memory_handler.get_owned_tools())
                 return self.format_success(
                     action_name="email_get_messages",
                     result_data=result_text,
                     anti_loop_hint=anti_loop,
                     xp_gained=ProgressionSystem.get_xp_value("email_get_messages"),
+                    owned_tools_count=owned_tools_count,
                 )
 
             except TimeoutError:
@@ -252,12 +265,13 @@ class EmailHandler(BaseHandler):
 
                 result_text = f"Email sent successfully to {recipient}.\nSubject: {subject}{auto_mark_message}"
                 anti_loop = f"Email to {recipient} SENT and original email marked as read. Do NOT send the same email again. Move to another task."
-
+                owned_tools_count = len(self.memory_handler.get_owned_tools())
                 return self.format_success(
                     action_name="email_send",
                     result_data=result_text,
                     anti_loop_hint=anti_loop,
                     xp_gained=ProgressionSystem.get_xp_value("email_send"),
+                    owned_tools_count=owned_tools_count,
                 )
 
             except smtplib.SMTPAuthenticationError:
@@ -388,12 +402,13 @@ class EmailHandler(BaseHandler):
 
                 result_text = f"Email UID {uid} marked as read."
                 anti_loop = f"Email {uid} already marked read. Do NOT mark again. Process next email or move to another task."
-
+                owned_tools_count = len(self.memory_handler.get_owned_tools())
                 return self.format_success(
                     action_name="email_mark_as_read",
                     result_data=result_text,
                     anti_loop_hint=anti_loop,
                     xp_gained=ProgressionSystem.get_xp_value("email_mark_as_read"),
+                    owned_tools_count=owned_tools_count,
                 )
 
             except Exception as e:
@@ -431,12 +446,13 @@ class EmailHandler(BaseHandler):
 
                 result_text = f"Email UID {uid} moved to '{folder}' folder."
                 anti_loop = f"Email {uid} archived. Do NOT archive again. Process next email or move to another task."
-
+                owned_tools_count = len(self.memory_handler.get_owned_tools())
                 return self.format_success(
                     action_name="email_archive",
                     result_data=result_text,
                     anti_loop_hint=anti_loop,
                     xp_gained=ProgressionSystem.get_xp_value("email_archive"),
+                    owned_tools_count=owned_tools_count,
                 )
 
             except Exception as e:
@@ -477,12 +493,13 @@ class EmailHandler(BaseHandler):
 
                 result_text = f"Email UID {uid} deleted (moved to Trash)."
                 anti_loop = f"Email {uid} deleted. Do NOT delete again. Process next email or move to another task."
-
+                owned_tools_count = len(self.memory_handler.get_owned_tools())
                 return self.format_success(
                     action_name="email_delete",
                     result_data=result_text,
                     anti_loop_hint=anti_loop,
                     xp_gained=ProgressionSystem.get_xp_value("email_delete"),
+                    owned_tools_count=owned_tools_count,
                 )
 
             except Exception as e:
@@ -543,22 +560,24 @@ class EmailHandler(BaseHandler):
                 if not results:
                     result_text = f"No emails found matching '{query}'."
                     anti_loop = f"Search for '{query}' returned ZERO results. Try a different query or move to another task."
-
+                    owned_tools_count = len(self.memory_handler.get_owned_tools())
                     return self.format_success(
                         action_name="email_search",
                         result_data=result_text,
                         anti_loop_hint=anti_loop,
                         xp_gained=ProgressionSystem.get_xp_value("email_search"),
+                        owned_tools_count=owned_tools_count,
                     )
 
                 result_text = f"Found {len(results)} email(s) matching '{query}'."
                 anti_loop = f"Search complete - {len(results)} result(s) for '{query}'. Do NOT search again with same query."
-
+                owned_tools_count = len(self.memory_handler.get_owned_tools())
                 return self.format_success(
                     action_name="email_search",
                     result_data=result_text,
                     anti_loop_hint=anti_loop,
                     xp_gained=ProgressionSystem.get_xp_value("email_search"),
+                    owned_tools_count=owned_tools_count,
                 )
 
             except Exception as e:

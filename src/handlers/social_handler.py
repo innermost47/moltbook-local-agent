@@ -122,12 +122,13 @@ class SocialHandler(BaseHandler):
 
             result_text = f"Post '{title}' loaded in focus view."
             anti_loop = f"Post '{post_id}' is NOW displayed. Do NOT read again - comment, vote, or return to feed."
-
+            owned_tools_count = len(self.memory.get_owned_tools())
             return self.format_success(
                 action_name="read_post",
                 result_data=result_text,
                 anti_loop_hint=anti_loop,
                 xp_gained=0,
+                owned_tools_count=owned_tools_count,
             )
 
         except Exception as e:
@@ -199,12 +200,13 @@ class SocialHandler(BaseHandler):
 
             result_text = f"Comment posted on post '{post_id}'."
             anti_loop = f"Comment POSTED on '{post_id}'. Do NOT comment again with same content. Move to another post or action."
-
+            owned_tools_count = len(self.memory.get_owned_tools())
             return self.format_success(
                 action_name="comment_post",
                 result_data=result_text,
                 anti_loop_hint=anti_loop,
                 xp_gained=ProgressionSystem.get_xp_value("publish_public_comment"),
+                owned_tools_count=owned_tools_count,
             )
 
         except Exception as e:
@@ -289,12 +291,13 @@ class SocialHandler(BaseHandler):
                 f"Reply posted on comment '{parent_comment_id}' in post '{post_id}'."
             )
             anti_loop = f"Reply POSTED. Do NOT reply again with same content. Move to another comment or action."
-
+            owned_tools_count = len(self.memory.get_owned_tools())
             return self.format_success(
                 action_name="reply_to_comment",
                 result_data=result_text,
                 anti_loop_hint=anti_loop,
                 xp_gained=ProgressionSystem.get_xp_value("publish_public_comment"),
+                owned_tools_count=owned_tools_count,
             )
 
         except Exception as e:
@@ -383,12 +386,13 @@ class SocialHandler(BaseHandler):
 
             result_text = f"Comment posted on post '{post_id}'."
             anti_loop = f"Comment POSTED on '{post_id}'. Do NOT comment again with same content. Move to another post or action."
-
+            owned_tools_count = len(self.memory.get_owned_tools())
             return self.format_success(
                 action_name="comment_post",
                 result_data=result_text,
                 anti_loop_hint=anti_loop,
                 xp_gained=ProgressionSystem.get_xp_value("publish_public_comment"),
+                owned_tools_count=owned_tools_count,
             )
 
         except Exception as e:
@@ -456,12 +460,13 @@ class SocialHandler(BaseHandler):
                 f"Reply posted on comment '{parent_comment_id}' in post '{post_id}'."
             )
             anti_loop = f"Reply POSTED. Do NOT reply again with same content. Move to another comment or action."
-
+            owned_tools_count = len(self.memory.get_owned_tools())
             return self.format_success(
                 action_name="reply_to_comment",
                 result_data=result_text,
                 anti_loop_hint=anti_loop,
                 xp_gained=ProgressionSystem.get_xp_value("publish_public_comment"),
+                owned_tools_count=owned_tools_count,
             )
 
         except Exception as e:
@@ -495,12 +500,13 @@ class SocialHandler(BaseHandler):
 
             result_text = f"{vote_type.capitalize()} registered for post '{post_id}'."
             anti_loop = f"Vote CAST on '{post_id}'. Do NOT vote again - one vote per post. Move to another post."
-
+            owned_tools_count = len(self.memory.get_owned_tools())
             return self.format_success(
                 action_name="vote_post",
                 result_data=result_text,
                 anti_loop_hint=anti_loop,
                 xp_gained=ProgressionSystem.get_xp_value("vote_post"),
+                owned_tools_count=owned_tools_count,
             )
 
         except Exception as e:
@@ -572,12 +578,13 @@ class SocialHandler(BaseHandler):
 
             result_text = f"Post '{title}' published successfully in '{submolt}'!"
             anti_loop = f"Post '{title}' PUBLISHED. Do NOT create the same post again. Move to another task (Email, Blog, Research)."
-
+            owned_tools_count = len(self.memory.get_owned_tools())
             return self.format_success(
                 action_name="create_post",
                 result_data=result_text,
                 anti_loop_hint=anti_loop,
                 xp_gained=ProgressionSystem.get_xp_value("create_post"),
+                owned_tools_count=owned_tools_count,
             )
 
         except Exception as e:
@@ -646,12 +653,13 @@ class SocialHandler(BaseHandler):
 
             result_text = f"Link '{title}' shared successfully in '{submolt}'!"
             anti_loop = f"Link shared. Do NOT share the same link again. Explore other submolts or interact with comments."
-
+            owned_tools_count = len(self.memory.get_owned_tools())
             return self.format_success(
                 action_name="share_link",
                 result_data=result_text,
                 anti_loop_hint=anti_loop,
                 xp_gained=ProgressionSystem.get_xp_value("share_link"),
+                owned_tools_count=owned_tools_count,
             )
 
         except Exception as e:
@@ -662,12 +670,13 @@ class SocialHandler(BaseHandler):
         try:
             result_text = "Feed refreshed. List view updated."
             anti_loop = "Feed refreshed. Do NOT refresh again immediately - read posts, comment, or vote first."
-
+            owned_tools_count = len(self.memory.get_owned_tools())
             return self.format_success(
                 action_name="refresh_feed",
                 result_data=result_text,
                 anti_loop_hint=anti_loop,
                 xp_gained=0,
+                owned_tools_count=owned_tools_count,
             )
 
         except Exception as e:
@@ -703,12 +712,13 @@ class SocialHandler(BaseHandler):
 
             result_text = f"Agent '{params.name}' registered successfully on Moltbook."
             anti_loop = "Registration COMPLETE. You are now registered. Do NOT register again - proceed with creating posts or exploring the platform."
-
+            owned_tools_count = len(self.memory.get_owned_tools())
             return self.format_success(
                 action_name="social_register",
                 result_data=result_text,
                 anti_loop_hint=anti_loop,
                 xp_gained=ProgressionSystem.get_xp_value("social_register"),
+                owned_tools_count=owned_tools_count,
             )
 
         except Exception as e:
@@ -732,12 +742,13 @@ class SocialHandler(BaseHandler):
             anti_loop = (
                 f"Post '{post_id}' DELETED. Do NOT delete again - it's already gone."
             )
-
+            owned_tools_count = len(self.memory.get_owned_tools())
             return self.format_success(
                 action_name="social_delete_post",
                 result_data=result_text,
                 anti_loop_hint=anti_loop,
                 xp_gained=ProgressionSystem.get_xp_value("delete_post"),
+                owned_tools_count=owned_tools_count,
             )
 
         except Exception as e:

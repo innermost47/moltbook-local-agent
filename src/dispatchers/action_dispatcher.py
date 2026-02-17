@@ -25,17 +25,22 @@ class ActionDispatcher:
         self.test_mode = test_mode
         chroma_client = chromadb.PersistentClient(path="./data/chroma_db")
         collection = chroma_client.get_or_create_collection(name="knowledge")
-        self.blog_handler = BlogHandler(test_mode)
+        self.memory_handler = MemoryHandler(
+            db_path=settings.DB_PATH, test_mode=test_mode
+        )
+        self.blog_handler = BlogHandler(
+            memory_handler=self.memory_handler, test_mode=test_mode
+        )
         self.email_handler = EmailHandler(
             settings.AGENT_IMAP_SERVER,
             settings.AGENT_IMAP_SMTP_HOST,
             settings.AGENT_MAIL_BOX_EMAIL,
             settings.AGENT_MAIL_BOX_PASSWORD,
-            test_mode,
+            memory_handler=self.memory_handler,
+            test_mode=test_mode,
         )
-        self.research_handler = ResearchHandler(collection, test_mode)
-        self.memory_handler = MemoryHandler(
-            db_path=settings.DB_PATH, test_mode=test_mode
+        self.research_handler = ResearchHandler(
+            collection, test_mode=test_mode, memory_handler=self.memory_handler
         )
         self.social_handler = SocialHandler(
             self.memory_handler, test_mode, ollama=ollama

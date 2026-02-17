@@ -56,6 +56,7 @@ class SessionManager:
         )
 
         modules_status = self._get_modules_quick_status()
+        owned_tools_count = len(self.dispatcher.memory_handler.get_owned_tools())
 
         self.current_context = UIUtils.layout(
             content=initial_body,
@@ -63,6 +64,7 @@ class SessionManager:
             action_count=0,
             notification_section=notification_section,
             modules_status=modules_status,
+            owned_tools_count=owned_tools_count,
         )
 
         self.run_loop()
@@ -785,6 +787,7 @@ The quantum frequencies resonate with your ascension...
                 "",
             ]
         )
+        owned_tools_count = len(self.dispatcher.memory_handler.get_owned_tools())
 
         return UIUtils.layout(
             content=f"{workspace_header}\n{raw_body}",
@@ -799,6 +802,8 @@ The quantum frequencies resonate with your ascension...
             progression_status=progression_status,
             notification_section=notification_section,
             modules_status=modules_status,
+            last_action=a_type,
+            owned_tools_count=owned_tools_count,
         )
 
     def _get_modules_quick_status(self) -> str:

@@ -152,12 +152,13 @@ class PlanHandler(BaseHandler):
 
             result_text = f"Master Plan initialized.\n🎯 Objective: {objective[:100]}...\n🧠 Strategy: {strategy[:100]}...\n📍 Milestones: {len(milestones)} defined"
             anti_loop = "Master Plan is NOW ACTIVE. Do NOT initialize again. System is unlocked - proceed with executing your strategy (Email, Blog, Social, Research)."
-
+            owned_tools_count = len(self.memory.get_owned_tools())
             result = self.format_success(
                 action_name="plan_initialize",
                 result_data=result_text,
                 anti_loop_hint=anti_loop,
                 xp_gained=ProgressionSystem.get_xp_value("plan_initialize"),
+                owned_tools_count=owned_tools_count,
             )
 
             result["navigate_to"] = "home"
@@ -182,12 +183,13 @@ class PlanHandler(BaseHandler):
                     "Strategy evaluated. No changes needed - plan remains in alignment."
                 )
                 anti_loop = "Plan review complete. Current strategy is VALID. Do NOT update again unless circumstances change. Execute the existing plan."
-
+                owned_tools_count = len(self.memory.get_owned_tools())
                 return self.format_success(
                     action_name="plan_update",
                     result_data=result_text,
                     anti_loop_hint=anti_loop,
                     xp_gained=ProgressionSystem.get_xp_value("plan_update"),
+                    owned_tools_count=owned_tools_count,
                 )
 
             new_obj = get_val("new_objective")
@@ -221,12 +223,13 @@ class PlanHandler(BaseHandler):
 
             result_text = f"Master Plan updated successfully.\nReason: {reasoning}\n🎯 New Objective: {new_obj[:100]}..."
             anti_loop = "Plan update complete. Do NOT update again immediately. Execute the NEW strategy now."
-
+            owned_tools_count = len(self.memory.get_owned_tools())
             return self.format_success(
                 action_name="plan_update",
                 result_data=result_text,
                 anti_loop_hint=anti_loop,
                 xp_gained=ProgressionSystem.get_xp_value("plan_update"),
+                owned_tools_count=owned_tools_count,
             )
 
         except Exception as e:
@@ -267,12 +270,13 @@ class PlanHandler(BaseHandler):
 
             result_text = plan_summary.strip()
             anti_loop = "Plan viewed. You now have the full strategy. Do NOT view again - EXECUTE it instead."
-
+            owned_tools_count = len(self.memory.get_owned_tools())
             return self.format_success(
                 action_name="plan_view",
                 result_data=result_text,
                 anti_loop_hint=anti_loop,
                 xp_gained=ProgressionSystem.get_xp_value("plan_update"),
+                owned_tools_count=owned_tools_count,
             )
 
         except Exception as e:

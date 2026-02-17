@@ -13,9 +13,10 @@ from src.managers.progression_system import ProgressionSystem
 
 
 class ResearchHandler(BaseHandler):
-    def __init__(self, vector_db, test_mode: bool = False):
+    def __init__(self, vector_db, memory_handler, test_mode: bool = False):
         self.test_mode = test_mode
         self.vector_db = vector_db
+        self.memory_handler = memory_handler
 
         try:
             wikipedia.set_lang("en")
@@ -98,12 +99,13 @@ class ResearchHandler(BaseHandler):
 
                         result_text = f"Search for '{query}' found {len(results)} page(s): {', '.join(results)}"
                         anti_loop = f"Search complete - {len(results)} results for '{query}'. Now use wiki_read on ONE of these titles. Do NOT search again with the same query."
-
+                        owned_tools_count = len(self.memory_handler.get_owned_tools())
                         return self.format_success(
                             action_name="wiki_search",
                             result_data=result_text,
                             anti_loop_hint=anti_loop,
                             xp_gained=ProgressionSystem.get_xp_value("wiki_search"),
+                            owned_tools_count=owned_tools_count,
                         )
             except Exception as cache_err:
                 log.warning(
@@ -120,12 +122,13 @@ class ResearchHandler(BaseHandler):
 
             result_text = f"Search for '{query}' found {len(results)} page(s): {', '.join(results)}"
             anti_loop = f"Search complete - {len(results)} results for '{query}'. Now use wiki_read on ONE of these titles. Do NOT search again with the same query."
-
+            owned_tools_count = len(self.memory_handler.get_owned_tools())
             result = self.format_success(
                 action_name="wiki_search",
                 result_data=result_text,
                 anti_loop_hint=anti_loop,
                 xp_gained=ProgressionSystem.get_xp_value("wiki_search"),
+                owned_tools_count=owned_tools_count,
             )
             result["results"] = results
             result["source"] = "live"
@@ -167,12 +170,13 @@ class ResearchHandler(BaseHandler):
                     content = existing["documents"][0]
                     result_text = f"Page '{topic}' retrieved from CACHE ({len(content)} chars).\n\nContent: {content[:500]}..."
                     anti_loop = f"Page '{topic}' loaded from cache. You now have the content. Do NOT read again - use the information to complete your research task."
-
+                    owned_tools_count = len(self.memory_handler.get_owned_tools())
                     result = self.format_success(
                         action_name="wiki_read",
                         result_data=result_text,
                         anti_loop_hint=anti_loop,
                         xp_gained=ProgressionSystem.get_xp_value("wiki_read"),
+                        owned_tools_count=owned_tools_count,
                     )
                     result["title"] = topic
                     result["content"] = content
@@ -212,12 +216,13 @@ class ResearchHandler(BaseHandler):
 
                 result_text = f"Page '{page.title}' fetched from Wikipedia ({len(content)} chars).\n\nURL: {page.url}\n\nContent: {content[:500]}..."
                 anti_loop = f"Page '{page.title}' loaded and CACHED. You now have the content. Do NOT read again - use it to complete research_complete."
-
+                owned_tools_count = len(self.memory_handler.get_owned_tools())
                 result = self.format_success(
                     action_name="wiki_read",
                     result_data=result_text,
                     anti_loop_hint=anti_loop,
                     xp_gained=ProgressionSystem.get_xp_value("wiki_read"),
+                    owned_tools_count=owned_tools_count,
                 )
                 result["title"] = page.title
                 result["content"] = content
@@ -305,12 +310,13 @@ class ResearchHandler(BaseHandler):
 
             result_text = f"Research session completed.\nObjective: {objective}\nFindings: {len(findings)} key points saved to workspace."
             anti_loop = f"Research COMPLETE for '{objective}'. Findings saved. Do NOT complete again. Move to Blog (write article), Social (share findings), or Email (report results)."
-
+            owned_tools_count = len(self.memory_handler.get_owned_tools())
             result = self.format_success(
                 action_name="research_complete",
                 result_data=result_text,
                 anti_loop_hint=anti_loop,
                 xp_gained=ProgressionSystem.get_xp_value("research_complete"),
+                owned_tools_count=owned_tools_count,
             )
             result["pin_data"] = {f"RESEARCH_{int(time.time())}": summary_text}
 
@@ -350,11 +356,12 @@ class ResearchHandler(BaseHandler):
                 ):
                     result_text = f"No cached research found for '{query}'."
                     anti_loop = f"Cache is empty for '{query}'. Use wiki_search to find new content instead of querying cache again."
-
+                    owned_tools_count = len(self.memory_handler.get_owned_tools())
                     return self.format_success(
                         action_name="research_query_cache",
                         result_data=result_text,
                         anti_loop_hint=anti_loop,
+                        owned_tools_count=owned_tools_count,
                     )
 
                 snippets = []
@@ -366,12 +373,13 @@ class ResearchHandler(BaseHandler):
 
                 result_text = f"CACHED RESEARCH for '{query}':\n" + "\n".join(snippets)
                 anti_loop = f"Cache results for '{query}' retrieved. You now have the cached content. Do NOT query cache again - use the information."
-
+                owned_tools_count = len(self.memory_handler.get_owned_tools())
                 return self.format_success(
                     action_name="research_query_cache",
                     result_data=result_text,
                     anti_loop_hint=anti_loop,
                     xp_gained=ProgressionSystem.get_xp_value("research_query_cache"),
+                    owned_tools_count=owned_tools_count,
                 )
 
             except Exception as e:

@@ -45,7 +45,10 @@ class HomeContext:
             self.has_seen_build_session_strategy_block = True
 
         prog_status = self.progression.get_current_status()
-        progression_block = self._build_progression_block(prog_status)
+        owned_tools_count = len(owned_tools)
+        progression_block = self._build_progression_block(
+            prog_status, owned_tools_count
+        )
 
         recent_learnings = self.memory.get_recent_learnings(limit=3)
 
@@ -164,7 +167,9 @@ class HomeContext:
 
         return "\n".join(strategy_block)
 
-    def _build_progression_block(self, prog_status: dict) -> str:
+    def _build_progression_block(
+        self, prog_status: dict, owned_tools_count: int = 99
+    ) -> str:
         if not prog_status:
             return ""
 
@@ -190,6 +195,40 @@ class HomeContext:
                 f"\n🏆 **Badges Unlocked**: {badge_icons} ({badge_count} total)"
             )
 
+        is_early_game = owned_tools_count <= 6
+
+        if is_early_game:
+            xp_earning_section = [
+                "💡 **How to Earn XP (Early Game Strategy):**",
+                "• ✅ Comment on posts: **+8 XP** ← YOUR MAIN ACTION RIGHT NOW",
+                "• Once you reach 100 XP → visit_shop → buy create_post (+15 XP/post)",
+                "• Then buy write_blog_article (+25 XP/article) for fast progression",
+                "• 🎯 Focus: comment spam until 100 XP, then buy tools!",
+            ]
+            penalty_section = [
+                "⚠️ **XP PENALTIES** (only for navigation/utility loops):",
+                "• Repeating `navigate_to_mode` or `refresh_home` → XP penalty",
+                "• ✅ Repeating `comment_post` on different posts → NO penalty (encouraged!)",
+                f"{'━' * 40}",
+            ]
+        else:
+            xp_earning_section = [
+                "💡 **How to Earn XP:**",
+                "• Major actions: Write blog (25 XP), Complete research (40 XP)",
+                "• Medium actions: Send email (10 XP), Create post (15 XP), Share link (12 XP)",
+                "• Small actions: Comment (8 XP), Store memory (7 XP), Vote (3 XP)",
+                "• Special bonuses: Perfect session (100 XP), Engagement master (50 XP)",
+                "• Each XP earned increases BOTH your Balance AND your Total",
+            ]
+            penalty_section = [
+                "⚠️ **XP PENALTIES FOR LOOPS:**",
+                "• Penalties reduce your XP Balance (not your Total or Level)",
+                "• 2nd repeat: -10 XP | 3rd repeat: -20 XP | 4th repeat: -30 XP",
+                "• 5th+ repeat: -50 XP, -75 XP, -100 XP",
+                "• STOP wasting actions = STOP losing XP Balance!",
+                f"{'━' * 40}",
+            ]
+
         progression_block = [
             "### 🎮 PROGRESSION & ACHIEVEMENTS",
             f"**Level {level}** - {title}",
@@ -208,19 +247,9 @@ class HomeContext:
             "• More tools = More strategic options = Better performance",
             "• Use `visit_shop` to browse available tools and purchase with XP Balance",
             "\n",
-            "💡 **How to Earn XP:**",
-            "• Major actions: Write blog (25 XP), Complete research (40 XP)",
-            "• Medium actions: Send email (10 XP), Create post (15 XP), Share link (12 XP)",
-            "• Small actions: Comment (8 XP), Store memory (7 XP), Vote (3 XP)",
-            "• Special bonuses: Perfect session (100 XP), Engagement master (50 XP)",
-            "• Each XP earned increases BOTH your Balance AND your Total",
+            *xp_earning_section,
             "\n",
-            "⚠️ **XP PENALTIES FOR LOOPS:**",
-            "• Penalties reduce your XP Balance (not your Total or Level)",
-            "• 2nd repeat: -10 XP | 3rd repeat: -20 XP | 4th repeat: -30 XP",
-            "• 5th+ repeat: -50 XP, -75 XP, -100 XP",
-            "• STOP wasting actions = STOP losing XP Balance!",
-            f"{'━' * 40}",
+            *penalty_section,
         ]
 
         return "\n".join([line for line in progression_block if line])

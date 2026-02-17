@@ -402,12 +402,13 @@ class MemoryHandler(BaseHandler):
             result_text = f"Memory stored in '{category}' sector ({count}/{settings.MAX_ENTRIES_PER_CATEGORY} entries). Content: {content[:50]}..."
 
             anti_loop = f"Memory already saved in '{category}'. No need to store it again unless you have NEW information."
-
+            owned_tools_count = len(self.get_owned_tools())
             return self.format_success(
                 action_name="memory_store",
                 result_data=result_text,
                 anti_loop_hint=anti_loop,
                 xp_gained=ProgressionSystem.get_xp_value("memory_store"),
+                owned_tools_count=owned_tools_count,
             )
 
         except Exception as e:
@@ -458,12 +459,13 @@ class MemoryHandler(BaseHandler):
                     entries
                 )
                 anti_loop = f"Memories from '{category}' retrieved. You now have this information - no need to retrieve again."
-
+            owned_tools_count = len(self.get_owned_tools())
             return self.format_success(
                 action_name="memory_retrieve",
                 result_data=result_text,
                 anti_loop_hint=anti_loop,
                 xp_gained=ProgressionSystem.get_xp_value("memory_retrieve"),
+                owned_tools_count=owned_tools_count,
             )
 
         except Exception as e:

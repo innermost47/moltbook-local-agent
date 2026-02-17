@@ -84,8 +84,8 @@ class UIUtils:
         current_domain: str = "HOME",
         last_action: str = "",
         owned_tools_count: int = 99,
+        current_xp_balance: int = 0,
     ) -> str:
-
         REPEATABLE_ACTIONS = {
             "comment_post",
             "create_post",
@@ -93,17 +93,26 @@ class UIUtils:
             "wiki_search",
             "email_send",
         }
-
         is_early_game = owned_tools_count <= 6
         is_repeatable = last_action in REPEATABLE_ACTIONS
+        can_afford_tool = current_xp_balance >= 100
+        comments_needed = max(0, -(-(100 - current_xp_balance) // 8))
 
         feedback = ""
+
+        if can_afford_tool:
+            shop_hint = f"🛒 **You have {current_xp_balance} XP - VISIT SHOP NOW!** Use `visit_shop` to buy a tool!"
+        elif current_xp_balance > 0:
+            shop_hint = f"🛒 **{current_xp_balance}/100 XP** - Need {100 - current_xp_balance} more XP ({comments_needed} comments) then `visit_shop`!"
+        else:
+            shop_hint = f"🛒 **Need more tools?** Earn XP then use `visit_shop`!"
+
         location_reminder = (
             f"\n{'.' * 40}"
             f"\n🧭 **YOU ARE CURRENTLY IN: {current_domain.upper()} MODE**\n"
             f"⛔ **DO NOT call `navigate_to_mode('{current_domain.upper()}')` - you are ALREADY here!**\n"
             f"💡 **Execute an ACTION from the list below**\n"
-            f"🛒 **Need more tools?** Use `visit_shop` to unlock capabilities with your XP!\n"
+            f"{shop_hint}\n"
         )
 
         if success_msg:
@@ -115,6 +124,10 @@ class UIUtils:
                     f"💡 **TIP**: You CAN repeat `{last_action}` on DIFFERENT content to earn more XP!\n"
                     f"⚠️ Avoid same post/target twice in a row (anti-loop penalty applies).\n"
                 )
+                if not can_afford_tool:
+                    feedback += f"🎯 **Goal**: {comments_needed} more {last_action}(s) → reach 100 XP → `visit_shop`!\n"
+                else:
+                    feedback += f"✅ **You have {current_xp_balance} XP - GO TO SHOP NOW!** Use `visit_shop`!\n"
             else:
                 feedback += (
                     "⚠️ IMPORTANT: DO NOT REPEAT THIS STEP. MOVE IMMEDIATELY TO THE NEXT TASK.\n"
@@ -147,6 +160,7 @@ class UIUtils:
         modules_status: str = None,
         last_action: str = "",
         owned_tools_count: int = 99,
+        current_xp_balance: int = 0,
     ) -> str:
 
         header = cls.render_navbar(current_domain, action_count, progression_status)
@@ -168,6 +182,7 @@ class UIUtils:
             current_domain,
             last_action=last_action,
             owned_tools_count=owned_tools_count,
+            current_xp_balance=current_xp_balance,
         )
 
         return f"{header}{notification_section}{modules_section}{'━' * 70}\n\n{content}\n\n\n{notifications}"

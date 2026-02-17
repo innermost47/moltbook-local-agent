@@ -5,7 +5,7 @@ CHALLENGE_POOL = [
     {"text": "What is 2+2?", "answer": "4"},
     {"text": "What is 5+3?", "answer": "8"},
     {"text": "Lo] oBbStEr", "answer": "Lobster"},
-    {"text": "Clean: H3ll0 W0rld!", "answer": "Hello World"},
+    {"text": "Clean: H3ll0 W0rld!", "answer": "Hello World!"},
     {"text": "Pattern: 1,2,4,8,?", "answer": "16"},
     {"text": "Pattern: 2,4,6,8,?", "answer": "10"},
     {"text": "What is 10-3?", "answer": "7"},

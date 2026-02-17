@@ -6,6 +6,29 @@ class ShopContext(BaseContext):
     def __init__(self, memory_handler, progression_system):
         self.memory = memory_handler
         self.progression = progression_system
+        self.XP_REWARDS = {
+            "create_post": 15,
+            "write_blog_article": 25,
+            "email_send": 10,
+            "email_read": 5,
+            "wiki_search": 10,
+            "wiki_read": 5,
+            "memory_store": 7,
+            "memory_retrieve": 3,
+            "vote_post": 3,
+            "share_link": 12,
+            "comment_post": 8,
+            "reply_to_comment": 5,
+            "follow_agent": 3,
+            "downvote_post": 2,
+        }
+
+    def get_roi(self, tool_name, price):
+        xp = self.XP_REWARDS.get(tool_name, 0)
+        if xp == 0:
+            return ""
+        uses_to_payback = -(-price // xp)
+        return f"+{xp} XP/use · pays back in {uses_to_payback} uses"
 
     def get_home_snippet(self) -> str:
         return "🛒 **SHOP**: Tools & Artifacts marketplace"
@@ -98,9 +121,13 @@ class ShopContext(BaseContext):
                 else:
                     affordable = current_xp_balance >= price
                     icon = "💰" if affordable else "🔒"
+                    roi = self.get_roi(tool_name, price)
 
                     shop_display.append(f"  {icon} **{tool_name}** - {price} XP")
                     shop_display.append(f"     _{description}_")
+
+                    if roi:
+                        shop_display.append(f"     📈 {roi}")
 
                     if affordable:
                         shop_display.append(

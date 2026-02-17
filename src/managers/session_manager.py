@@ -5,6 +5,7 @@ from src.utils import log
 from src.utils.ui_utils import UIUtils
 from src.screens.schema_factory import SchemaFactory
 from src.screens.tool_factory import ToolFactory
+from src.screens.master_plan import StrategyScreen
 from src.settings import settings
 from src.utils.live_broadcaster import LiveBroadcaster
 
@@ -57,6 +58,7 @@ class SessionManager:
 
         modules_status = self._get_modules_quick_status()
         owned_tools_count = len(self.dispatcher.memory_handler.get_owned_tools())
+        progression_status = self.progression.get_current_status()
 
         self.current_context = UIUtils.layout(
             content=initial_body,
@@ -65,6 +67,9 @@ class SessionManager:
             notification_section=notification_section,
             modules_status=modules_status,
             owned_tools_count=owned_tools_count,
+            progression_status=progression_status,
+            current_xp_balance=progression_status.get("current_xp_balance", 0),
+            last_action="",
         )
 
         self.run_loop()
@@ -401,6 +406,8 @@ class SessionManager:
 
         log.success("🏁 Session limit reached.")
 
+        self._update_master_plan()
+
         session_learnings = self._generate_session_learnings()
 
         self.home.memory.archive_session(
@@ -412,6 +419,94 @@ class SessionManager:
 
         if settings.ENABLE_EMAIL_REPORTS:
             self.send_final_report(session_learnings)
+
+    def _update_master_plan(self):
+
+        active_plan = self.dispatcher.plan_handler.get_active_master_plan()
+        if not active_plan:
+            log.warning("⚠️ No active master plan to update")
+            return
+
+        prog_status = self.progression.get_current_status()
+        owned_tools = self.dispatcher.memory_handler.get_owned_tools()
+        successes = sum(1 for e in self.tracker.events if e["success"])
+        total = len(self.tracker.events)
+        events_summary = "\n".join(
+            [
+                f"{'✅' if e['success'] else '❌'} {e['action']} in {e['domain']}"
+                for e in self.tracker.events
+            ]
+        )
+
+        prompt = f"""
+End of session. Review your Master Plan and decide if it needs updating.
+
+SESSION SUMMARY:
+- Actions: {total} total, {successes} successful
+- XP Balance: {prog_status.get('current_xp_balance', 0)}
+- Total XP Earned: {prog_status.get('total_xp_earned', 0)}
+- Level: {prog_status.get('level', 1)} - {prog_status.get('current_title', '')}
+- Tools Owned: {', '.join(owned_tools) if owned_tools else 'None'}
+
+ACTIONS LOG:
+{events_summary}
+
+CURRENT MASTER PLAN:
+- Objective: {active_plan.get('objective', '')}
+- Strategy: {active_plan.get('strategy', '')}
+- Milestones: {active_plan.get('milestones', [])}
+
+Decide: should you update your master plan based on what happened?
+
+RULES:
+- new_objective: minimum 20 characters
+- new_strategy: minimum 30 characters
+- new_milestones: list of at least 1 item, each minimum 10 characters
+- If should_update is false, still provide valid dummy values for the other fields
+"""
+
+        response, self.agent_conversation_history = self.ollama.generate(
+            prompt=prompt,
+            conversation_history=self.agent_conversation_history,
+            pydantic_model=StrategyScreen,
+            temperature=0.3,
+            agent_name=settings.AGENT_NAME,
+            debug_filename="debug_plan_update.json",
+        )
+
+        content = response.get("message", {}).get("content", "")
+        if not content:
+            log.warning("⚠️ No response for master plan update")
+            return
+
+        try:
+            raw = self.ollama._robust_json_parser(content)
+
+            action_payload = raw.get("action") or (
+                raw if "action_type" in raw else None
+            )
+
+            if not action_payload:
+                log.warning("⚠️ Could not extract action from plan update response")
+                return
+
+            action_params = action_payload.get("action_params", {})
+
+            params = (
+                Namespace(**action_params)
+                if isinstance(action_params, dict)
+                else action_params
+            )
+
+            result = self.dispatcher.plan_handler.handle_plan_update(params)
+
+            if result.get("success"):
+                log.success("✅ Master plan reviewed successfully!")
+            else:
+                log.warning(f"⚠️ Plan update issue: {result.get('error', 'Unknown')}")
+
+        except Exception as e:
+            log.error(f"❌ Failed to update master plan: {e}")
 
     def _generate_session_learnings(self) -> Dict:
         events_summary = "\n".join(
@@ -804,6 +899,7 @@ The quantum frequencies resonate with your ascension...
             modules_status=modules_status,
             last_action=a_type,
             owned_tools_count=owned_tools_count,
+            current_xp_balance=progression_status.get("current_xp_balance", 0),
         )
 
     def _get_modules_quick_status(self) -> str:

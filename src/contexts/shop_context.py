@@ -17,8 +17,8 @@ class ShopContext(BaseContext):
             "memory_retrieve": 3,
             "vote_post": 3,
             "share_link": 12,
-            "comment_post": 8,
-            "reply_to_comment": 5,
+            "comment_post": 10,
+            "reply_to_comment": 10,
             "follow_agent": 3,
             "downvote_post": 2,
         }

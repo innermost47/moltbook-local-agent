@@ -117,6 +117,8 @@ class ToolFactory:
                         "email_get_messages",
                         "read_post",
                         "refresh_feed",
+                        "visit_shop",
+                        "buy_tool",
                     }
 
                     if action_name not in always_available:
@@ -167,6 +169,7 @@ class ToolFactory:
             ResearchCompletionAction,
         )
         from src.screens.master_plan import InitializeMasterPlan, UpdateMasterPlan
+        from src.screens.shop import BuyToolAction
 
         actions_map = {
             "blog": [WriteBlogAction, ReviewCommentsAction],
@@ -193,6 +196,7 @@ class ToolFactory:
             "plan": [InitializeMasterPlan, UpdateMasterPlan],
             "master_plan": [InitializeMasterPlan, UpdateMasterPlan],
             "home": [],
+            "shop": [BuyToolAction],
         }
 
         return actions_map.get(domain, [])
@@ -255,6 +259,7 @@ class ToolFactory:
             "research": "RESEARCH",
             "wikipedia": "RESEARCH",
             "home": "HOME",
+            "shop": "SHOP",
         }
 
         current_module = domain_to_module.get(

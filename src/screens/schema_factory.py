@@ -112,6 +112,8 @@ class SchemaFactory:
             "email_get_messages",
             "read_post",
             "refresh_feed",
+            "visit_shop",
+            "buy_tool",
         }
 
         allowed_actions = set()
@@ -203,6 +205,8 @@ class SchemaFactory:
             "social": "SOCIAL",
             "research": "RESEARCH",
             "wikipedia": "RESEARCH",
+            "shop": "SHOP",
+            "home": "HOME",
         }
 
         current_module_name = domain_to_module.get(

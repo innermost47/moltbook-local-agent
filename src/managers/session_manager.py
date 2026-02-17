@@ -5,7 +5,7 @@ from src.utils import log
 from src.utils.ui_utils import UIUtils
 from src.screens.schema_factory import SchemaFactory
 from src.screens.tool_factory import ToolFactory
-from src.screens.master_plan import StrategyScreen
+from src.screens.master_plan import UpdateMasterPlan
 from src.settings import settings
 from src.utils.live_broadcaster import LiveBroadcaster
 
@@ -468,15 +468,16 @@ RULES:
         response, self.agent_conversation_history = self.ollama.generate(
             prompt=prompt,
             conversation_history=self.agent_conversation_history,
-            pydantic_model=StrategyScreen,
+            pydantic_model=UpdateMasterPlan,
             temperature=0.3,
             agent_name=settings.AGENT_NAME,
-            debug_filename="debug_plan_update.json",
         )
 
-        content = response.get("message", {}).get("content", "")
-        if not content:
-            log.warning("⚠️ No response for master plan update")
+        message = response.get("message", {})
+        content = message.get("content", "")
+
+        if not content or content.strip() == "Error":
+            log.warning("⚠️ No valid response for master plan update")
             return
 
         try:
@@ -487,7 +488,7 @@ RULES:
             )
 
             if not action_payload:
-                log.warning("⚠️ Could not extract action from plan update response")
+                log.warning("⚠️ Could not extract action payload")
                 return
 
             action_params = action_payload.get("action_params", {})
@@ -500,7 +501,7 @@ RULES:
 
             result = self.dispatcher.plan_handler.handle_plan_update(params)
 
-            if result.get("success"):
+            if result.get("success") and "error" not in result:
                 log.success("✅ Master plan reviewed successfully!")
             else:
                 log.warning(f"⚠️ Plan update issue: {result.get('error', 'Unknown')}")

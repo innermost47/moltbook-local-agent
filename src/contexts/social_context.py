@@ -125,6 +125,7 @@ class SocialContext(BaseContext):
         my_posts_display = ""
         try:
             my_post_ids = self.memory.get_agent_post_ids(limit=10)
+            can_create = "create_post" in owned_tools or "share_link" in owned_tools
 
             if my_post_ids:
                 my_posts_display = "### 📝 YOUR POSTS\n\n"
@@ -152,10 +153,17 @@ class SocialContext(BaseContext):
                         continue
 
                 my_posts_display += "---\n"
-            else:
+            elif can_create:
                 my_posts_display = (
                     "### 📝 YOUR POSTS\n\n"
                     "_You haven't created any posts yet. Use `create_post` or `share_link` to start!_\n\n"
+                    "---\n"
+                )
+            else:
+                my_posts_display = (
+                    "### 📝 YOUR POSTS\n\n"
+                    "🔒 **You can't create posts yet.**\n\n"
+                    "👉 Go to HOME → `visit_shop` → buy `create_post` (100 XP, +15 XP/post)\n\n"
                     "---\n"
                 )
 

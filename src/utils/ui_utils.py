@@ -86,6 +86,7 @@ class UIUtils:
         owned_tools_count: int = 99,
         current_xp_balance: int = 0,
     ) -> str:
+        is_on_shop = current_domain.lower() == "shop"
         REPEATABLE_ACTIONS = {
             "comment_post",
             "create_post",
@@ -100,19 +101,21 @@ class UIUtils:
 
         feedback = ""
 
-        if can_afford_tool:
-            shop_hint = f"🛒 **You have {current_xp_balance} XP - VISIT SHOP NOW!** Use `visit_shop` to buy a tool!"
+        if is_on_shop:
+            shop_hint = ""
+        elif can_afford_tool:
+            shop_hint = f"🛒 **You have {current_xp_balance} XP - VISIT SHOP NOW!** Use `visit_shop`!"
         elif current_xp_balance > 0:
             shop_hint = f"🛒 **{current_xp_balance}/100 XP** - Need {100 - current_xp_balance} more XP ({comments_needed} comments) then `visit_shop`!"
         else:
-            shop_hint = f"🛒 **Need more tools?** Earn XP then use `visit_shop`!"
+            shop_hint = "🛒 **Need tools?** Earn XP then use `visit_shop`!"
 
         location_reminder = (
             f"\n{'.' * 40}"
             f"\n🧭 **YOU ARE CURRENTLY IN: {current_domain.upper()} MODE**\n"
             f"⛔ **DO NOT call `navigate_to_mode('{current_domain.upper()}')` - you are ALREADY here!**\n"
             f"💡 **Execute an ACTION from the list below**\n"
-            f"{shop_hint}\n"
+            + (f"{shop_hint}\n" if shop_hint else "")
         )
 
         if success_msg:
@@ -120,10 +123,7 @@ class UIUtils:
             feedback += f"\n✅ **LAST STATUS**: {success_msg}\n"
 
             if is_repeatable and is_early_game:
-                feedback += (
-                    f"💡 **TIP**: You CAN repeat `{last_action}` on DIFFERENT content to earn more XP!\n"
-                    f"⚠️ Avoid same post/target twice in a row (anti-loop penalty applies).\n"
-                )
+                feedback += f"⚠️ Avoid same post/target twice in a row (anti-loop penalty applies).\n"
                 if not can_afford_tool:
                     feedback += f"🎯 **Goal**: {comments_needed} more {last_action}(s) → reach 100 XP → `visit_shop`!\n"
                 else:
@@ -164,16 +164,17 @@ class UIUtils:
     ) -> str:
 
         header = cls.render_navbar(current_domain, action_count, progression_status)
-
         modules_section = ""
         if modules_status:
+            shop_hint = (
+                ""
+                if current_domain.lower() == "shop"
+                else "\n🛒 **Need more capabilities?** Use `visit_shop` to unlock tools with your XP!"
+            )
             modules_section = f"""
 ### 🗺️ MODULES QUICK STATUS
 💡 Available actions in other modules (avoid useless navigation):
-
-{modules_status}
-
-🛒 **Need more capabilities?** Use `visit_shop` to unlock tools with your XP!
+{modules_status}{shop_hint}
 """
 
         notifications = cls.render_feedback(

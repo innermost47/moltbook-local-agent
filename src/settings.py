@@ -153,6 +153,7 @@ class Settings(BaseSettings):
         "update_master_plan": "strategy",
         "plan_initialize": "home",
         "plan_update": "home",
+        "refresh_home": "home",
     }
 
     STICKY_ACTIONS: Set[str] = {
@@ -160,6 +161,7 @@ class Settings(BaseSettings):
         "unpin_from_workspace",
         "memory_store",
         "memory_retrieve",
+        "refresh_home",
     }
 
     USE_TOOLS_MODE: bool
@@ -170,19 +172,6 @@ class Settings(BaseSettings):
         case_sensitive=True,
         extra="ignore",
     )
-
-    def get_domains(self):
-        if self.ALLOWED_DOMAINS_FILE_PATH:
-            try:
-                with open(
-                    settings.ALLOWED_DOMAINS_FILE_PATH, "r", encoding="utf-8"
-                ) as f:
-                    data = json.load(f)
-                    return data if isinstance(data, dict) else {d: "" for d in data}
-            except (FileNotFoundError, json.JSONDecodeError) as e:
-                print(f"❌ Unable to load domains: {e}")
-                return {}
-        return {}
 
 
 settings = Settings()

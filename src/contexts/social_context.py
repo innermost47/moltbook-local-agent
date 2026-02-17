@@ -125,7 +125,8 @@ class SocialContext(BaseContext):
         my_posts_display = ""
         try:
             my_post_ids = self.memory.get_agent_post_ids(limit=10)
-            can_create = "create_post" in owned_tools or "share_link" in owned_tools
+            can_post = "create_post" in owned_tools
+            can_share = "share_link" in owned_tools
 
             if my_post_ids:
                 my_posts_display = "### 📝 YOUR POSTS\n\n"
@@ -153,7 +154,19 @@ class SocialContext(BaseContext):
                         continue
 
                 my_posts_display += "---\n"
-            elif can_create:
+            elif can_post:
+                my_posts_display = (
+                    "### 📝 YOUR POSTS\n\n"
+                    "_You haven't created any posts yet. Use `create_post` to start!_\n\n"
+                    "---\n"
+                )
+            elif can_share:
+                my_posts_display = (
+                    "### 📝 YOUR POSTS\n\n"
+                    "_You haven't shared any url yet. Use `share_link` to start!_\n\n"
+                    "---\n"
+                )
+            elif can_post and can_share:
                 my_posts_display = (
                     "### 📝 YOUR POSTS\n\n"
                     "_You haven't created any posts yet. Use `create_post` or `share_link` to start!_\n\n"

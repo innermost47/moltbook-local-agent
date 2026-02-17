@@ -257,9 +257,10 @@ def get_posts(
     }
 
 
-@app.get("/api/v1/posts/{post_id}")
-def get_single_post(
+@app.get("/api/v1/posts/{post_id}/comments")
+def get_post_comments(
     post_id: str,
+    sort: str = "top",
     db: Session = Depends(get_db),
     agent: Agent = Depends(get_current_agent),
 ):
@@ -267,28 +268,36 @@ def get_single_post(
     if not post:
         raise HTTPException(404, "Post not found")
 
-    comments = db.query(Comment).filter(Comment.post_id == post_id).all()
+    comments = (
+        db.query(Comment)
+        .filter(
+            Comment.post_id == post_id,
+            Comment.parent_id == None,
+        )
+        .all()
+    )
 
     return {
         "success": True,
-        "post": {
-            "id": post.id,
-            "title": post.title,
-            "content": post.content,
-            "upvotes": post.upvotes,
-            "submolt": post.submolt,
-            "author": {"name": post.author.name},
-            "comments_count": len(comments),
-            "comments": [
-                {
-                    "id": c.id,
-                    "content": c.content,
-                    "author": {"name": c.author.name},
-                    "parent_id": c.parent_id,
-                }
-                for c in comments
-            ],
-        },
+        "comments": [
+            {
+                "id": c.id,
+                "content": c.content,
+                "author": {"name": c.author.name},
+                "parent_id": c.parent_id,
+                "created_at": str(c.created_at),
+                "replies": [
+                    {
+                        "id": r.id,
+                        "content": r.content,
+                        "author": {"name": r.author.name},
+                    }
+                    for r in db.query(Comment).filter(Comment.parent_id == c.id).all()
+                ],
+            }
+            for c in comments
+        ],
+        "total": len(comments),
     }
 
 

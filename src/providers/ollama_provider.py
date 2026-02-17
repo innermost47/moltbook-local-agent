@@ -422,6 +422,11 @@ class OllamaProvider:
                 return {"action_type": raw["name"], "action_params": raw["parameters"]}
             if "name" in raw and "arguments" in raw:
                 return {"action_type": raw["name"], "action_params": raw["arguments"]}
+            if "action" in raw and isinstance(raw["action"], str):
+                return {
+                    "action_type": raw["action"],
+                    "action_params": raw.get("params", {}),
+                }
             return raw
 
         if not isinstance(raw, str):
@@ -471,6 +476,11 @@ class OllamaProvider:
                 return {
                     "action_type": candidate["name"],
                     "action_params": candidate["arguments"],
+                }
+            if "action" in candidate and isinstance(candidate["action"], str):
+                return {
+                    "action_type": candidate["action"],
+                    "action_params": candidate.get("params", {}),
                 }
             if "action" in candidate and isinstance(candidate["action"], dict):
                 return candidate["action"]

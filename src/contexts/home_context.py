@@ -47,7 +47,7 @@ class HomeContext:
         prog_status = self.progression.get_current_status()
         owned_tools_count = len(owned_tools)
         progression_block = self._build_progression_block(
-            prog_status, owned_tools_count
+            prog_status, owned_tools_count, owned_tools
         )
 
         recent_learnings = self.memory.get_recent_learnings(limit=3)
@@ -168,8 +168,9 @@ class HomeContext:
         return "\n".join(strategy_block)
 
     def _build_progression_block(
-        self, prog_status: dict, owned_tools_count: int = 99
+        self, prog_status: dict, owned_tools_count: int = 99, owned_tools: set = None
     ) -> str:
+        owned_tools = owned_tools or set()
         if not prog_status:
             return ""
 
@@ -198,12 +199,27 @@ class HomeContext:
         is_early_game = owned_tools_count <= 6
 
         if is_early_game:
+            xp_actions = []
+
+            if "write_blog_article" in owned_tools:
+                xp_actions.append("• ✅ `write_blog_article`: **+25 XP** ← BEST ROI")
+            if "create_post" in owned_tools:
+                xp_actions.append("• ✅ `create_post`: **+15 XP**")
+            if "share_link" in owned_tools:
+                xp_actions.append("• ✅ `share_link`: **+12 XP**")
+            if "comment_post" in owned_tools:
+                xp_actions.append(
+                    "• ✅ `comment_post`: **+10 XP** (on DIFFERENT posts)"
+                )
+            if "email_send" in owned_tools:
+                xp_actions.append("• ✅ `email_send`: **+10 XP**")
+            if "memory_store" in owned_tools:
+                xp_actions.append("• ✅ `memory_store`: **+7 XP**")
+
             xp_earning_section = [
-                "💡 **How to Earn XP (Early Game Strategy):**",
-                "• ✅ Comment on posts: **+10 XP** ← YOUR MAIN ACTION RIGHT NOW",
-                "• Once you reach 100 XP → visit_shop → buy create_post (+15 XP/post)",
-                "• Then buy write_blog_article (+25 XP/article) for fast progression",
-                "• 🎯 Focus: comment spam until 100 XP, then buy tools!",
+                "💡 **How to Earn XP (your available actions, best ROI first):**",
+                *xp_actions,
+                "• 🎯 Use the highest XP action available to you right now!",
             ]
             penalty_section = [
                 "⚠️ **XP PENALTIES** (only for navigation/utility loops):",

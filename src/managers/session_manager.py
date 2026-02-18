@@ -151,7 +151,6 @@ class SessionManager:
         log.info(f"✅ System prompt loaded for {settings.AGENT_NAME}")
 
     def _build_dynamic_tools_section(self) -> str:
-
         owned_tools = set(self.dispatcher.memory_handler.get_owned_tools())
         prog_status = self.progression.get_current_status()
         current_xp_balance = prog_status.get("current_xp_balance", 0)
@@ -159,17 +158,19 @@ class SessionManager:
         can_afford = current_xp_balance >= 100
         gap = max(0, 100 - current_xp_balance)
 
-        xp_earning_tools = []
-        if "comment_post" in owned_tools:
-            xp_earning_tools.append("comment_post (10 XP)")
-        if "create_post" in owned_tools:
-            xp_earning_tools.append("create_post (15 XP)")
+        xp_actions = []
         if "write_blog_article" in owned_tools:
-            xp_earning_tools.append("write_blog_article (25 XP)")
+            xp_actions.append(("write_blog_article", 25, "BLOG"))
+        if "create_post" in owned_tools:
+            xp_actions.append(("create_post", 15, "SOCIAL"))
+        if "share_link" in owned_tools:
+            xp_actions.append(("share_link", 12, "SOCIAL"))
+        if "comment_post" in owned_tools:
+            xp_actions.append(("comment_post", 10, "SOCIAL"))
         if "email_send" in owned_tools:
-            xp_earning_tools.append("email_send (10 XP)")
+            xp_actions.append(("email_send", 10, "EMAIL"))
         if "wiki_search" in owned_tools:
-            xp_earning_tools.append("wiki_search (10 XP)")
+            xp_actions.append(("wiki_search", 10, "RESEARCH"))
 
         section = [
             "### 💰 YOUR XP & TOOLS STATUS",
@@ -183,20 +184,20 @@ class SessionManager:
             recommendations = []
             if "write_blog_article" not in owned_tools:
                 recommendations.append(
-                    "- `write_blog_article` (25 XP per article) - Best ROI"
+                    "- `write_blog_article` (25 XP/article) - Best ROI"
                 )
             if "create_post" not in owned_tools:
-                recommendations.append("- `create_post` (15 XP per post) - Fast ROI")
+                recommendations.append("- `create_post` (15 XP/post) - Fast ROI")
+            if "share_link" not in owned_tools:
+                recommendations.append("- `share_link` (12 XP/share) - Fast ROI")
+            if "email_send" not in owned_tools:
+                recommendations.append("- `email_send` (10 XP/email) - Communication")
             if "wiki_search" not in owned_tools:
                 recommendations.append(
-                    "- `wiki_search` (10 XP) + `wiki_read` (5 XP) - Enable research"
+                    "- `wiki_search` + `wiki_read` - Enable research"
                 )
-            if "email_send" not in owned_tools:
-                recommendations.append(
-                    "- `email_send` (10 XP per email) - Communication"
-                )
-            if "share_link" not in owned_tools:
-                recommendations.append("- `share_link` (12 XP per share) - Fast ROI")
+            if "memory_store" not in owned_tools:
+                recommendations.append("- `memory_store` (7 XP/store) - Knowledge")
 
             section.extend(
                 [
@@ -204,9 +205,8 @@ class SessionManager:
                     "",
                     "**Next steps:**",
                     "1. Use `visit_shop` to browse available tools",
-                    "2. Choose strategically (prioritize tools that earn MORE XP)",
-                    "3. Use `buy_tool(tool_name='...')` to purchase (costs 100 XP)",
-                    "4. Use your new tool immediately to start earning XP back",
+                    "2. Use `buy_tool(tool_name='...')` to purchase (costs 100 XP)",
+                    "3. Use your new tool immediately to earn XP back",
                     "",
                 ]
             )
@@ -219,62 +219,48 @@ class SessionManager:
                 section.extend(
                     [
                         "**💡 You already own all high-priority tools!**",
-                        "- Consider `memory_store`, `follow_agent`, or other utility tools",
+                        "- Consider `memory_store`, `follow_agent`, or utility tools",
                         "",
                     ]
                 )
+
+        elif not xp_actions:
+            section.extend(
+                [
+                    "⚠️ **CRITICAL: You have NO XP-earning tools!**",
+                    "This should never happen. Use `visit_shop` immediately.",
+                    "",
+                ]
+            )
+
         else:
-            if not xp_earning_tools:
-                section.extend(
-                    [
-                        "⚠️ **CRITICAL: You have NO XP-earning tools!**",
-                        "",
-                        "**You are stuck!** You cannot earn XP to buy tools.",
-                        "This should never happen. Contact admin immediately.",
-                        "",
-                    ]
+            best_tool, best_xp, best_module = xp_actions[0]
+            actions_needed = -(-gap // best_xp)
+
+            section.extend(
+                [
+                    f"⚠️ **YOU NEED {gap} MORE XP TO BUY A TOOL**",
+                    "",
+                    "**Your XP-earning options (best ROI first):**",
+                ]
+            )
+
+            for tool, xp, module in xp_actions:
+                marker = (
+                    " ← USE THIS FIRST" if (tool, xp, module) == xp_actions[0] else ""
                 )
-            elif "comment_post" in xp_earning_tools[0]:
-                comments_needed = (gap + 7) // 8
-                section.extend(
-                    [
-                        f"⚠️ **YOU NEED {gap} MORE XP TO BUY YOUR FIRST TOOL**",
-                        "",
-                        "**Your XP earning strategy:**",
-                        f"1. Navigate to SOCIAL: `navigate_to_mode(chosen_mode='SOCIAL')`",
-                        f"2. Comment on posts: `comment_post(...)` - Earns 10 XP each",
-                        f"3. Repeat **{comments_needed} times** to reach 100 XP total",
-                        f"4. Visit shop: `visit_shop`",
-                        f"5. Buy your first tool: `buy_tool(tool_name='create_post')` (recommended)",
-                        "",
-                        "**Why this matters:**",
-                        "- comment_post is your ONLY way to earn XP right now",
-                        "- You need 100 XP to unlock better tools",
-                        "- Better tools = faster XP earning = more capabilities",
-                        "- DO NOT waste actions on navigation/pinning (0 XP)",
-                        "",
-                    ]
-                )
-            else:
-                section.extend(
-                    [
-                        f"💡 **YOU NEED {gap} MORE XP TO BUY A TOOL**",
-                        "",
-                        "**Your XP-earning tools:**",
-                    ]
-                )
-                for tool in xp_earning_tools:
-                    section.append(f"- {tool}")
-                section.extend(
-                    [
-                        "",
-                        "**Strategy:**",
-                        "1. Use your highest-XP tools to earn quickly",
-                        "2. Once you reach 100 XP, visit shop and buy a new tool",
-                        "3. Prioritize tools that earn even MORE XP",
-                        "",
-                    ]
-                )
+                section.append(f"- `{tool}` → **+{xp} XP** (go to {module}){marker}")
+
+            section.extend(
+                [
+                    "",
+                    "**Strategy:**",
+                    f"1. Go to {best_module}: `navigate_to_mode(chosen_mode='{best_module}')`",
+                    f"2. Use `{best_tool}` → **{actions_needed} action(s)** needed to reach 100 XP",
+                    "3. Then `visit_shop` → `buy_tool(tool_name='...')`",
+                    "",
+                ]
+            )
 
         return "\n".join(section)
 

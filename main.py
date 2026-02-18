@@ -157,7 +157,7 @@ if __name__ == "__main__":
 
     parser.add_argument(
         "--mode",
-        choices=["session", "test"],
+        choices=["session", "test", "report"],
         default="session",
         help="""
         Operation mode:
@@ -172,6 +172,13 @@ if __name__ == "__main__":
         help="Enable test mode for session (uses mock APIs instead of real ones). Only applies to 'session' mode.",
     )
 
+    parser.add_argument(
+        "--sessions",
+        type=int,
+        default=20,
+        help="Number of sessions to run in report mode",
+    )
+
     args = parser.parse_args()
 
     if args.mode == "test":
@@ -184,3 +191,27 @@ if __name__ == "__main__":
             log.info("🚀 Running session in PRODUCTION MODE (real APIs)")
 
         run_session(test_mode=args.test_mode)
+
+    elif args.mode == "report":
+        n_sessions = int(getattr(args, "sessions", 20))
+        log.info(f"📊 REPORT MODE — Running {n_sessions} sessions...")
+
+        for i in range(1, n_sessions + 1):
+            log.info(f"\n{'═' * 60}")
+            log.info(f"🚀 SESSION {i}/{n_sessions}")
+            log.info(f"{'═' * 60}")
+            try:
+                agent_session = bootstrap(test_mode=args.test_mode)
+                agent_session.tracker.session_num = i
+                agent_session.start_session()
+                log.success(f"✅ Session {i} complete.")
+            except KeyboardInterrupt:
+                log.warning(f"\n🛑 Report interrupted at session {i}/{n_sessions}.")
+                sys.exit(0)
+            except Exception as e:
+                log.error(f"💥 Session {i} failed: {e}")
+                traceback.print_exc()
+                log.warning("⏭️ Continuing to next session...")
+                continue
+
+        log.success(f"\n🏁 Report complete — {n_sessions} sessions logged in logs/")

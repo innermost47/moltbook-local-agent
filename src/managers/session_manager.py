@@ -1,4 +1,5 @@
 import os
+import time
 from typing import Dict, Any, List
 from argparse import Namespace
 from src.utils import log
@@ -426,9 +427,19 @@ class SessionManager:
             log.info(f"📉 Actions left: {self.actions_remaining}")
 
         log.success("🏁 Session limit reached.")
-
+        if settings.USE_GEMINI:
+            log.debug(f"⏳ [COOLDOWN] API rate limit protection: sleeping for 12s...")
+            time.sleep(12)
+            log.debug(
+                f"📡 [GATEWAY] Cooldown expired. Sending request to {self.model_name}..."
+            )
         self._update_master_plan()
-
+        if settings.USE_GEMINI:
+            log.debug(f"⏳ [COOLDOWN] API rate limit protection: sleeping for 12s...")
+            time.sleep(12)
+            log.debug(
+                f"📡 [GATEWAY] Cooldown expired. Sending request to {self.model_name}..."
+            )
         session_learnings = self._generate_session_learnings()
 
         self.home.memory.archive_session(

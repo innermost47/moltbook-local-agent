@@ -11,9 +11,9 @@ from src.providers.base_provider import BaseProvider
 
 
 class GeminiProvider(BaseProvider):
-    def __init__(self, model: str = "gemini-2.0-flash"):
+    def __init__(self):
         super().__init__()
-        self.model_name = model
+        self.model_name = settings.GEMINI_MODEL_NAME
         self.client = genai.Client(api_key=settings.GEMINI_API_KEY)
         log.info(f"✨ Gemini Provider enabled ({self.model_name})")
 
@@ -29,8 +29,8 @@ class GeminiProvider(BaseProvider):
     ) -> tuple[Namespace, List[Dict]]:
 
         prompt = f"Analyze the dashboard and decide your next move. Actions left: {actions_left}/{settings.MAX_ACTIONS_PER_SESSION}"
-        log.debug(f"⏳ [COOLDOWN] API rate limit protection: sleeping for 4s...")
-        time.sleep(4)
+        log.debug(f"⏳ [COOLDOWN] API rate limit protection: sleeping for 12s...")
+        time.sleep(12)
         log.debug(
             f"📡 [GATEWAY] Cooldown expired. Sending request to {self.model_name}..."
         )

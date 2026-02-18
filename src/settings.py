@@ -106,6 +106,8 @@ class Settings(BaseSettings):
     USE_SD_PROXY: bool
     USE_GEMINI: bool
 
+    GEMINI_MODEL_NAME: str
+
     GEMINI_API_KEY: Optional[str] = None
 
     AVAILABLE_MODULES: List[str] = [module.value for module in AvailableModule]

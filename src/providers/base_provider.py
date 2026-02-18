@@ -213,7 +213,20 @@ class BaseProvider:
         with open(filename, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=4, ensure_ascii=False, default=json_default)
 
-    def _sanitize_tools(self, tools: list) -> list:
+    def _sanitize_messages(self, messages: list, aggressive: bool = False) -> list:
+        sanitized = []
+        for msg in messages:
+            m = dict(msg)
+            if isinstance(m.get("content"), str):
+                m["content"] = (
+                    m["content"].replace("\n", " ").replace("\r", " ")
+                    if aggressive
+                    else m["content"]
+                )
+            sanitized.append(m)
+        return sanitized
+
+    def _sanitize_tools(self, tools: list, aggressive: bool = False) -> list:
         if not tools:
             return tools
         sanitized = []

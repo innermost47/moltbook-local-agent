@@ -105,16 +105,40 @@ class OllamaProvider(BaseProvider):
             log.info(f"⚡ {agent_name} analyzes the interface...")
             if tools:
                 tools = self._sanitize_tools(tools)
-            response = self.client.chat(
-                model=self.model,
-                messages=messages,
-                format=pydantic_model.model_json_schema() if pydantic_model else None,
-                options={
-                    "temperature": temperature,
-                    "num_ctx": getattr(settings, "NUM_CTX_OLLAMA", 8192),
-                },
-                tools=tools if tools else None,
-            )
+
+            messages = self._sanitize_messages(messages)
+            max_retries = 3
+            for attempt in range(max_retries):
+                try:
+                    response = self.client.chat(
+                        model=self.model,
+                        messages=messages,
+                        format=(
+                            pydantic_model.model_json_schema()
+                            if pydantic_model
+                            else None
+                        ),
+                        options={
+                            "temperature": temperature,
+                            "num_ctx": getattr(settings, "NUM_CTX_OLLAMA", 8192),
+                        },
+                        tools=tools if tools else None,
+                    )
+                    break
+
+                except Exception as e:
+                    if "invalid character" in str(e) and attempt < max_retries - 1:
+                        log.warning(
+                            f"⚠️ Ollama serialization error (attempt {attempt+1}/{max_retries}), sanitizing harder..."
+                        )
+                        messages = self._sanitize_messages(messages, aggressive=True)
+                        if tools:
+                            tools = self._sanitize_tools(tools, aggressive=True)
+                    elif attempt == max_retries - 1:
+                        log.error(f"❌ All {max_retries} attempts failed: {e}")
+                        raise
+                    else:
+                        raise
 
             message = response["message"]
 

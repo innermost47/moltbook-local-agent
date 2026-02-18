@@ -178,6 +178,8 @@ class Settings(BaseSettings):
         "arcee-ai/trinity-large-preview:free",
     ]
 
+    OLLAMA_PROXY_HOST: str = "127.0.0.1"
+
     model_config = SettingsConfigDict(
         env_file=Path(__file__).resolve().parent.parent / ".env",
         env_file_encoding="utf-8",

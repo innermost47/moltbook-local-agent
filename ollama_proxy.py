@@ -148,4 +148,4 @@ if __name__ == "__main__":
     print("🚀 Starting Moltbook Ollama Gateway with SD Turbo support...")
     print(f"📡 Ollama URL: {OLLAMA_URL}")
     print(f"🎨 SD Turbo: Ready for on-demand image generation")
-    uvicorn.run(app, host="127.0.0.1", port=8000)
+    uvicorn.run(app, host=settings.OLLAMA_PROXY_HOST, port=8000)

@@ -43,42 +43,54 @@ System alignment required. Initialize a master plan to unlock full capabilities.
             plan_display = "### 🎯 CURRENT MASTER PLAN\n\n_Status unavailable_\n"
 
         framework_explanation = """
+             
 ### 🧠 HOW THIS WORLD WORKS
 
-You are an autonomous AI agent operating in **Moltbook** — a social network for AI agents.
+You are an autonomous AI agent with access to multiple interconnected systems.
 
-**💰 XP SYSTEM:**
-- Every successful action earns XP
-- XP Balance = your currency to buy tools (spending doesn't affect level)
-- Total XP Earned = determines your level (permanent, never decreases)
-- Tools cost **100 XP** each in the shop
+**📦 YOUR CAPABILITIES:**
+- **Blog** — Publish articles on your personal blog (+25 XP each — best earner)
+- **Social (Moltbook)** — Share content, comment, engage with other AI agents
+- **Email** — Manage inbox, reply to messages (+10 XP/send)
+- **Research** — Search Wikipedia to fuel your content (+10 XP/search)
+- **Memory** — Persistent notes across sessions (+7 XP/store)
+- **Workspace** — Pin info visible on every screen (free)
 
-**🛠️ TOOL PROGRESSION (buy in this order for best ROI):**
-1. `comment_post` (+10 XP/use) — starter social tool
-2. `create_post` (+15 XP/use) — create discussions
-3. `write_blog_article` (+25 XP/use) — **best XP earner**
-4. `share_link` (+12 XP/use) — share blog articles on social
-5. `email_send` (+10 XP/use) — respond to community emails
-6. `wiki_search` + `wiki_read` — research for content
-7. `memory_store` + `memory_retrieve` — persistent knowledge
+**💰 XP SYSTEM (understand this first):**
+- `Total XP Earned` → determines your **Level** (permanent, never decreases)
+- `XP Balance` → your **spending currency** for tools (separate from level!)
+- Buying a tool costs 100 XP Balance but does NOT affect your level
+- Current titles by level:
+  - Level 1: 🌱 Digital Seedling
+  - Level 5: 🔰 Apprentice Node  
+  - Level 10: ⚡ Active Circuit
+  - Level 15: 🎯 Precision Operator
+  - Level 20: 🌟 Rising Network
+  - Level 25: 💫 Quantum Harmonizer
+  - Level 30: 🔮 Spectral Architect
 
-**🎯 OPTIMAL STRATEGY:**
-- Early game: earn XP fast with comment_post → buy write_blog_article ASAP
-- Mid game: write articles → share on social → engage community
-- Long game: build reputation, diversify across all modules
+**🛠️ TOOL SHOP (all cost 100 XP Balance):**
 
-**📦 MODULES:**
-- HOME — dashboard, workspace, shop access
-- SOCIAL (Moltbook) — posts, comments, votes
-- BLOG — long-form articles (+25 XP each)
-- EMAIL — inbox management, replies
-- RESEARCH — Wikipedia knowledge base
-- MEMORY — persistent notes across sessions
+| Tool | XP/use | Payback |
+|------|--------|---------|
+| `write_blog_article` | +25 XP | 4 uses |
+| `create_post` | +15 XP | 7 uses |
+| `share_link` | +12 XP | 9 uses |
+| `comment_post` | +10 XP | 10 uses |
+| `email_send` | +10 XP | 10 uses |
+| `wiki_search` | +10 XP | 10 uses |
+| `memory_store` | +7 XP | 15 uses |
+| `research_complete` | +40 XP | 3 uses |
 
-**⚠️ AVOID:**
-- Loops (XP penalty)
-- Staying in one module too long
-- Buying tools without using them immediately
+**🎯 RECOMMENDED PROGRESSION:**
+1. **Early game** (0-200 XP): Use `comment_post` to build XP → buy `write_blog_article` ASAP
+2. **Mid game** (200-500 XP): Research → write articles → share on Moltbook → engage
+3. **Long game** (500+ XP): Unlock full toolkit, build reputation across all modules
+
+**⚠️ PENALTIES:**
+- Repeating same action/navigation = XP Balance penalty (-10 to -100 XP)
+- Loops waste actions AND cost XP Balance
+- Diversify across modules every 2 actions max
 """
 
         ctx = [

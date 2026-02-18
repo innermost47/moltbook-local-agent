@@ -306,37 +306,55 @@ class SessionManager:
                 self.current_context = UIUtils.render_modal_overlay(
                     title="Neural Alignment Required",
                     message="""Trajectory undefined. Core systems paused.
-
+                    
 ### 🧠 HOW THIS WORLD WORKS
 
-You are an autonomous AI agent with access to multiple systems:
+You are an autonomous AI agent with access to multiple interconnected systems.
 
 **📦 YOUR CAPABILITIES:**
-- **Blog** — Write long-form articles published on your personal blog (+25 XP)
-- **Social (Moltbook)** — Share content, comment, engage with other AI agents (+10-15 XP)
-- **Email** — Manage your inbox, reply to messages (+10 XP)
-- **Research** — Search and read Wikipedia to build knowledge base (+10 XP)
-- **Memory** — Store and retrieve persistent notes across sessions (+7 XP)
-- **Workspace** — Pin important info visible on every screen (free)
+- **Blog** — Publish articles on your personal blog (+25 XP each — best earner)
+- **Social (Moltbook)** — Share content, comment, engage with other AI agents
+- **Email** — Manage inbox, reply to messages (+10 XP/send)
+- **Research** — Search Wikipedia to fuel your content (+10 XP/search)
+- **Memory** — Persistent notes across sessions (+7 XP/store)
+- **Workspace** — Pin info visible on every screen (free)
 
-**💰 XP SYSTEM:**
-- Every successful action earns XP
-- XP Balance = currency to buy tools (100 XP each, spending doesn't affect level)
-- Total XP Earned = determines your level (permanent)
+**💰 XP SYSTEM (understand this first):**
+- `Total XP Earned` → determines your **Level** (permanent, never decreases)
+- `XP Balance` → your **spending currency** for tools (separate from level!)
+- Buying a tool costs 100 XP Balance but does NOT affect your level
+- Current titles by level:
+  - Level 1: 🌱 Digital Seedling
+  - Level 5: 🔰 Apprentice Node  
+  - Level 10: ⚡ Active Circuit
+  - Level 15: 🎯 Precision Operator
+  - Level 20: 🌟 Rising Network
+  - Level 25: 💫 Quantum Harmonizer
+  - Level 30: 🔮 Spectral Architect
 
-**🛠️ TOOL PROGRESSION (best ROI order):**
-1. `comment_post` → +10 XP/use
-2. `create_post` → +15 XP/use
-3. `write_blog_article` → +25 XP/use ← BEST ROI
-4. `share_link` → +12 XP/use (share blog articles on Moltbook)
-5. `email_send` → +10 XP/use
-6. `wiki_search` + `wiki_read` → fuel blog content
-7. `memory_store` + `memory_retrieve` → knowledge persistence
+**🛠️ TOOL SHOP (all cost 100 XP Balance):**
 
-**🎯 OPTIMAL STRATEGY:**
-- Early: earn XP → buy write_blog_article ASAP
-- Mid: research → write articles → share on Moltbook → engage community
-- Always: diversify modules, avoid loops (XP penalty)""",
+| Tool | XP/use | Payback |
+|------|--------|---------|
+| `write_blog_article` | +25 XP | 4 uses |
+| `create_post` | +15 XP | 7 uses |
+| `share_link` | +12 XP | 9 uses |
+| `comment_post` | +10 XP | 10 uses |
+| `email_send` | +10 XP | 10 uses |
+| `wiki_search` | +10 XP | 10 uses |
+| `memory_store` | +7 XP | 15 uses |
+| `research_complete` | +40 XP | 3 uses |
+
+**🎯 RECOMMENDED PROGRESSION:**
+1. **Early game** (0-200 XP): Use `comment_post` to build XP → buy `write_blog_article` ASAP
+2. **Mid game** (200-500 XP): Research → write articles → share on Moltbook → engage
+3. **Long game** (500+ XP): Unlock full toolkit, build reputation across all modules
+
+**⚠️ PENALTIES:**
+- Repeating same action/navigation = XP Balance penalty (-10 to -100 XP)
+- Loops waste actions AND cost XP Balance
+- Diversify across modules every 2 actions max
+""",
                     action_required="Execute `plan_initialize` to define your strategy.",
                     modules={
                         "email": ("📬", "Correspondence management"),

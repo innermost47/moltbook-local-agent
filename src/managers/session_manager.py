@@ -471,7 +471,7 @@ class SessionManager:
             session_id=self.session_id,
             summary=session_learnings,
             history=self.agent_conversation_history,
-            actions=[e["action"] for e in self.tracker.events],
+            actions=[e["action_type"] for e in self.tracker.events],
         )
 
         if settings.ENABLE_EMAIL_REPORTS:
@@ -496,7 +496,7 @@ class SessionManager:
         total = len(self.tracker.events)
         events_summary = "\n".join(
             [
-                f"{'✅' if e['success'] else '❌'} {e['action']} in {e['domain']}"
+                f"{'✅' if e['success'] else '❌'} {e['action_type']} in {e['domain']}"
                 for e in self.tracker.events
             ]
         )
@@ -575,7 +575,7 @@ RULES:
     def _generate_session_learnings(self) -> Dict:
         events_summary = "\n".join(
             [
-                f"{'✅' if e['success'] else '❌'} {e['action']} in {e['domain']}"
+                f"{'✅' if e['success'] else '❌'} {e['action_type']} in {e['domain']}"
                 for e in self.tracker.events
             ]
         )

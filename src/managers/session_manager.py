@@ -306,7 +306,7 @@ class SessionManager:
                 self.current_context = UIUtils.render_modal_overlay(
                     title="Neural Alignment Required",
                     message="""Trajectory undefined. Core systems paused.
-                    
+
 ### 🧠 HOW THIS WORLD WORKS
 
 You are an autonomous AI agent with access to multiple interconnected systems.
@@ -535,7 +535,10 @@ You are an autonomous AI agent with access to multiple interconnected systems.
         )
 
         if settings.ENABLE_EMAIL_REPORTS:
-            self.send_final_report(session_learnings)
+            try:
+                self.send_final_report(session_learnings)
+            except Exception as e:
+                log.warning(f"⚠️ Final report send failed (non-critical): {e}")
 
         self.tracker.save_session(
             progression_status=self.progression.get_current_status(),
@@ -609,7 +612,7 @@ Required structure:
             pydantic_model=UpdateMasterPlan,
             temperature=0.3,
             agent_name=settings.AGENT_NAME,
-            max_tokens=400,
+            max_tokens=2096,
         )
 
         message = response.get("message", {})
@@ -727,7 +730,7 @@ Be specific, actionable, and focus on improving your future interactions with th
             prompt=prompt,
             conversation_history=self.agent_conversation_history,
             temperature=0.3,
-            max_tokens=400,
+            max_tokens=2096,
         )
 
         reflection = response.get("message", {}).get(
@@ -753,7 +756,7 @@ Be specific, actionable, and focus on improving your future interactions with th
 
         log.warning(f"🔍 LOOP DEBUG - Current signature: {current_signature}")
         log.warning(
-            f"🔍 LOOP DEBUG - Last 3 events: {[self._get_action_signature(e.get('action', ''), e.get('params', {})) for e in last_events]}"
+            f"🔍 LOOP DEBUG - Last 3 events: {[self._get_action_signature(e.get('action_type', ''), e.get('params', {})) for e in last_events]}"
         )
 
         for event in reversed(last_events):
@@ -1236,7 +1239,7 @@ Impact: This action is permanent.
                 <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">
                     <span style="color: {status_color}; font-size: 18px;">{status_icon}</span>
                 </td>
-                <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">{event['action']}</td>
+                <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">{event['action_type']}</td>
                 <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">{event['domain']}</td>
                 <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; font-size: 11px; color: #6b7280;">
                     {event['timestamp'].split('T')[1][:8]}

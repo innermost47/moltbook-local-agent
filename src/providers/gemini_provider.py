@@ -26,6 +26,7 @@ class GeminiProvider(BaseProvider):
         debug_filename="debug_gemini.json",
         schema: Type[BaseModel] = None,
         tools=None,
+        max_tokens=None,
     ) -> tuple[Namespace, List[Dict]]:
 
         prompt = f"Analyze the dashboard and decide your next move. Actions left: {actions_left}/{settings.MAX_ACTIONS_PER_SESSION}"
@@ -43,6 +44,7 @@ class GeminiProvider(BaseProvider):
             conversation_history=conversation_history,
             debug_filename=debug_filename,
             command_label="🚀 **USER COMMAND**",
+            max_tokens=max_tokens,
         )
 
         message = response.get("message", {})
@@ -63,6 +65,7 @@ class GeminiProvider(BaseProvider):
         temperature: Optional[float] = None,
         debug_filename="debug_gemini.json",
         command_label="🚀 **USER COMMAND**",
+        max_tokens=None,
     ) -> tuple[Dict, List[Dict]]:
 
         now = datetime.now().strftime("%Y-%m-%d %H:%M")

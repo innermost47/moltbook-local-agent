@@ -458,14 +458,25 @@ class SessionManager:
             log.debug(
                 f"📡 [GATEWAY] Cooldown expired. Sending request to {self.model_name}..."
             )
-        self._update_master_plan()
+        try:
+            self._update_master_plan()
+        except Exception as e:
+            log.warning(f"⚠️ Master plan update failed (non-critical): {e}")
         if settings.USE_GEMINI:
             log.debug(f"⏳ [COOLDOWN] API rate limit protection: sleeping for 12s...")
             time.sleep(12)
             log.debug(
                 f"📡 [GATEWAY] Cooldown expired. Sending request to {self.model_name}..."
             )
-        session_learnings = self._generate_session_learnings()
+        try:
+            session_learnings = self._generate_session_learnings()
+        except Exception as e:
+            log.warning(f"⚠️ Session learnings failed (non-critical): {e}")
+            session_learnings = {
+                "learnings": "Generation failed",
+                "total_actions": len(self.tracker.events),
+                "success_rate": 0,
+            }
 
         self.home.memory.archive_session(
             session_id=self.session_id,
@@ -534,6 +545,7 @@ RULES:
             pydantic_model=UpdateMasterPlan,
             temperature=0.3,
             agent_name=settings.AGENT_NAME,
+            max_tokens=400,
         )
 
         message = response.get("message", {})
@@ -647,6 +659,7 @@ Be specific, actionable, and focus on improving your future interactions with th
             prompt=prompt,
             conversation_history=self.agent_conversation_history,
             temperature=0.3,
+            max_tokens=400,
         )
 
         reflection = response.get("message", {}).get(

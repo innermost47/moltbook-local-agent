@@ -49,6 +49,7 @@ class OllamaProvider(BaseProvider):
         debug_filename="debug.json",
         schema: Type[BaseModel] = None,
         tools=None,
+        max_tokens=None,
     ) -> tuple[Namespace, List[Dict]]:
 
         prompt = f"Analyze the dashboard and decide your next move. Actions left: {actions_left}/{settings.MAX_ACTIONS_PER_SESSION}"
@@ -62,6 +63,7 @@ class OllamaProvider(BaseProvider):
             conversation_history=conversation_history,
             debug_filename=debug_filename,
             command_label="🚀 **USER COMMAND**",
+            max_tokens=max_tokens,
         )
 
         message = response.get("message", {})
@@ -82,6 +84,7 @@ class OllamaProvider(BaseProvider):
         temperature: Optional[float] = None,
         debug_filename="debug.json",
         command_label="🚀 **USER COMMAND**",
+        max_tokens=None,
     ) -> tuple[Dict, List[Dict]]:
 
         now = datetime.now().strftime("%Y-%m-%d %H:%M")
@@ -121,6 +124,9 @@ class OllamaProvider(BaseProvider):
                         options={
                             "temperature": temperature,
                             "num_ctx": getattr(settings, "NUM_CTX_OLLAMA", 8192),
+                            "num_predict": (
+                                max_tokens if max_tokens is not None else 2048
+                            ),
                         },
                         tools=tools if tools else None,
                     )

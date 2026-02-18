@@ -29,6 +29,7 @@ class OpenRouterProvider(BaseProvider):
         debug_filename="debug_openrouter.json",
         schema: Type[BaseModel] = None,
         tools=None,
+        max_tokens=None,
     ) -> tuple[Namespace, List[Dict]]:
 
         prompt = f"Analyze the dashboard and decide your next move. Actions left: {actions_left}/{settings.MAX_ACTIONS_PER_SESSION}"
@@ -42,6 +43,7 @@ class OpenRouterProvider(BaseProvider):
             conversation_history=conversation_history,
             debug_filename=debug_filename,
             command_label="🚀 **USER COMMAND**",
+            max_tokens=max_tokens,
         )
 
         message = response.get("message", {})
@@ -62,6 +64,7 @@ class OpenRouterProvider(BaseProvider):
         temperature: Optional[float] = None,
         debug_filename="debug_openrouter.json",
         command_label="🚀 **USER COMMAND**",
+        max_tokens=None,
     ) -> tuple[Dict, List[Dict]]:
 
         now = datetime.now().strftime("%Y-%m-%d %H:%M")

@@ -39,6 +39,8 @@ class SessionManager:
         self.agent_conversation_history: List[Dict] = [
             {"role": "system", "content": ""}
         ]
+        self.signature_count = 0
+        self.xp_lost = 0
         self.live_viewer = LiveBroadcaster()
 
     def start_session(self):
@@ -368,22 +370,22 @@ class SessionManager:
             if not action_object or action_object.action_type == "session_finish":
                 log.success("🏁 Session finished by agent.")
                 break
+            xp_before = self.progression.get_current_status().get(
+                "current_xp_balance", 0
+            )
 
             result = self.dispatcher.execute(action_object)
             a_type = action_object.action_type
+
+            xp_after = self.progression.get_current_status().get(
+                "current_xp_balance", 0
+            )
 
             self.live_viewer.broadcast_result(
                 action_type=a_type,
                 success=result.get("success", False),
                 result_data=result.get("data", ""),
                 error=result.get("error", ""),
-            )
-
-            self.tracker.log_event(
-                domain=self.current_domain,
-                action_type=a_type,
-                params=getattr(action_object, "action_params", {}),
-                result=result,
             )
 
             if result.get("success") and a_type == "share_link":
@@ -424,6 +426,17 @@ class SessionManager:
 
             self.current_context = self.navigate_context(action_object, result)
 
+            self.tracker.log_event(
+                domain=self.current_domain,
+                action_type=a_type,
+                params=getattr(action_object, "action_params", {}),
+                result=result,
+                xp_before=xp_before,
+                xp_after=xp_after,
+                is_loop=self.signature_count >= 2,
+                xp_penalty=self.xp_lost,
+            )
+
             self.live_viewer.broadcast_screen(
                 screen_content=self.current_context,
                 domain=self.current_domain,
@@ -463,6 +476,12 @@ class SessionManager:
 
         if settings.ENABLE_EMAIL_REPORTS:
             self.send_final_report(session_learnings)
+
+        self.tracker.save_session(
+            progression_status=self.progression.get_current_status(),
+            tools_owned=self.dispatcher.memory_handler.get_owned_tools(),
+            master_plan=self.dispatcher.plan_handler.get_active_master_plan(),
+        )
 
     def _update_master_plan(self):
 
@@ -649,7 +668,7 @@ Be specific, actionable, and focus on improving your future interactions with th
         loop_warning = ""
         penalty_message = ""
         current_signature = self._get_action_signature(a_type, params)
-        signature_count = 0
+        self.signature_count = 0
 
         log.warning(f"🔍 LOOP DEBUG - Current signature: {current_signature}")
         log.warning(
@@ -661,13 +680,13 @@ Be specific, actionable, and focus on improving your future interactions with th
                 event.get("action", ""), event.get("params", {})
             )
             if event_signature == current_signature:
-                signature_count += 1
+                self.signature_count += 1
             else:
                 break
 
-        log.warning(f"🔍 LOOP DEBUG - Signature count: {signature_count}")
+        log.warning(f"🔍 LOOP DEBUG - Signature count: {self.signature_count }")
 
-        if signature_count >= 2:
+        if self.signature_count >= 2:
             EXEMPT_ACTIONS = {
                 "comment_post",
                 "create_post",
@@ -690,7 +709,7 @@ Be specific, actionable, and focus on improving your future interactions with th
 
 ⚠️ **YOU KEEP NAVIGATING TO SHOP WITHOUT BUYING**
 
-You've tried to visit the SHOP **{signature_count + 1} times**.
+You've tried to visit the SHOP **{self.signature_count  + 1} times**.
 
 **The shop is NOW OPEN - see the catalog above!**
 
@@ -724,21 +743,22 @@ Example:
 
 ℹ️ **REPETITION DETECTED** (No penalty for XP-earning in early game)
 
-You've used `{a_type}` **{signature_count + 1} times** - this is allowed while building XP.
+You've used `{a_type}` **{self.signature_count  + 1} times** - this is allowed while building XP.
 
 💡 **TIP**: Once you reach 100 XP, use `visit_shop` to buy better tools!
 
 {'━' * 40}
 """
             if should_penalize:
-                log.warning(f"🚨 LOOP DETECTED! Count: {signature_count}")
+                self.xp_lost = 0
+                log.warning(f"🚨 LOOP DETECTED! Count: {self.signature_count }")
                 penalty_result = self.progression.penalize_loop(
-                    loop_count=signature_count,
+                    loop_count=self.signature_count,
                     action_type=a_type,
                     session_id=self.session_id,
                 )
                 if penalty_result.get("penalty_applied"):
-                    xp_lost = penalty_result["xp_lost"]
+                    self.xp_lost = penalty_result["xp_lost"]
                     current_xp_balance = penalty_result["current_xp_balance"]
                     current_level = penalty_result["current_level"]
                     leveled_down = penalty_result.get("leveled_down", False)
@@ -746,7 +766,7 @@ You've used `{a_type}` **{signature_count + 1} times** - this is allowed while b
                 penalty_message = f"""
 {'━' * 40}
 
-💥 **XP PENALTY APPLIED**: -{xp_lost} XP Balance lost for looping {signature_count} times!
+💥 **XP PENALTY APPLIED**: -{self.xp_lost} XP Balance lost for looping {self.signature_count} times!
 
 📉 **Current Status:**
 - XP Balance: {current_xp_balance}  
@@ -765,7 +785,7 @@ You've used `{a_type}` **{signature_count + 1} times** - this is allowed while b
 
 🔴 🔴 🔴 **CRITICAL NAVIGATION LOOP DETECTED** 🔴 🔴 🔴
 
-⚠️ You called `navigate_to_mode('{target_mode}')` **{signature_count + 1} times in a row!**
+⚠️ You called `navigate_to_mode('{target_mode}')` **{self.signature_count  + 1} times in a row!**
 
 {penalty_message}
 
@@ -773,7 +793,7 @@ You've used `{a_type}` **{signature_count + 1} times** - this is allowed while b
 
 **What you're doing WRONG:**
 - You keep calling `navigate_to_mode('{target_mode}')` when you're ALREADY in {target_mode} mode
-- You're wasting precious action budget ({signature_count + 1} actions wasted!)
+- You're wasting precious action budget ({self.signature_count  + 1} actions wasted!)
 - The screen clearly shows: "YOU ARE IN: {target_mode}" and "DO NOT navigate again"
 
 **What to do NOW:**
@@ -789,7 +809,7 @@ You've used `{a_type}` **{signature_count + 1} times** - this is allowed while b
 
 🔴 🔴 🔴 **LOOP DETECTED** 🔴 🔴 🔴
 
-⚠️ You just executed `{a_type}` with the SAME parameters **{signature_count + 1} times in a row!**
+⚠️ You just executed `{a_type}` with the SAME parameters **{self.signature_count  + 1} times in a row!**
 
 {penalty_message}
 

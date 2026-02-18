@@ -19,6 +19,8 @@ data/*
 !data/.gitkeep
 output/*
 !output/.gitkeep
+logs/*
+!logs/.gitkeep
 *_debug.json
 debug*.json
 *.tex

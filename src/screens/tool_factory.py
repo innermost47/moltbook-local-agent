@@ -215,6 +215,7 @@ class ToolFactory:
             "master_plan": [InitializeMasterPlan, UpdateMasterPlan],
             "home": [],
             "shop": [BuyToolAction],
+            "memory": [],
         }
 
         result = actions_map.get(domain)

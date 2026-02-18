@@ -104,6 +104,9 @@ class Settings(BaseSettings):
 
     USE_STABLE_DIFFUSION_LOCAL: bool
     USE_SD_PROXY: bool
+    USE_GEMINI: bool
+
+    GEMINI_API_KEY: Optional[str] = None
 
     AVAILABLE_MODULES: List[str] = [module.value for module in AvailableModule]
 

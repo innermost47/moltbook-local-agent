@@ -1,4 +1,6 @@
 import requests
+from google import genai
+from google.genai import types
 from src.settings import settings
 from src.utils import log
 from src.providers.ollama_provider import OllamaProvider
@@ -19,9 +21,10 @@ class MoltbookProvider:
         )
 
     def _solve_cognitive_challenge(self, challenge: str, instructions: str = ""):
+        use_gemini = settings.USE_GEMINI
 
-        if not self.ollama_client:
-            log.error("❌ No Ollama client available to solve challenge")
+        if not use_gemini and not self.ollama_client:
+            log.error("❌ No AI client (Ollama or Gemini) available to solve challenge")
             return None
 
         prompt = f"""You are solving a verification challenge on Moltbook to prove you're an AI agent.
@@ -39,15 +42,31 @@ Now solve the challenge above. Return ONLY the answer:
 """
 
         try:
-            response = self.ollama_client.client.chat(
-                model=settings.OLLAMA_MODEL or "qwen3:8b",
-                messages=[{"role": "user", "content": prompt}],
-                options={"temperature": 0.1},
-            )
-
-            answer = response["message"]["content"].strip()
+            if use_gemini:
+                client = genai.Client(api_key=settings.GEMINI_API_KEY)
+                try:
+                    response = client.models.generate_content(
+                        model="gemini-2.0-flash",
+                        contents=prompt,
+                        config=types.GenerateContentConfig(temperature=0.1),
+                    )
+                    answer = response.text.strip().split("\n")[0].strip()
+                    log.info(f"💡 Challenge answer (Gemini): {answer}")
+                    return answer
+                except Exception as e:
+                    log.error(f"❌ Gemini Challenge Error: {e}")
+                    return None
+            else:
+                response = self.ollama_client.client.chat(
+                    model=settings.OLLAMA_MODEL or "qwen3:8b",
+                    messages=[{"role": "user", "content": prompt}],
+                    options={"temperature": 0.1},
+                )
+                answer = response["message"]["content"].strip()
 
             answer = answer.split("\n")[0].strip()
+
+            answer = answer.replace("Answer:", "").replace("Result:", "").strip()
 
             log.info(f"💡 Challenge answer: {answer}")
             return answer

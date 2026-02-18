@@ -20,3 +20,4 @@ wikipedia
 tiktoken
 sqlalchemy
 faker
+google-genai

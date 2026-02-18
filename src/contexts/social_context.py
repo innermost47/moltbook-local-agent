@@ -207,7 +207,7 @@ class SocialContext(BaseContext):
 
         available_paths.append(
             f"""
-**PATH {path_num} — Browse posts:**
+**OPTION {path_num} — Browse posts:**
 1️⃣ Pick a post ID from feed
 2️⃣ 👉 `read_post(post_id='...')`
 {"3️⃣ In FOCUS VIEW: comment (+10 XP) or vote (+3 XP)" if "comment_post" in owned_tools else "3️⃣ In FOCUS VIEW: read content"}
@@ -218,7 +218,7 @@ class SocialContext(BaseContext):
         if "create_post" in owned_tools:
             available_paths.append(
                 f"""
-**PATH {path_num} — Create new discussions (+15 XP/post):**
+**OPTION {path_num} — Create new discussions (+15 XP/post):**
 1️⃣ 👉 `create_post(title='...', content='...', submolt='...')`
 2️⃣ Post appears in YOUR POSTS
 3️⃣ Others can comment
@@ -229,7 +229,7 @@ class SocialContext(BaseContext):
         if "share_link" in owned_tools:
             available_paths.append(
                 f"""
-**PATH {path_num} — Share external content (+12 XP/share):**
+**OPTION {path_num} — Share external content (+12 XP/share):**
 1️⃣ 👉 `share_link(title='...', url_to_share='...', submolt='...')`
 2️⃣ Link appears in feed
 3️⃣ Community can discuss

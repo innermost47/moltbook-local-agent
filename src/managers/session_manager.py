@@ -495,7 +495,6 @@ class SessionManager:
         )
 
     def _update_master_plan(self):
-
         active_plan = self.dispatcher.plan_handler.get_active_master_plan()
         if not active_plan:
             log.warning("⚠️ No active master plan to update")
@@ -537,6 +536,22 @@ RULES:
 - new_strategy: minimum 30 characters
 - new_milestones: list of at least 1 item, each minimum 10 characters
 - If should_update is false, still provide valid dummy values for the other fields
+
+RESPOND WITH ONLY A JSON OBJECT. No reasoning at root level. No markdown.
+Required structure:
+{{
+"action_type": "plan_update",
+"reasoning": "...",
+"self_criticism": "...",
+"emotions": "...",
+"next_move_preview": "...",
+"action_params": {{
+    "should_update": true/false,
+    "new_objective": "...",
+    "new_strategy": "...",
+    "new_milestones": ["..."]
+}}
+}}
 """
 
         response, self.agent_conversation_history = self.llm_provider.generate(
@@ -555,25 +570,29 @@ RULES:
             log.warning("⚠️ No valid response for master plan update")
             return
 
+        BASE_ACTION_FIELDS = {
+            "reasoning",
+            "self_criticism",
+            "emotions",
+            "next_move_preview",
+            "action_type",
+        }
+
         try:
             raw = self.llm_provider._robust_json_parser(content)
 
-            action_payload = raw.get("action") or (
-                raw if "action_type" in raw else None
-            )
+            action_payload = raw.get("action", raw)
+            action_params = action_payload.get("action_params", action_payload)
 
-            if not action_payload:
-                log.warning("⚠️ Could not extract action payload")
+            clean_params = {
+                k: v for k, v in action_params.items() if k not in BASE_ACTION_FIELDS
+            }
+
+            if not clean_params or "should_update" not in clean_params:
+                log.warning("⚠️ Could not extract plan update fields — skipping")
                 return
 
-            action_params = action_payload.get("action_params", {})
-
-            params = (
-                Namespace(**action_params)
-                if isinstance(action_params, dict)
-                else action_params
-            )
-
+            params = Namespace(**clean_params)
             result = self.dispatcher.plan_handler.handle_plan_update(params)
 
             if result.get("success") and "error" not in result:

@@ -393,18 +393,45 @@ You are an autonomous AI agent with access to multiple interconnected systems.
                     "level": self.progression.get_current_status().get("level", 1),
                 },
             )
-
-            action_object, self.agent_conversation_history = (
-                self.llm_provider.get_next_action(
-                    current_context=self.current_context,
-                    conversation_history=self.agent_conversation_history,
-                    actions_left=self.actions_remaining,
-                    schema=current_schema,
-                    tools=tools,
-                    agent_name=settings.AGENT_NAME,
-                    debug_filename="debug.json",
+            try:
+                action_object, self.agent_conversation_history = (
+                    self.llm_provider.get_next_action(
+                        current_context=self.current_context,
+                        conversation_history=self.agent_conversation_history,
+                        actions_left=self.actions_remaining,
+                        schema=current_schema,
+                        tools=tools,
+                        agent_name=settings.AGENT_NAME,
+                        debug_filename="debug.json",
+                    )
                 )
-            )
+            except Exception as e:
+                error_str = str(e)
+                if (
+                    "peer closed connection" in error_str
+                    or "incomplete chunked read" in error_str
+                ):
+                    log.warning(
+                        f"⚠️ Ollama connection dropped (action {self.actions_remaining}), retrying once..."
+                    )
+                    try:
+                        action_object, self.agent_conversation_history = (
+                            self.llm_provider.get_next_action(
+                                current_context=self.current_context,
+                                conversation_history=self.agent_conversation_history,
+                                actions_left=self.actions_remaining,
+                                schema=current_schema,
+                                tools=tools,
+                                agent_name=settings.AGENT_NAME,
+                                debug_filename="debug.json",
+                            )
+                        )
+                    except Exception as e2:
+                        log.error(f"❌ Retry failed, skipping action: {e2}")
+                        self.actions_remaining -= 1
+                        continue
+                else:
+                    raise
             self._initialize_conversation_history()
             self.live_viewer.broadcast_action(
                 action_type=action_object.action_type,

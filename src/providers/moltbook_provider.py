@@ -24,7 +24,7 @@ class MoltbookProvider:
         use_gemini = settings.USE_GEMINI
         use_openrouter = settings.USE_OPENROUTER
 
-        if not use_gemini and not use_openrouter and not self.ollama_client:
+        if not use_gemini and not use_openrouter and not self.llm_provider:
             log.error(
                 "❌ No AI client (Ollama, Gemini or OpenRouter) available to solve challenge"
             )

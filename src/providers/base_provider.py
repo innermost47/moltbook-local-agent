@@ -212,3 +212,19 @@ class BaseProvider:
 
         with open(filename, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=4, ensure_ascii=False, default=json_default)
+
+    def _sanitize_tools(self, tools: list) -> list:
+        if not tools:
+            return tools
+        sanitized = []
+        for tool in tools:
+            t = json.loads(json.dumps(tool))
+            func = t.get("function", {})
+            if "description" in func:
+                func["description"] = func["description"].replace("\n", " ").strip()
+            props = func.get("parameters", {}).get("properties", {})
+            for prop in props.values():
+                if "description" in prop:
+                    prop["description"] = prop["description"].replace("\n", " ").strip()
+            sanitized.append(t)
+        return sanitized

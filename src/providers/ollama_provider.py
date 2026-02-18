@@ -95,7 +95,8 @@ class OllamaProvider(BaseProvider):
 
         try:
             log.info(f"⚡ {agent_name} analyzes the interface...")
-
+            if tools:
+                tools = self._sanitize_tools(tools)
             response = self.client.chat(
                 model=self.model,
                 messages=messages,

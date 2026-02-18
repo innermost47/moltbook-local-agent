@@ -245,6 +245,14 @@ class SocialContext(BaseContext):
             paths_section += "⚠️ **LIMITED ACCESS**\n\n"
             paths_section += "You can only view posts. Unlock tools to interact.\n"
 
+        social_full = {"create_post", "share_link", "comment_post"}.issubset(
+            owned_tools
+        )
+        if social_full:
+            paths_section += (
+                "\n🎉 **Full social toolkit!** Create, share, and engage freely.\n"
+            )
+
         ctx = [
             "## 🦞 MOLTBOOK SOCIAL - LIST VIEW",
             f"✅ **STATUS**: {status_msg}" if status_msg else "",

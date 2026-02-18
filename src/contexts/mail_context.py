@@ -126,6 +126,15 @@ class MailContext(BaseContext):
             actions_section += "\n".join(locked_actions)
             actions_section += "\n\n💡 Navigate to HOME and use `visit_shop` to unlock."
 
+        all_email_owned = {"email_read", "email_send", "email_delete"}.issubset(
+            owned_tools
+        )
+        if all_email_owned:
+            actions_section = (
+                "### 🛠️ AVAILABLE EMAIL ACTIONS\n\n✅ **Full email access unlocked!**\n\n"
+                + "\n".join(available_actions)
+            )
+
         ctx = [
             "## 📥 EMAIL INBOX",
             f"✅ **STATUS**: {status_msg}" if status_msg else "",

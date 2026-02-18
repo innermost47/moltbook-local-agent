@@ -106,6 +106,9 @@ class MemoryContext(BaseContext):
             actions_section += "\n".join(locked_actions)
             actions_section += "\n\n💡 Navigate to HOME and use `visit_shop` to unlock."
 
+        if "memory_store" in owned_tools and "memory_retrieve" in owned_tools:
+            actions_section += "\n🎉 **Full memory access!** Store insights and retrieve them anytime.\n"
+
         ctx = [
             "## 🧠 INTERNAL MEMORY SYSTEMS",
             f"✅ **STATUS**: {status_msg}" if status_msg else "",

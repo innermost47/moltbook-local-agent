@@ -219,9 +219,7 @@ class BaseProvider:
             m = dict(msg)
             if isinstance(m.get("content"), str):
                 m["content"] = (
-                    m["content"].replace("\n", " ").replace("\r", " ")
-                    if aggressive
-                    else m["content"]
+                    self._sanitize_value(m["content"]) if aggressive else m["content"]
                 )
             sanitized.append(m)
         return sanitized
@@ -241,3 +239,40 @@ class BaseProvider:
                     prop["description"] = prop["description"].replace("\n", " ").strip()
             sanitized.append(t)
         return sanitized
+
+    def _sanitize_value(self, value):
+        if isinstance(value, str):
+            return value.replace("\n", " ").replace("\r", " ").strip()
+        elif isinstance(value, dict):
+            return {k: self._sanitize_value(v) for k, v in value.items()}
+        elif isinstance(value, list):
+            return [self._sanitize_value(item) for item in value]
+        return value
+
+    def _clean_history_for_context(self, history: List[Dict]) -> List[Dict]:
+        cleaned = []
+        for msg in history:
+            if msg.get("role") == "assistant" and msg.get("tool_calls"):
+                tool_calls = msg["tool_calls"]
+                summary_parts = []
+                for tc in tool_calls:
+                    func = tc.get("function", {})
+                    name = func.get("name", "unknown")
+                    args = func.get("arguments", {})
+                    clean_args = {
+                        k: v
+                        for k, v in args.items()
+                        if k not in ("reasoning", "self_criticism", "emotions")
+                        and len(str(v)) < 200
+                    }
+                    summary_parts.append(f"[Called: {name}({clean_args})]")
+
+                cleaned.append(
+                    {
+                        "role": "assistant",
+                        "content": " ".join(summary_parts),
+                    }
+                )
+            else:
+                cleaned.append(msg)
+        return cleaned

@@ -114,6 +114,14 @@ class BlogContext(BaseContext):
             actions_section += "⚠️ **NO BLOG TOOLS AVAILABLE**\n\n"
             actions_section += "Navigate to another module or visit the shop.\n"
 
+        if (
+            "write_blog_article" in owned_tools
+            and "review_pending_comments" in owned_tools
+        ):
+            actions_section += (
+                "\n🎉 **You own all BLOG tools!** Focus on creating content.\n"
+            )
+
         ctx = [
             "## 📚 BLOG ADMINISTRATION & HUB",
             f"✅ **STATUS**: {status_msg}" if status_msg else "",

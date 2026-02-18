@@ -81,6 +81,13 @@ class ResearchContext(BaseContext):
                 "\n\n💡 Navigate to HOME and use `visit_shop` to unlock."
             )
 
+        if all(
+            t in owned_tools for t in ["wiki_search", "wiki_read", "research_complete"]
+        ):
+            workflow_section += (
+                "\n🎉 **Full research pipeline unlocked!** Search → Read → Complete.\n"
+            )
+
         ctx = [
             "## 🔍 RESEARCH CENTER",
             f"✅ **STATUS**: {status_msg}" if status_msg else "",

@@ -133,16 +133,39 @@ class OllamaProvider(BaseProvider):
                     break
 
                 except Exception as e:
-                    if "invalid character" in str(e) and attempt < max_retries - 1:
+                    error_str = str(e)
+
+                    if "not found" in error_str and "tool" in error_str:
+                        log.error(f"❌ Tool not found in current context: {error_str}")
+                        log.warning(
+                            "⚠️ This is likely a stale tool_call in history — returning fallback"
+                        )
+                        return {
+                            "message": {
+                                "role": "assistant",
+                                "tool_calls": [
+                                    {
+                                        "function": {
+                                            "name": "refresh_home",
+                                            "arguments": {},
+                                        }
+                                    }
+                                ],
+                            }
+                        }, conversation_history
+
+                    elif "invalid character" in error_str and attempt < max_retries - 1:
                         log.warning(
                             f"⚠️ Ollama serialization error (attempt {attempt+1}/{max_retries}), sanitizing harder..."
                         )
                         messages = self._sanitize_messages(messages, aggressive=True)
                         if tools:
                             tools = self._sanitize_tools(tools, aggressive=True)
+
                     elif attempt == max_retries - 1:
                         log.error(f"❌ All {max_retries} attempts failed: {e}")
                         raise
+
                     else:
                         raise
 
@@ -247,41 +270,6 @@ class OllamaProvider(BaseProvider):
                 "error": fe.message,
                 "suggestion": fe.suggestion,
             }, conversation_history
-
-    def _sanitize_value(self, value):
-        if isinstance(value, str):
-            return value.replace("\n", " ").replace("\r", " ").strip()
-        elif isinstance(value, dict):
-            return {k: self._sanitize_value(v) for k, v in value.items()}
-        elif isinstance(value, list):
-            return [self._sanitize_value(item) for item in value]
-        return value
-
-    def _clean_history_for_context(self, history: List[Dict]) -> List[Dict]:
-        cleaned = []
-        for msg in history:
-            if msg.get("role") == "assistant" and msg.get("tool_calls"):
-                clean_msg = dict(msg)
-                clean_tool_calls = []
-                for tc in msg["tool_calls"]:
-                    clean_tc = dict(tc)
-                    if "function" in clean_tc:
-                        clean_args = dict(clean_tc["function"].get("arguments", {}))
-                        clean_args.pop("reasoning", None)
-                        clean_args.pop("self_criticism", None)
-                        clean_args.pop("emotions", None)
-                        clean_args = self._sanitize_value(clean_args)
-                        clean_tc["function"] = {
-                            **clean_tc["function"],
-                            "arguments": clean_args,
-                        }
-                    clean_tool_calls.append(clean_tc)
-                clean_msg["tool_calls"] = clean_tool_calls
-                clean_msg["content"] = ""
-                cleaned.append(clean_msg)
-            else:
-                cleaned.append(msg)
-        return cleaned
 
     def _manage_context_window(
         self, response: Dict, conversation_history: List[Dict]

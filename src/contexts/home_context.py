@@ -144,6 +144,10 @@ class HomeContext:
         )
         actions_block.append(f"{'━' * 40}")
 
+        memory_full = "memory_store" in owned_tools and "memory_retrieve" in owned_tools
+        if memory_full:
+            available.append("✅ **Full memory access** — store & retrieve")
+
         return "\n".join(actions_block)
 
     def _build_session_strategy_block(self) -> str:

@@ -14,12 +14,12 @@ from src.managers.progression_system import ProgressionSystem
 
 
 class SocialHandler(BaseHandler):
-    def __init__(self, memory_handler, test_mode: bool = False, ollama=None):
+    def __init__(self, memory_handler, test_mode: bool = False, llm_provider=None):
         self.test_mode = test_mode
         self.memory = memory_handler
         self._enable_auto_wait = True
         if not test_mode:
-            self.api = MoltbookProvider(ollama=ollama)
+            self.api = MoltbookProvider(llm_provider=llm_provider)
         else:
             self.api = None
 

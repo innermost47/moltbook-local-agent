@@ -82,7 +82,6 @@ class SocialContext(BaseContext):
         if workspace_pins:
             pin = workspace_pins[0]
             url = pin["content"]
-
             title = self._extract_title_from_url(url)
 
             if "share_link" in owned_tools:
@@ -94,31 +93,9 @@ class SocialContext(BaseContext):
                         "",
                         "Execute this NOW:",
                         "",
-                        f'👉 `share_link(title="{title}", '
-                        f'url_to_share="{url}", submolt="general")`',
+                        f'👉 `share_link(title="{title}", url_to_share="{url}", submolt="general")`',
                         "",
                         "That's it. One action. Do it now.",
-                    ]
-                )
-            else:
-                return "\n".join(
-                    [
-                        "## 🦞 MOLTBOOK SOCIAL",
-                        "",
-                        "📌 **URGENT: You have a blog article to share.**",
-                        "",
-                        "⚠️ **PROBLEM: You don't own `share_link` yet!**",
-                        "",
-                        f"Article URL: {url}",
-                        f"Title: {title}",
-                        "",
-                        "🔒 You need to unlock `share_link` (100 XP) to share this article.",
-                        "",
-                        "**OPTIONS:**",
-                        "1. Navigate to HOME → visit_shop → buy share_link",
-                        "2. Navigate to another module to earn more XP first",
-                        "",
-                        "💡 Once you have share_link, come back to SOCIAL to share.",
                     ]
                 )
 
@@ -226,56 +203,39 @@ class SocialContext(BaseContext):
             )
 
         available_paths = []
-        locked_actions = []
+        path_num = 1
 
-        if "comment_post" in owned_tools:
-            available_paths.append(
-                """
-**PATH 1 — Interact with existing posts:**
+        available_paths.append(
+            f"""
+**PATH {path_num} — Browse posts:**
 1️⃣ Pick a post ID from feed
 2️⃣ 👉 `read_post(post_id='...')`
-3️⃣ In FOCUS VIEW: comment or vote
+{"3️⃣ In FOCUS VIEW: comment (+10 XP) or vote (+3 XP)" if "comment_post" in owned_tools else "3️⃣ In FOCUS VIEW: read content"}
 """
-            )
-        else:
-            available_paths.append(
-                """
-**PATH 1 — View posts only:**
-1️⃣ Pick a post ID from feed
-2️⃣ 👉 `read_post(post_id='...')` (view only)
-⚠️ You can't comment yet (unlock `comment_post`)
-"""
-            )
+        )
+        path_num += 1
 
         if "create_post" in owned_tools:
             available_paths.append(
-                """
-**PATH 2 — Create new discussions:**
+                f"""
+**PATH {path_num} — Create new discussions (+15 XP/post):**
 1️⃣ 👉 `create_post(title='...', content='...', submolt='...')`
 2️⃣ Post appears in YOUR POSTS
 3️⃣ Others can comment
 """
             )
-        else:
-            locked_actions.append("🔒 `create_post` - 100 XP (unlock to create posts)")
+        path_num += 1
 
         if "share_link" in owned_tools:
             available_paths.append(
-                """
-**PATH 3 — Share external content:**
+                f"""
+**PATH {path_num} — Share external content (+12 XP/share):**
 1️⃣ 👉 `share_link(title='...', url_to_share='...', submolt='...')`
 2️⃣ Link appears in feed
 3️⃣ Community can discuss
 """
             )
-        else:
-            locked_actions.append("🔒 `share_link` - 100 XP (unlock to share links)")
-
-        if "upvote_post" not in owned_tools:
-            locked_actions.append("🔒 `upvote_post` / `downvote_post` - 100 XP")
-
-        if "follow_agent" not in owned_tools:
-            locked_actions.append("🔒 `follow_agent` - 100 XP")
+        path_num += 1
 
         paths_section = "### 🧭 EXECUTION PATHS\n\n"
 
@@ -284,12 +244,6 @@ class SocialContext(BaseContext):
         else:
             paths_section += "⚠️ **LIMITED ACCESS**\n\n"
             paths_section += "You can only view posts. Unlock tools to interact.\n"
-
-        if locked_actions:
-            paths_section += "\n\n### 🔒 LOCKED ACTIONS\n"
-            paths_section += "Purchase these tools to unlock full social features:\n\n"
-            paths_section += "\n".join(locked_actions)
-            paths_section += "\n\n💡 Navigate to HOME and use `visit_shop` to unlock."
 
         ctx = [
             "## 🦞 MOLTBOOK SOCIAL - LIST VIEW",
@@ -419,52 +373,34 @@ Could not load post: `{item_id}`
                 ownership_indicator = f"👤 **Post by @{author}**"
 
                 actions = []
-                locked = []
 
                 if "comment_post" in owned_tools:
                     actions.append(
                         f"""
-👉 `comment_post(post_id="{post_id}", content="...")`
+👉 `comment_post(post_id="{post_id}", content="...")` **(+10 XP)**
 - Add a top-level comment
 """
                     )
-                else:
-                    locked.append(
-                        "🔒 `comment_post` - FREE starter tool (should be unlocked)"
-                    )
 
-                if "reply_to_comment" in owned_tools:
-                    actions.append(
-                        f"""
-👉 `reply_to_comment(post_id="{post_id}", parent_comment_id="...", content="...")`
-- Reply to comments above
+                actions.append(
+                    f"""
+👉 `reply_to_comment(post_id="{post_id}", parent_comment_id="...", content="...")` **(+10 XP)**
+- Reply to a comment above
 """
-                    )
-                else:
-                    locked.append("🔒 `reply_to_comment` - 100 XP")
+                )
 
                 if "upvote_post" in owned_tools or "downvote_post" in owned_tools:
                     actions.append(
                         f"""
-👉 `vote_post(post_id="{post_id}", vote_type="upvote")`
+👉 `vote_post(post_id="{post_id}", vote_type="upvote")` **(+3 XP)**
 - Upvote or downvote this post
-- vote_type: 'upvote' or 'downvote'
 """
                     )
-                else:
-                    locked.append("🔒 `vote_post` - 100 XP")
 
                 actions.append("👉 `refresh_feed` - Return to feed")
 
                 available_actions = "### 🛠️ AVAILABLE ACTIONS (EXTERNAL POST)\n\n"
                 available_actions += "\n".join(actions)
-
-                if locked:
-                    available_actions += "\n\n### 🔒 LOCKED ACTIONS\n"
-                    available_actions += "\n".join(locked)
-                    available_actions += (
-                        "\n\n💡 Visit shop to unlock more interactions."
-                    )
 
             return f"""
 ## 🎯 FOCUSED: POST VIEW

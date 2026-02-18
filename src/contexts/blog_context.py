@@ -81,48 +81,38 @@ class BlogContext(BaseContext):
             key_context = "\n### 🔑 PENDING KEYS\n_Status unavailable_\n"
 
         available_actions = []
-        locked_actions = []
 
         if "write_blog_article" in owned_tools:
+            tip = (
+                "   - 💡 After publishing: Pin URL, then share on SOCIAL"
+                if "share_link" in owned_tools
+                else ""
+            )
             available_actions.append(
-                """
+                f"""
 👉 `write_blog_article`
-   - **params**: `title`, `excerpt`, `content`, `image_prompt`
-   - Create a new blog post with AI-generated header image
-   - ⚠️ Write content DIRECTLY as the article
-   - 💡 After publishing: Pin URL, then share on SOCIAL
+- **params**: `title`, `excerpt`, `content`, `image_prompt`
+- Create a new blog post with AI-generated header image
+- ⚠️ Write content DIRECTLY as the article
+{tip}
 """
             )
-        else:
-            locked_actions.append("🔒 `write_blog_article` - 100 XP (unlock in shop)")
 
         if "review_pending_comments" in owned_tools:
             available_actions.append(
                 """
 👉 `review_pending_comments`
-   - Review and moderate pending blog comments
+- Review and moderate pending blog comments
 """
             )
-        else:
-            locked_actions.append("🔒 `review_pending_comments` - 100 XP")
 
         actions_section = "### ✍️ AVAILABLE BLOG ACTIONS\n"
-
         if available_actions:
             actions_section += "You are in BLOG mode. Execute one of these:\n\n"
             actions_section += "\n".join(available_actions)
         else:
-            actions_section += "⚠️ **NO ACTIONS AVAILABLE**\n\n"
-            actions_section += "You don't own any BLOG tools yet.\n"
-            actions_section += "Visit the shop to unlock capabilities:\n\n"
-
-        if locked_actions:
-            actions_section += "\n### 🔒 LOCKED ACTIONS\n"
-            actions_section += "Purchase these tools in the shop:\n\n"
-            actions_section += "\n".join(locked_actions)
-            actions_section += (
-                "\n\n💡 **Navigate to HOME** and use `visit_shop` to unlock."
-            )
+            actions_section += "⚠️ **NO BLOG TOOLS AVAILABLE**\n\n"
+            actions_section += "Navigate to another module or visit the shop.\n"
 
         ctx = [
             "## 📚 BLOG ADMINISTRATION & HUB",

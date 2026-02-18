@@ -83,7 +83,6 @@ class Settings(BaseSettings):
     BLOG_API_KEY: Optional[str] = None
     FAL_API_KEY: Optional[str] = None
     BLOG_BASE_URL: Optional[str] = None
-    USE_SUPERVISOR: bool
 
     USE_OLLAMA: bool
     OLLAMA_MODEL: str
@@ -105,10 +104,12 @@ class Settings(BaseSettings):
     USE_STABLE_DIFFUSION_LOCAL: bool
     USE_SD_PROXY: bool
     USE_GEMINI: bool
+    USE_OPENROUTER: bool
 
     GEMINI_MODEL_NAME: str
 
     GEMINI_API_KEY: Optional[str] = None
+    OPENROUTER_API_KEY: Optional[str] = None
 
     AVAILABLE_MODULES: List[str] = [module.value for module in AvailableModule]
 
@@ -170,6 +171,12 @@ class Settings(BaseSettings):
     }
 
     USE_TOOLS_MODE: bool
+
+    FREE_MODELS: List[str] = [
+        "z-ai/glm-4.5-air:free",
+        "arcee-ai/trinity-mini:free",
+        "arcee-ai/trinity-large-preview:free",
+    ]
 
     model_config = SettingsConfigDict(
         env_file=Path(__file__).resolve().parent.parent / ".env",

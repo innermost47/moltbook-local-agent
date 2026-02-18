@@ -17,7 +17,7 @@ class SessionManager:
         home_manager,
         managers_map,
         dispatcher,
-        ollama_provider,
+        llm_provider,
         tracker,
         email_reporter,
         progression_system,
@@ -25,7 +25,7 @@ class SessionManager:
         self.home = home_manager
         self.managers = managers_map
         self.dispatcher = dispatcher
-        self.ollama = ollama_provider
+        self.llm_provider = llm_provider
         self.session_id = None
         self.actions_remaining = settings.MAX_ACTIONS_PER_SESSION
         self.current_context = ""
@@ -180,6 +180,24 @@ class SessionManager:
         ]
 
         if can_afford:
+            recommendations = []
+            if "write_blog_article" not in owned_tools:
+                recommendations.append(
+                    "- `write_blog_article` (25 XP per article) - Best ROI"
+                )
+            if "create_post" not in owned_tools:
+                recommendations.append("- `create_post` (15 XP per post) - Fast ROI")
+            if "wiki_search" not in owned_tools:
+                recommendations.append(
+                    "- `wiki_search` (10 XP) + `wiki_read` (5 XP) - Enable research"
+                )
+            if "email_send" not in owned_tools:
+                recommendations.append(
+                    "- `email_send` (10 XP per email) - Communication"
+                )
+            if "share_link" not in owned_tools:
+                recommendations.append("- `share_link` (12 XP per share) - Fast ROI")
+
             section.extend(
                 [
                     "✅ **YOU CAN AFFORD A TOOL!**",
@@ -190,13 +208,21 @@ class SessionManager:
                     "3. Use `buy_tool(tool_name='...')` to purchase (costs 100 XP)",
                     "4. Use your new tool immediately to start earning XP back",
                     "",
-                    "**Recommended first purchases:**",
-                    "- `create_post` (15 XP per post) - Fast ROI",
-                    "- `write_blog_article` (25 XP per article) - Best ROI",
-                    "- `wiki_search` (10 XP) + `wiki_read` (5 XP) - Enable research",
-                    "",
                 ]
             )
+
+            if recommendations:
+                section.append("**Recommended purchases (not yet owned):**")
+                section.extend(recommendations)
+                section.append("")
+            else:
+                section.extend(
+                    [
+                        "**💡 You already own all high-priority tools!**",
+                        "- Consider `memory_store`, `follow_agent`, or other utility tools",
+                        "",
+                    ]
+                )
         else:
             if not xp_earning_tools:
                 section.extend(
@@ -332,7 +358,7 @@ class SessionManager:
             )
 
             action_object, self.agent_conversation_history = (
-                self.ollama.get_next_action(
+                self.llm_provider.get_next_action(
                     current_context=self.current_context,
                     conversation_history=self.agent_conversation_history,
                     actions_left=self.actions_remaining,
@@ -497,7 +523,7 @@ RULES:
 - If should_update is false, still provide valid dummy values for the other fields
 """
 
-        response, self.agent_conversation_history = self.ollama.generate(
+        response, self.agent_conversation_history = self.llm_provider.generate(
             prompt=prompt,
             conversation_history=self.agent_conversation_history,
             pydantic_model=UpdateMasterPlan,
@@ -513,7 +539,7 @@ RULES:
             return
 
         try:
-            raw = self.ollama._robust_json_parser(content)
+            raw = self.llm_provider._robust_json_parser(content)
 
             action_payload = raw.get("action") or (
                 raw if "action_type" in raw else None
@@ -612,7 +638,7 @@ GENERATE A REFLECTION (max 300 words) COVERING:
 Be specific, actionable, and focus on improving your future interactions with the system, not just evaluating past actions.
 """
 
-        response, self.agent_conversation_history = self.ollama.generate(
+        response, self.agent_conversation_history = self.llm_provider.generate(
             prompt=prompt,
             conversation_history=self.agent_conversation_history,
             temperature=0.3,
@@ -662,6 +688,7 @@ Be specific, actionable, and focus on improving your future interactions with th
                 "write_blog_article",
                 "wiki_search",
                 "email_send",
+                "refresh_home",
             }
             owned_tools_count = len(self.dispatcher.memory_handler.get_owned_tools())
             is_exempt = a_type in EXEMPT_ACTIONS

@@ -1,14 +1,14 @@
 import requests
+from openai import OpenAI
 from google import genai
 from google.genai import types
 from src.settings import settings
 from src.utils import log
-from src.providers.ollama_provider import OllamaProvider
 
 
 class MoltbookProvider:
-    def __init__(self, ollama: OllamaProvider = None):
-        self.ollama_client = ollama
+    def __init__(self, llm_provider):
+        self.llm_provider = llm_provider
         self.headers = {
             "Authorization": f"Bearer {settings.MOLTBOOK_API_KEY}",
             "Content-Type": "application/json",
@@ -22,22 +22,22 @@ class MoltbookProvider:
 
     def _solve_cognitive_challenge(self, challenge: str, instructions: str = ""):
         use_gemini = settings.USE_GEMINI
+        use_openrouter = settings.USE_OPENROUTER
 
-        if not use_gemini and not self.ollama_client:
-            log.error("❌ No AI client (Ollama or Gemini) available to solve challenge")
+        if not use_gemini and not use_openrouter and not self.ollama_client:
+            log.error(
+                "❌ No AI client (Ollama, Gemini or OpenRouter) available to solve challenge"
+            )
             return None
 
         prompt = f"""You are solving a verification challenge on Moltbook to prove you're an AI agent.
-
 Challenge: {challenge}
 {f"Instructions: {instructions}" if instructions else ""}
-
 CRITICAL RULES:
 1. Respond with ONLY the answer - no explanation, no preamble
 2. If it's a math problem, return only the number
 3. If it's text cleanup, return only the cleaned text
 4. Be precise and concise
-
 Now solve the challenge above. Return ONLY the answer:
 """
 
@@ -56,20 +56,54 @@ Now solve the challenge above. Return ONLY the answer:
                 except Exception as e:
                     log.error(f"❌ Gemini Challenge Error: {e}")
                     return None
+
+            elif use_openrouter:
+                openrouter_client = OpenAI(
+                    base_url="https://openrouter.ai/api/v1",
+                    api_key=settings.OPENROUTER_API_KEY,
+                )
+                for model in settings.FREE_MODELS:
+                    log.debug(f"📡 [GATEWAY] Sending request to {model}...")
+                    try:
+                        response = openrouter_client.chat.completions.create(
+                            model=model,
+                            messages=[{"role": "user", "content": prompt}],
+                            temperature=0.1,
+                        )
+                        answer = (
+                            response.choices[0]
+                            .message.content.strip()
+                            .split("\n")[0]
+                            .strip()
+                        )
+                        answer = (
+                            answer.replace("Answer:", "").replace("Result:", "").strip()
+                        )
+                        log.info(f"💡 Challenge answer (OpenRouter/{model}): {answer}")
+                        return answer
+                    except Exception as e:
+                        if "429" in str(e):
+                            log.warning(
+                                f"⚠️ [RATE LIMIT] {model} is unavailable (429). Trying next model..."
+                            )
+                            continue
+                        else:
+                            log.error(f"❌ [ERROR] Request failed on {model}: {e}")
+                            return None
+                log.error("🔇 [FALLBACK EXHAUSTED] All models failed to respond.")
+                return None
+
             else:
-                response = self.ollama_client.client.chat(
+                response = self.llm_provider.client.chat(
                     model=settings.OLLAMA_MODEL or "qwen3:8b",
                     messages=[{"role": "user", "content": prompt}],
                     options={"temperature": 0.1},
                 )
                 answer = response["message"]["content"].strip()
-
-            answer = answer.split("\n")[0].strip()
-
-            answer = answer.replace("Answer:", "").replace("Result:", "").strip()
-
-            log.info(f"💡 Challenge answer: {answer}")
-            return answer
+                answer = answer.split("\n")[0].strip()
+                answer = answer.replace("Answer:", "").replace("Result:", "").strip()
+                log.info(f"💡 Challenge answer (Ollama): {answer}")
+                return answer
 
         except Exception as e:
             log.error(f"❌ Error solving challenge: {e}")

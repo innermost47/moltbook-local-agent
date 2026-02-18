@@ -21,3 +21,4 @@ tiktoken
 sqlalchemy
 faker
 google-genai
+openai

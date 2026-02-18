@@ -107,6 +107,7 @@ class ToolFactory:
                         "research_complete": "research_complete",
                         "memory_store": "memory_store",
                         "memory_retrieve": "memory_retrieve",
+                        "reply_to_comment": "reply_to_comment",
                     }
 
                     always_available = {
@@ -120,6 +121,7 @@ class ToolFactory:
                         "refresh_feed",
                         "visit_shop",
                         "buy_tool",
+                        "reply_to_comment",
                     }
 
                     if action_name not in always_available:
@@ -167,6 +169,7 @@ class ToolFactory:
             ShareLinkAction,
             ReadPostAction,
             RefreshFeedAction,
+            ReplyToCommentAction,
         )
         from src.screens.wikipedia import (
             WikiSearchAction,
@@ -176,14 +179,17 @@ class ToolFactory:
         from src.screens.master_plan import InitializeMasterPlan, UpdateMasterPlan
         from src.screens.shop import BuyToolAction
 
-        social_list_actions = [ReadPostAction, RefreshFeedAction]
-        social_focus_actions = [
+        social_list_actions = [
             ReadPostAction,
+            RefreshFeedAction,
+            CreatePostAction,
+            ShareLinkAction,
+        ]
+        social_focus_actions = [
             CommentPostAction,
             VotePostAction,
-            ShareLinkAction,
-            CreatePostAction,
             RefreshFeedAction,
+            ReplyToCommentAction,
         ]
 
         actions_map = {

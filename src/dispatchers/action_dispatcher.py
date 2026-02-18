@@ -21,7 +21,7 @@ from src.utils.exceptions import (
 
 
 class ActionDispatcher:
-    def __init__(self, test_mode: bool = False, ollama=None):
+    def __init__(self, test_mode: bool = False, llm_provider=None):
         self.test_mode = test_mode
         chroma_client = chromadb.PersistentClient(path="./data/chroma_db")
         collection = chroma_client.get_or_create_collection(name="knowledge")
@@ -43,7 +43,7 @@ class ActionDispatcher:
             collection, test_mode=test_mode, memory_handler=self.memory_handler
         )
         self.social_handler = SocialHandler(
-            self.memory_handler, test_mode, ollama=ollama
+            self.memory_handler, test_mode, llm_provider=llm_provider
         )
         self.plan_handler = PlanHandler(self.memory_handler)
         self.shop_handler = ShopHandler(

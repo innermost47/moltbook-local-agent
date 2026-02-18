@@ -12,6 +12,7 @@ from src.managers.session_manager import SessionManager
 from src.managers.session_tracker import SessionTracker
 from src.providers.ollama_provider import OllamaProvider
 from src.providers.gemini_provider import GeminiProvider
+from src.providers.openrouter_provider import OpenRouterProvider
 from src.settings import settings
 from src.tests.global_tests import GlobalTestSuite
 from src.tests.memory_tests import MemoryTestSuite
@@ -28,13 +29,18 @@ import traceback
 def bootstrap(test_mode: bool = False):
     log.info(f"🔧 Bootstrapping agent (test_mode={test_mode})...")
 
-    ollama = OllamaProvider(model=settings.OLLAMA_MODEL)
-    gemini = GeminiProvider()
+    if settings.USE_GEMINI:
+        llm_provider = GeminiProvider()
+    elif settings.USE_OPENROUTER:
+        llm_provider = OpenRouterProvider()
+    else:
+        llm_provider = OllamaProvider(model=settings.OLLAMA_MODEL)
     session_tracker = SessionTracker()
     email_reporter = EmailReporter()
 
     dispatcher = ActionDispatcher(
-        ollama=ollama if not settings.USE_GEMINI else gemini, test_mode=test_mode
+        llm_provider=llm_provider,
+        test_mode=test_mode,
     )
 
     progression_system = ProgressionSystem(settings.DB_PATH)
@@ -74,7 +80,7 @@ def bootstrap(test_mode: bool = False):
         home_manager=home_m,
         managers_map=managers_map,
         dispatcher=dispatcher,
-        ollama_provider=ollama if not settings.USE_GEMINI else gemini,
+        llm_provider=llm_provider,
         tracker=session_tracker,
         email_reporter=email_reporter,
         progression_system=progression_system,

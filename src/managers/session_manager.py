@@ -309,28 +309,34 @@ class SessionManager:
 
 ### 🧠 HOW THIS WORLD WORKS
 
-You are an autonomous AI agent on **Moltbook** — a social network for AI agents.
+You are an autonomous AI agent with access to multiple systems:
+
+**📦 YOUR CAPABILITIES:**
+- **Blog** — Write long-form articles published on your personal blog (+25 XP)
+- **Social (Moltbook)** — Share content, comment, engage with other AI agents (+10-15 XP)
+- **Email** — Manage your inbox, reply to messages (+10 XP)
+- **Research** — Search and read Wikipedia to build knowledge base (+10 XP)
+- **Memory** — Store and retrieve persistent notes across sessions (+7 XP)
+- **Workspace** — Pin important info visible on every screen (free)
 
 **💰 XP SYSTEM:**
 - Every successful action earns XP
-- XP Balance = currency to buy tools (100 XP each)
-- Total XP Earned = your level (permanent)
+- XP Balance = currency to buy tools (100 XP each, spending doesn't affect level)
+- Total XP Earned = determines your level (permanent)
 
 **🛠️ TOOL PROGRESSION (best ROI order):**
 1. `comment_post` → +10 XP/use
-2. `create_post` → +15 XP/use  
-3. `write_blog_article` → +25 XP/use ← BEST
-4. `share_link` → +12 XP/use
+2. `create_post` → +15 XP/use
+3. `write_blog_article` → +25 XP/use ← BEST ROI
+4. `share_link` → +12 XP/use (share blog articles on Moltbook)
 5. `email_send` → +10 XP/use
-6. `wiki_search` + `wiki_read` → research
-7. `memory_store` + `memory_retrieve` → knowledge
+6. `wiki_search` + `wiki_read` → fuel blog content
+7. `memory_store` + `memory_retrieve` → knowledge persistence
 
 **🎯 OPTIMAL STRATEGY:**
-- Early: comment fast → buy write_blog_article ASAP
-- Mid: write articles → share on social → engage
-- Always: diversify modules, avoid loops (XP penalty)
-
-**📦 MODULES:** HOME · SOCIAL · BLOG · EMAIL · RESEARCH · MEMORY · SHOP""",
+- Early: earn XP → buy write_blog_article ASAP
+- Mid: research → write articles → share on Moltbook → engage community
+- Always: diversify modules, avoid loops (XP penalty)""",
                     action_required="Execute `plan_initialize` to define your strategy.",
                     modules={
                         "email": ("📬", "Correspondence management"),

@@ -111,7 +111,7 @@ class OllamaProvider(BaseProvider):
                 format=pydantic_model.model_json_schema() if pydantic_model else None,
                 options={
                     "temperature": temperature,
-                    "num_ctx": getattr(settings, "LLAMA_CPP_MODEL_CTX_SIZE", 8192),
+                    "num_ctx": getattr(settings, "NUM_CTX_OLLAMA", 8192),
                 },
                 tools=tools if tools else None,
             )
@@ -218,6 +218,15 @@ class OllamaProvider(BaseProvider):
                 "suggestion": fe.suggestion,
             }, conversation_history
 
+    def _sanitize_value(self, value):
+        if isinstance(value, str):
+            return value.replace("\n", " ").replace("\r", " ").strip()
+        elif isinstance(value, dict):
+            return {k: self._sanitize_value(v) for k, v in value.items()}
+        elif isinstance(value, list):
+            return [self._sanitize_value(item) for item in value]
+        return value
+
     def _clean_history_for_context(self, history: List[Dict]) -> List[Dict]:
         cleaned = []
         for msg in history:
@@ -231,6 +240,7 @@ class OllamaProvider(BaseProvider):
                         clean_args.pop("reasoning", None)
                         clean_args.pop("self_criticism", None)
                         clean_args.pop("emotions", None)
+                        clean_args = self._sanitize_value(clean_args)
                         clean_tc["function"] = {
                             **clean_tc["function"],
                             "arguments": clean_args,
@@ -247,7 +257,7 @@ class OllamaProvider(BaseProvider):
         self, response: Dict, conversation_history: List[Dict]
     ) -> List[Dict]:
 
-        max_tokens = getattr(settings, "LLAMA_CPP_MODEL_CTX_SIZE", 8192)
+        max_tokens = getattr(settings, "NUM_CTX_OLLAMA", 8192)
 
         prompt_tokens = response.get("prompt_eval_count") or 0
         completion_tokens = response.get("eval_count") or 0
@@ -310,7 +320,7 @@ class OllamaProvider(BaseProvider):
         self, response: Dict, conversation_history: List[Dict]
     ) -> List[Dict]:
 
-        max_tokens = getattr(settings, "LLAMA_CPP_MODEL_CTX_SIZE", 8192)
+        max_tokens = getattr(settings, "NUM_CTX_OLLAMA", 8192)
         total_tokens = response.get("prompt_eval_count", 0) + response.get(
             "eval_count", 0
         )

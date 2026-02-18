@@ -78,7 +78,14 @@ async def generate_image(payload: ImageGenerationRequest, _=Depends(verify_api_k
 
 @app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "DELETE"])
 async def proxy_ollama(path: str, request: Request, _=Depends(verify_api_key)):
-    async with httpx.AsyncClient(timeout=None) as client:
+    async with httpx.AsyncClient(
+        timeout=httpx.Timeout(
+            connect=10.0,
+            read=None,
+            write=None,
+            pool=None,
+        )
+    ) as client:
         url = f"{OLLAMA_URL}/{path}"
         body = await request.body()
         if path == "api/chat" or path == "api/generate":

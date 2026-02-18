@@ -1,5 +1,6 @@
 import json
 import re
+import httpx
 from datetime import datetime
 from typing import Dict, List, Optional, Type
 from pydantic import BaseModel, ValidationError
@@ -26,10 +27,17 @@ class OllamaProvider(BaseProvider):
         if settings.USE_OLLAMA_PROXY:
             proxy_url = getattr(settings, "OLLAMA_PROXY_URL", "http://localhost:8000")
             api_key = settings.OLLAMA_PROXY_API_KEY
-            self.client = Client(host=proxy_url, headers={"X-API-Key": api_key})
+            self.client = Client(
+                host=proxy_url,
+                headers={"X-API-Key": api_key},
+                timeout=httpx.Timeout(None),
+            )
             log.info(f"🌐 Ollama Generator PROXY mode enabled to {proxy_url}")
         else:
-            self.client = Client(host="http://localhost:11434")
+            self.client = Client(
+                host="http://localhost:11434",
+                timeout=httpx.Timeout(None),
+            )
             log.info("🏠 LOCAL Mode enabled (Direct Ollama)")
 
     def get_next_action(
